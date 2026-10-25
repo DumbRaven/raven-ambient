@@ -1,0 +1,2436 @@
+/* ==========================================================================
+   BOLD SKIN —— 纯白 / 大圆角纯色块 / 黑色胶囊
+   这一层只做视觉覆盖，不动 styles.css 与任何逻辑。
+   想回到原来的玻璃柜风格，把 main.tsx 里的这行 import 删掉即可。
+   ========================================================================== */
+
+.app {
+  --bold-bg: #ffffff;
+  --bold-page: #f6f5f2;
+  --bold-ink: #101010;
+  --bold-muted: #8b8b85;
+  --bold-faint: #b6b5ae;
+  --bold-line: #eceae5;
+  --bold-mint: #a8e6c1;
+  --bold-lilac: #c7c0f0;
+  --bold-lemon: #d9eb6c;
+  --bold-coral: #f7b7a8;
+  --bold-sand: #efede6;
+
+  --ink: var(--bold-ink);
+  --muted-ink: var(--bold-muted);
+  background: var(--bold-page);
+}
+
+:root {
+  color: #101010;
+  background: #f6f5f2;
+  font-family: "Inter", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body { background: var(--bold-page, #f6f5f2); }
+
+/* 去掉纸纹与渐变底，换成干净的白 */
+.background-wash { display: none; }
+.paper-grain { display: none; }
+.has-scenery { background: var(--bold-page); }
+.has-scenery .background-wash {
+  display: block;
+  background-image: linear-gradient(#ffffffd9, #ffffffea), var(--scenery);
+  background-size: cover;
+  background-position: center;
+  filter: saturate(.85);
+}
+
+/* ---------- 外壳 ---------- */
+.portrait-shell {
+  max-width: 760px;
+  padding: 0 28px 96px;
+}
+
+.masthead {
+  height: 84px;
+  border-bottom: 0;
+}
+
+.brand { gap: 10px; }
+.brand > svg { color: #101010; }
+.brand > span {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: #101010;
+}
+.brand i {
+  font-size: 14px;
+  font-weight: 400;
+  font-style: normal;
+  color: #b6b5ae;
+  margin-left: 4px;
+  letter-spacing: 0;
+}
+
+.header-actions { gap: 6px; }
+.icon-button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  color: #101010;
+  border: 1px solid var(--bold-line);
+  background: #fff;
+}
+.icon-button:not(:disabled):hover { background: #f2f1ed; color: #101010; }
+
+.local-status {
+  font: 600 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.1px;
+  color: var(--bold-faint);
+  margin-right: 8px;
+}
+.local-status i { background: #101010; box-shadow: none; width: 5px; height: 5px; }
+
+/* ---------- 首屏标题 ---------- */
+.intro { padding: 26px 2px 30px; }
+.edition {
+  font: 600 10px/1 "Inter", sans-serif;
+  letter-spacing: 1.6px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.intro-title { margin-top: 18px; }
+.intro h1 {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 46px;
+  line-height: 1.14;
+  letter-spacing: -1.4px;
+  font-weight: 800;
+  color: #101010;
+}
+.intro h1 em {
+  font-style: normal;
+  font-weight: 800;
+  color: #101010;
+}
+.intro > p {
+  color: var(--bold-muted);
+  font-size: 13px;
+  letter-spacing: 0;
+  line-height: 1.7;
+  margin-top: 18px;
+}
+
+/* ---------- 导航：一块黑底滑块弹过去 ---------- */
+.view-tabs {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 0;
+  min-height: 0;
+  padding: 5px;
+  border-radius: 999px;
+  background: #f0efea;
+  width: fit-content;
+  /* 胶囊自身有 5px 内边距，往左退同样多，第一个页签的起点才和下面的内容对齐 */
+  margin-left: -5px;
+  margin-bottom: 22px;
+}
+
+/* 黑色滑块：位置和宽度由 use-view-layout 写进变量，切换时滑过去并轻微回弹 */
+.view-tabs > .nav-marker {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 5px;
+  /* 基础样式把它当下划线（height:2px / bottom:-1px），这里必须一起盖回来 */
+  bottom: 5px;
+  height: auto;
+  width: var(--nav-marker-width, 0px);
+  transform: translateX(var(--nav-marker-x, 0px));
+  border-radius: 999px;
+  background: #101010;
+  pointer-events: none;
+  z-index: 0;
+  /* 回弹来自曲线的 y 超过 1：先冲过去一点再退回来 */
+  transition: transform 430ms cubic-bezier(.3, 1.32, .48, 1), width 430ms cubic-bezier(.3, 1.32, .48, 1);
+}
+
+/* 第一帧还没量好位置，别让它从 0 滑过来 */
+.view-tabs:not([data-marker-ready="true"]) > .nav-marker { transition: none; }
+
+.view-tabs > button {
+  position: relative;
+  z-index: 1;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: #6f6f6a;
+  gap: 6px;
+  background: transparent;
+  transition: color .22s ease;
+}
+.view-tabs > button.active {
+  background: transparent;
+  color: #fff;
+}
+.view-tabs > button.active svg { color: #fff; }
+.view-tabs > button.active:hover { color: #fff; }
+.view-tabs > button:not(.active):hover { color: #101010; background: #ffffffb0; }
+.view-tabs small {
+  font: 600 10px/1 "Inter", sans-serif;
+  color: inherit;
+  opacity: .5;
+  margin-left: 1px;
+}
+.tab-dot { background: var(--bold-coral); width: 6px; height: 6px; margin-left: 2px; }
+
+/* ---------- 工具条 ---------- */
+.collection-toolbar { margin: 0 0 20px; }
+.filter-tabs {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: #f0efea;
+  width: fit-content;
+}
+
+/* 黑色滑块：跟页签栏是同一套动作（JS 写 --flip-x / --flip-width） */
+.filter-tabs > .flip-marker {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: var(--flip-width, 0px);
+  transform: translateX(var(--flip-x, 0px));
+  border-radius: 999px;
+  background: #101010;
+  pointer-events: none;
+  z-index: 0;
+  transition: transform 380ms cubic-bezier(.3, 1.28, .48, 1), width 380ms cubic-bezier(.3, 1.28, .48, 1);
+}
+
+.filter-tabs:not([data-ready="true"]) > .flip-marker { transition: none; }
+
+.filter-tabs button {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6f6f6a;
+  padding: 7px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  transition: color .22s ease;
+}
+
+.filter-tabs button.active {
+  background: transparent;
+  border-color: transparent;
+  color: #fff;
+  box-shadow: none;
+}
+
+.filter-tabs button.active:hover { color: #fff; }
+.filter-tabs button:not(.active):hover { color: #101010; background: transparent; }
+
+.search {
+  gap: 7px;
+  color: var(--bold-faint);
+  max-width: 168px;
+  background: #fff;
+  border: 1px solid var(--bold-line);
+  border-radius: 999px;
+  padding: 8px 14px;
+}
+.search input {
+  font-size: 12px;
+  color: #101010;
+  padding: 0;
+}
+.search input::placeholder { color: var(--bold-faint); }
+
+/* ---------- 唱片柜：扁平白卡 ---------- */
+.cabinet-layout { grid-template-columns: minmax(0, 1fr) 188px; gap: 28px; }
+
+.cabinet {
+  border: 0;
+  border-radius: 26px;
+  background: #fff;
+  box-shadow: none;
+  backdrop-filter: none;
+  padding: 22px 20px 0;
+}
+.cabinet::before { display: none; }
+.cabinet-corners { display: none; }
+
+.shelf-label {
+  font: 600 10px/1 "Inter", sans-serif;
+  letter-spacing: 1.4px;
+  color: var(--bold-faint);
+  padding: 2px 4px 18px;
+  text-transform: uppercase;
+}
+.shelf-label > span:last-child { font-size: 11px; letter-spacing: 0; color: #101010; }
+
+.record-grid {
+  column-gap: 18px;
+  row-gap: 26px;
+  padding: 0 2px;
+}
+
+/* ---------- 唱片卡：纯色大圆角块 ---------- */
+.record-card { padding-bottom: 10px; }
+.record-card::after { display: none; }
+.record-preview { padding: 0; perspective: 900px; }
+
+.record-case {
+  border-radius: 20px;
+  filter: none;
+  transition: transform .3s cubic-bezier(.2,.7,.3,1);
+}
+.case-back { display: none; }
+.case-front {
+  border: 0;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 0 0 1px #00000008, 0 2px 10px #0000000a;
+  transform-origin: 50% 50%;
+  transition: transform .5s cubic-bezier(.2,.7,.3,1), opacity .4s;
+  backface-visibility: visible;
+  overflow: hidden;
+}
+.case-front::after { display: none; }
+.case-spine { display: none; }
+
+/* 点击决定的开关，优先级要压过 :hover：
+   'closed' 是刚合上、鼠标还停在卡片上的那一瞬间，必须强制合上；
+   'open' 是把悬停状态钉住，鼠标移开也不弹回去。 */
+.record-card[data-flip="closed"] .case-front { transform: none !important; opacity: 1 !important; }
+.record-card[data-flip="closed"] .disc-pocket { transform: none !important; }
+.record-card[data-flip="closed"] .record-case { transform: none !important; }
+
+.record-card[data-flip="open"] .case-front { transform: rotateY(-72deg); opacity: .9; }
+.record-card[data-flip="open"] .disc-pocket { transform: translateX(17%) rotate(9deg); }
+.record-card[data-flip="open"] .record-case { transform: translateY(-5px) rotate(-3deg); }
+
+/* 悬停时封面卡像书页一样掀开，黑胶从右边滑出来——幅度与原版一致 */
+.case-front { transform-origin: 0 50%; }
+.disc-pocket {
+  position: absolute;
+  inset: 6%;
+  transition: transform .7s cubic-bezier(.22,.7,.22,1);
+}
+.record-card:hover .disc-pocket,
+.record-card:focus-within .disc-pocket { transform: translateX(17%) rotate(9deg); }
+.record-card:hover .case-front,
+.record-card:focus-within .case-front {
+  transform: rotateY(-72deg);
+  opacity: .9;
+}
+.record-card:hover .record-case,
+.record-card:focus-within .record-case { transform: translateY(-5px) rotate(-3deg); }
+
+/* 用 background-color 而不是 background 简写：简写会把 styles.css 里的
+   background-size:cover / background-position:center 重置成 auto，
+   用户上传的封面图就不再铺满了。 */
+.cover-art {
+  inset: 0;
+  border: 0;
+  border-radius: 20px;
+  background-color: var(--record-color);
+  background-size: cover;
+  background-position: center;
+}
+/* 参考图的四块亮色：按唱片自身颜色映射过去，每张仍各不相同 */
+.cover-art[class*="sleeve-"] {
+  background-color: var(--cover-from, var(--record-color));
+  background-image: none;
+}
+.cover-art[class*="sleeve-"]::after { display: none; }
+
+/* 随机封套的装饰形状全部收掉，只留纯色 */
+.cover-orbit, .cover-sun, .sleeve-glow, .sleeve-disc, .sleeve-sky,
+.sleeve-line, .sleeve-gate, .ripple-ring, .sleeve-band { display: none; }
+
+.cover-border { display: none; }
+
+.cover-edition {
+  top: 16px;
+  left: 17px;
+  right: 17px;
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: .8px;
+  color: #101010;
+  opacity: .42;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cover-title {
+  left: 17px;
+  right: 17px;
+  top: auto;
+  bottom: 34px;
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.24;
+  letter-spacing: -0.4px;
+  color: #101010;
+  text-shadow: none;
+  -webkit-line-clamp: 2;
+}
+.cover-bottom {
+  left: 17px;
+  right: 17px;
+  bottom: 15px;
+  font: 600 9px/1 "Inter", sans-serif;
+  letter-spacing: .4px;
+  color: #101010;
+  opacity: .38;
+  text-transform: uppercase;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 卡片下方说明 ---------- */
+.record-caption { margin-top: 11px; gap: 8px; }
+.record-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #101010;
+  letter-spacing: -0.1px;
+  line-height: 1.5;
+}
+.select-record {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--bold-line);
+  background: #fff;
+  color: #101010;
+  padding: 0;
+}
+.select-record:not(:disabled):hover { background: #f2f1ed; color: #101010; }
+.select-record[aria-pressed="true"] {
+  background: #101010;
+  border-color: #101010;
+  color: #fff;
+  box-shadow: none;
+}
+.select-record > span { font: 600 11px/1 "Inter", sans-serif; }
+
+.record-card > p {
+  font-size: 11px;
+  color: var(--bold-muted);
+  gap: 7px;
+  margin-top: 4px;
+}
+.playing-bars i { background: #101010; }
+
+/* ---------- 加入条 / 柜底 ---------- */
+.add-to-shelf {
+  margin: 22px 0 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6f6f6a;
+  padding: 13px;
+  border: 1px dashed #d8d6cf;
+  border-radius: 14px;
+  background: transparent;
+}
+.add-to-shelf:not(:disabled):hover { background: #f6f5f2; color: #101010; border-color: #101010; }
+
+.cabinet-base {
+  font: 600 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.2px;
+  color: var(--bold-faint);
+  height: 34px;
+  border-top: 1px solid var(--bold-line);
+  margin: 0 -20px;
+  padding: 0 20px;
+  border-radius: 0 0 26px 26px;
+}
+.cabinet-base > span:first-child { font: 700 10px "Inter", sans-serif; color: #101010; }
+.cabinet-base i { background: #101010; box-shadow: none; width: 5px; height: 5px; }
+
+/* ---------- 右侧介绍 ---------- */
+.record-notes { padding-top: 14px; }
+.notes-eyebrow {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.4px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.notes-eyebrow > span { font-size: 12px; }
+.notes-disc { display: none; }
+
+.record-type {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.3px;
+  color: var(--bold-faint);
+  margin: 18px 0 8px;
+  text-transform: uppercase;
+}
+.record-notes h2 {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1.24;
+  letter-spacing: -0.6px;
+  color: #101010;
+}
+.artist { font-size: 12px; color: var(--bold-muted); margin-top: 7px; }
+.fine-rule { background: var(--bold-line); width: 100%; margin: 20px 0; height: 1px; }
+.record-description {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 12px;
+  line-height: 1.9;
+  letter-spacing: 0;
+  color: #55554f;
+}
+.text-button {
+  font-size: 12px;
+  font-weight: 600;
+  color: #101010;
+  gap: 6px;
+}
+.text-button:not(:disabled):hover { color: #000; }
+.edit-notes { font-size: 11px; margin-top: 16px; }
+
+.record-meta { margin: 20px 0 16px; }
+.record-meta > div {
+  font: 500 11px/1 "Inter", sans-serif;
+  margin: 10px 0;
+}
+.record-meta dt { color: var(--bold-faint); }
+.record-meta dd { color: #101010; }
+
+.notes-select {
+  padding: 12px;
+  border: 1px solid var(--bold-line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: #101010;
+  gap: 7px;
+}
+.notes-select:not(:disabled):hover { background: #f6f5f2; color: #101010; }
+.notes-select.chosen {
+  background: #101010;
+  border-color: #101010;
+  color: #fff;
+}
+.notes-select.chosen:hover { background: #000; color: #fff; }
+
+/* ---------- 滑杆 ---------- */
+.slider-field > span {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--bold-muted);
+}
+.slider-field output { font: 600 11px "Inter", sans-serif; color: #101010; }
+input[type="range"] {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, #101010 0 var(--fill), #eceae5 var(--fill) 100%);
+  margin: 14px 0 8px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  width: 15px;
+  height: 15px;
+  background: #101010;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px #0000002e;
+}
+.dock-bottom input[type="range"] {
+  background: linear-gradient(to right, #ffffff 0 var(--fill), #ffffff2e var(--fill) 100%);
+}
+.dock-bottom input[type="range"]::-webkit-slider-thumb {
+  background: var(--bold-ink);
+  border-color: #fff;
+  box-shadow: none;
+}
+
+/* ---------- 声音微调 ---------- */
+.sound-tweaks { border-top: 1px solid var(--bold-line); margin-top: 20px; padding-top: 14px; }
+.sound-tweaks summary {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bold-muted);
+}
+.sound-tweaks summary:hover { color: #101010; }
+.tweak-help { font-size: 10px; line-height: 1.8; color: var(--bold-faint); }
+
+/* ---------- 开关 ---------- */
+.toggle {
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  padding: 3px;
+  background: #e4e2dc;
+}
+.toggle span {
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  box-shadow: 0 1px 3px #00000026;
+}
+.toggle.on { background: #101010; }
+.toggle.on span { transform: translateX(18px); }
+
+/* ---------- 底部致谢 ---------- */
+.dedication { padding: 26px 0 18px; }
+.dedication > span:first-child {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.6px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.dedication p {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--bold-muted);
+  margin: 12px 0 14px;
+}
+.dedication-signature { font: 500 11px "Inter", sans-serif; color: var(--bold-faint); }
+
+/* ---------- 空状态 ---------- */
+.empty-cabinet { padding: 30px 4px 26px; }
+.empty-art { width: 158px; margin: 0 auto 24px; perspective: none; }
+.showcase-case { transform: none; }
+.showcase-case .case-front { transform: none; }
+.showcase-case .cover-title { font: 700 26px/1.2 "Inter", sans-serif; letter-spacing: -0.8px; top: auto; bottom: 34px; }
+.shelf-line {
+  height: 1px;
+  background: var(--bold-line);
+  box-shadow: none;
+  margin: 0 0 26px;
+}
+.empty-copy > span {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.6px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.empty-copy h2 {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: -0.4px;
+  color: #101010;
+  margin: 12px 0 10px;
+}
+.empty-copy p { font-size: 12px; color: var(--bold-muted); line-height: 1.8; }
+
+.empty-notes { padding-top: 6px; }
+.empty-notes > svg { color: var(--bold-faint); margin: 34px 0 22px; }
+.empty-notes > p {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: -0.4px;
+  color: #101010;
+}
+.empty-notes em { font-style: normal; color: var(--bold-faint); }
+.empty-notes small { font-size: 11px; line-height: 2; color: var(--bold-muted); }
+
+.no-results { padding: 44px 5px; color: var(--bold-faint); min-height: 240px; }
+.no-results p { font-size: 13px; color: var(--bold-muted); margin: 18px 0; }
+
+/* ---------- 分页 ---------- */
+.shelf-pager { gap: 8px; margin: 20px 0 4px; }
+.pager-arrow {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: #101010;
+  border: 1px solid var(--bold-line);
+  background: #fff;
+}
+.pager-arrow:not(:disabled):hover { background: #101010; color: #fff; border-color: #101010; }
+.pager-numbers { gap: 6px; }
+.pager-numbers button {
+  min-width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font: 600 12px "Inter", sans-serif;
+  color: var(--bold-muted);
+  border: 1px solid transparent;
+  background: transparent;
+}
+.pager-numbers button.active {
+  background: #101010;
+  color: #fff;
+  border-color: #101010;
+}
+.pager-numbers button:not(.active):hover { background: #f0efea; color: #101010; }
+
+/* ---------- 按钮 ---------- */
+.primary-button,
+.secondary-button {
+  padding: 13px 22px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 8px;
+}
+.primary-button {
+  background: #101010;
+  color: #fff;
+  border: 1px solid #101010;
+  box-shadow: none;
+}
+.primary-button:not(:disabled):hover {
+  background: #000;
+  color: #fff;
+  box-shadow: none;
+}
+.secondary-button {
+  border: 1px solid var(--bold-line);
+  background: #fff;
+  color: #101010;
+}
+.secondary-button:not(:disabled):hover { background: #f6f5f2; color: #101010; border-color: #d8d6cf; }
+
+/* ---------- 弹窗 ---------- */
+.modal {
+  background: #fff;
+  color: #101010;
+  border: 0;
+  outline: 0;
+  border-radius: 28px;
+  box-shadow: 0 30px 90px #0000002b;
+  max-width: 470px;
+  max-height: 88dvh;
+}
+.modal::backdrop { background: #10101040; backdrop-filter: blur(6px); }
+.modal-content { padding: 32px 30px; }
+.modal-close {
+  right: 18px;
+  top: 18px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--bold-line);
+  background: #fff;
+  color: #101010;
+}
+.modal-close:not(:disabled):hover { background: #101010; color: #fff; border-color: #101010; }
+.eyebrow {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.5px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.modal h2 {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.7px;
+  color: #101010;
+  margin-top: 14px;
+}
+.modal-lead { font-size: 12px; color: var(--bold-muted); margin-top: 8px; line-height: 1.7; }
+
+.import-types { gap: 12px; margin: 24px 0 20px; }
+.import-types button {
+  padding: 18px 16px;
+  border: 1px solid var(--bold-line);
+  border-radius: 18px;
+  background: #fff;
+  color: #101010;
+}
+.import-types button:hover { background: #f6f5f2; color: #101010; }
+.import-types button.selected {
+  border-color: #101010;
+  background: #f6f5f2;
+  box-shadow: 0 0 0 1px #101010;
+  color: #101010;
+}
+.import-types strong { font-size: 13px; font-weight: 700; margin-top: 12px; color: #101010; }
+.import-types small { font-size: 11px; color: var(--bold-muted); margin-top: 6px; line-height: 1.6; }
+
+.import-help { font-size: 11px; line-height: 1.9; color: var(--bold-faint); margin-top: 18px; }
+.import-report {
+  background: #f6f5f2;
+  border: 0;
+  border-radius: 14px;
+  padding: 14px;
+  margin-top: 16px;
+  color: #55554f;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.text-field { font-size: 11px; color: var(--bold-muted); margin: 18px 0; font-weight: 500; }
+.text-field input,
+.text-field textarea {
+  border: 1px solid var(--bold-line);
+  border-radius: 14px;
+  background: #f9f8f5;
+  padding: 13px;
+  color: #101010;
+  font-size: 13px;
+  line-height: 1.7;
+  margin-top: 8px;
+}
+.text-field input:focus,
+.text-field textarea:focus {
+  outline: 2px solid #101010;
+  outline-offset: 0;
+  background: #fff;
+}
+.text-field textarea::placeholder { color: var(--bold-faint); }
+.remove-record { color: #c04a34; margin-top: 24px; }
+.remove-record:hover { color: #a13a26; }
+
+.settings-group { border-bottom: 1px solid var(--bold-line); padding-bottom: 22px; margin-top: 24px; }
+.settings-group h3 { font-size: 13px; font-weight: 700; color: #101010; letter-spacing: -0.1px; }
+.settings-group > p { font-size: 11px; color: var(--bold-muted); margin: 8px 0 12px; line-height: 1.7; }
+.settings-group > .text-button { margin-top: 14px; }
+
+.sleep-select { font-size: 12px; color: var(--bold-muted); margin-top: 16px; }
+.sleep-select select {
+  background: #f6f5f2;
+  border: 1px solid var(--bold-line);
+  border-radius: 999px;
+  color: #101010;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.guide-steps { margin-top: 24px; }
+.guide-steps p { font-size: 12px; line-height: 1.8; color: var(--bold-muted); padding-bottom: 20px; padding-left: 34px; }
+.guide-steps strong { font-size: 13px; font-weight: 700; color: #101010; margin-bottom: 5px; }
+.guide-steps p > span { font: 700 10px "Inter", sans-serif; color: var(--bold-faint); }
+
+/* 换唱片的方式：三选一胶囊 */
+.transition-options { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.transition-options button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 13px 16px;
+  border: 1px solid var(--bold-line);
+  border-radius: 16px;
+  background: #fff;
+  text-align: left;
+  color: #101010;
+}
+.transition-options button:hover { background: #f6f5f2; color: #101010; }
+.transition-options button[aria-checked="true"],
+.transition-options button.chosen {
+  border-color: #101010;
+  box-shadow: 0 0 0 1px #101010;
+  background: #f6f5f2;
+}
+.transition-options strong { font-size: 13px; font-weight: 700; }
+.transition-options small { font-size: 11px; color: var(--bold-muted); line-height: 1.6; }
+
+/* ---------- 提示条 ---------- */
+.toast,
+.motion-notice {
+  bottom: 152px;
+  background: #101010;
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 10px 30px #00000033;
+  padding: 14px 24px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #fff;
+  backdrop-filter: none;
+}
+.toast svg, .motion-notice svg { color: #fff; }
+
+/* ---------- 正在听 ---------- */
+.listening-room { padding-top: 8px; }
+
+.turntable {
+  aspect-ratio: 1.62;
+  max-width: 460px;
+  border-radius: 28px;
+  background: #101010;
+  border: 0;
+  box-shadow: 0 20px 50px #0000001f;
+  overflow: hidden;
+}
+.turntable::before { display: none; }
+.turntable-label {
+  top: 22px;
+  left: 26px;
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.5px;
+  color: #ffffff5c;
+  text-transform: uppercase;
+}
+.platter {
+  left: 8%;
+  top: 17%;
+  width: 45%;
+  box-shadow: none;
+}
+.platter .vinyl-label > span { font: 600 9px/1.7 "Inter", sans-serif; letter-spacing: .6px; }
+.platter .vinyl-label small { font: 500 6px "Inter", sans-serif; }
+.platter-disc { border-radius: 50%; }
+
+/* 黑胶盘面：底色与沟槽保持中性深色，但绝不覆盖彩胶工艺的取色层。
+   彩胶的 .pressing-* 只设置 background-color / background-image，
+   这里只补沟槽纹理的明暗，让工艺色透出来。 */
+.vinyl {
+  box-shadow: 0 0 0 1px #ffffff14, 0 10px 24px #00000066;
+}
+.vinyl::before {
+  background: conic-gradient(from 30deg, transparent, #ffffff1f 14%, transparent 24%, #00000040 45%, #ffffff2b 64%, transparent 76%, #ffffff14 91%, transparent);
+}
+/* 没有彩胶工艺时（无封面取色）才用中性黑盘 */
+.vinyl:not([class*="pressing-"]) {
+  background: repeating-radial-gradient(circle at center, #1c1c1c 0, #1c1c1c 1px, #0d0d0d 1px, #232323 2px, #111 3px);
+}
+/* 彩胶盘面加一层极淡的沟槽压纹，保留唱片质感又不吃掉颜色 */
+.vinyl[class*="pressing-"] {
+  background-blend-mode: normal;
+  box-shadow: 0 0 0 1px #ffffff1f, 0 10px 24px #00000059;
+}
+.vinyl-label {
+  box-shadow: 0 0 0 1px #ffffff26;
+  color: #101010;
+}
+
+.tonearm {
+  border: 0;
+  background: linear-gradient(90deg, #3a3a3a, #b9b9b4, #4a4a4a);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px #00000059;
+}
+.tonearm > span {
+  border: 0;
+  background: radial-gradient(#e8e8e3, #9a9a95);
+  box-shadow: 0 0 0 3px #ffffff1a, 0 3px 8px #00000059;
+}
+.tonearm > i {
+  background: linear-gradient(90deg, #6a6a66, #cfcfca, #6a6a66);
+  border-radius: 4px;
+  box-shadow: 0 3px 8px #0000004d;
+}
+.power-light { background: #ffffff2e; box-shadow: none; }
+.power-light.on { background: var(--bold-mint); box-shadow: 0 0 12px var(--bold-mint); }
+.rpm {
+  color: #ffffff52;
+  font: 600 15px "Inter", sans-serif;
+  right: 28px;
+  bottom: 24px;
+  text-align: right;
+  line-height: 1.2;
+}
+.rpm small {
+  font: 700 8px "Inter", sans-serif;
+  letter-spacing: 1.4px;
+  display: block;
+  margin-top: 3px;
+}
+
+.playing-title { margin: 30px 0 34px; }
+.playing-title > span {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.5px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.playing-title h2 {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.24;
+  letter-spacing: -0.9px;
+  color: #101010;
+  margin-top: 10px;
+}
+
+/* 队列 */
+.queue-heading {
+  border-bottom: 1px solid var(--bold-line);
+  margin-top: 26px;
+  padding-bottom: 13px;
+}
+.queue-heading h3 { font-size: 13px; font-weight: 700; color: #101010; letter-spacing: -0.1px; }
+.queue-heading > span { font: 600 10px "Inter", sans-serif; color: var(--bold-faint); letter-spacing: .3px; }
+
+.music-queue li {
+  border-bottom: 1px solid var(--bold-line);
+  padding: 15px 10px;
+  border-radius: 12px;
+  gap: 12px;
+}
+.music-queue li.current { background: #f6f5f2; }
+.queue-number { font: 600 10px "Inter", sans-serif; color: var(--bold-faint); width: 26px; }
+.queue-title { font-size: 13px; font-weight: 600; color: #101010; }
+.queue-title small { color: var(--bold-muted); font-size: 11px; margin-top: 4px; font-weight: 400; }
+.queue-remove { color: var(--bold-faint); }
+.queue-remove:hover { color: #c04a34; }
+.queue-empty { font-size: 12px; color: var(--bold-muted); line-height: 1.8; margin-top: 16px; }
+
+.ambient-chips { gap: 9px; padding-top: 15px; }
+.ambient-chips button {
+  font-size: 12px;
+  font-weight: 600;
+  color: #101010;
+  border: 1px solid var(--bold-line);
+  border-radius: 999px;
+  padding: 9px 15px;
+  background: #fff;
+  gap: 8px;
+}
+.ambient-chips button:hover { background: #f6f5f2; color: #101010; }
+.ambient-mark { width: 15px; height: 15px; }
+
+.back-cabinet { margin: 28px 0 4px; font-size: 12px; }
+
+/* ---------- 专注 ---------- */
+.focus-room { padding-top: 8px; }
+.focus-layout { gap: 28px; }
+.focus-stage {
+  border: 0;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: none;
+  backdrop-filter: none;
+  padding: 26px 22px 26px;
+}
+.focus-head { margin-bottom: 4px; }
+.focus-head > .notes-eyebrow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 700 10px/1 "Inter", sans-serif;
+  letter-spacing: 1.4px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.focus-head > .notes-eyebrow > span {
+  font: 700 10px/1 "Inter", sans-serif;
+  letter-spacing: .6px;
+  color: #101010;
+}
+.focus-mode {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.4px;
+  color: #101010;
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 13px;
+  background: var(--bold-mint);
+  text-transform: uppercase;
+}
+
+.focus-dial { width: min(280px, 74vw); margin: 20px auto 6px; }
+.focus-track { stroke: #f0efea; stroke-width: 10; }
+.focus-progress { stroke: #101010; stroke-width: 10; stroke-linecap: round; }
+.focus-dial.is-break .focus-progress { stroke: var(--bold-lilac); }
+
+.focus-phase {
+  font: 700 10px/1 "Inter", sans-serif;
+  letter-spacing: 2px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.focus-time {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  font-size: 62px;
+  font-weight: 800;
+  letter-spacing: -2.5px;
+  color: #101010;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.focus-dial.is-running .focus-time { color: #101010; }
+.focus-caption { font-size: 11px; color: var(--bold-muted); letter-spacing: 0; }
+
+.focus-actions { gap: 10px; margin-top: 20px; }
+.focus-actions .primary-button { min-width: 132px; }
+.focus-actions .secondary-button { padding: 13px 15px; }
+.focus-hint {
+  border-top: 1px solid var(--bold-line);
+  margin-top: 18px;
+  padding-top: 14px;
+  font-size: 11px;
+  color: var(--bold-muted);
+  line-height: 1.8;
+}
+.focus-play { font-size: 12px; margin-top: 8px; }
+
+.focus-notes h3 {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: #101010;
+  margin: 16px 0 4px;
+}
+.focus-numbers { gap: 30px; margin: 16px 0 10px; }
+.focus-numbers strong {
+  font: 800 36px/1 "Inter", sans-serif;
+  color: #101010;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+.focus-numbers span {
+  font: 600 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.1px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.focus-line { font-size: 11px; line-height: 1.9; color: var(--bold-muted); }
+.focus-presets { gap: 7px; margin-top: 11px; }
+.focus-presets button {
+  padding: 9px 15px;
+  border: 1px solid var(--bold-line);
+  border-radius: 999px;
+  background: #fff;
+  color: #101010;
+  font-size: 11px;
+  font-weight: 600;
+}
+.focus-presets button:hover { background: #f6f5f2; color: #101010; }
+.focus-presets button.chosen {
+  border-color: #101010;
+  box-shadow: 0 0 0 1px #101010;
+  background: #f6f5f2;
+  color: #101010;
+}
+.focus-switch > span { font-size: 12px; font-weight: 500; color: #101010; gap: 3px; }
+.focus-switch small { font-size: 10px; color: var(--bold-muted); }
+.focus-clear { font-size: 11px; }
+
+/* ---------- 队列拖拽（原版是奶白玻璃质感，这里换成纯白卡片） ----------
+   注意：原版「第十批」用 .music-queue.reorder-queue > .queue-item.dragging（0,3,0）
+   和 --queue-y 变量，选择器必须同等具体，否则覆盖不到。 */
+.music-queue.reorder-queue::before {
+  border: 1px dashed #10101033;
+  border-radius: 12px;
+  background: #10101008;
+}
+.music-queue.reorder-queue > .queue-item.dragging {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 26px #0000001f, 0 0 0 1px #101010;
+}
+.queue-item.drop-before::before {
+  left: 2px;
+  right: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: #101010;
+}
+.queue-remove { color: var(--bold-faint); }
+
+/* ---------- 断点 ---------- */
+@media (min-width: 800px) {
+  .app {
+    max-width: 820px;
+    margin: 26px auto;
+    min-height: calc(100vh - 52px);
+    border: 1px solid #eceae5;
+    border-radius: 34px;
+    box-shadow: 0 18px 60px #0000000a;
+    background: #fff;
+  }
+  .background-wash, .paper-grain { position: absolute; }
+  .portrait-shell { padding-left: 40px; padding-right: 40px; }
+  .toast, .motion-notice { bottom: 160px; }
+}
+
+@media (max-width: 599px) {
+  .portrait-shell { padding: 0 20px 80px; }
+  .masthead { height: 72px; }
+  .intro { padding-top: 20px; }
+  .intro h1 { font-size: 38px; letter-spacing: -1.2px; }
+  .edition { font-size: 9px; letter-spacing: 1.3px; }
+  .brand > span { font-size: 14px; }
+  .view-tabs { padding: 4px; gap: 3px; }
+  .view-tabs > button { padding: 8px 12px; font-size: 11px; }
+  .cabinet-layout { grid-template-columns: minmax(0, 1fr) 148px; gap: 20px; }
+  .cabinet { padding: 18px 15px 0; border-radius: 22px; }
+  .cabinet-base { margin: 0 -15px; padding: 0 15px; border-radius: 0 0 22px 22px; }
+  .record-grid { column-gap: 13px; row-gap: 22px; }
+  .cover-title { font-size: 15px; left: 14px; right: 14px; bottom: 28px; }
+  .cover-edition { font-size: 8px; top: 13px; left: 14px; right: 14px; }
+  .cover-bottom { font-size: 8px; left: 14px; right: 14px; bottom: 12px; }
+  .record-name { font-size: 12px; }
+  .record-notes h2 { font-size: 21px; }
+  .record-description { font-size: 11px; }
+  .dock-record strong { max-width: 150px; font-size: 12px; }
+  .main-play { width: 42px; height: 42px; }
+  .transport .icon-button, .order-button, .channel-button { width: 30px; height: 30px; }
+  .turntable { aspect-ratio: 1.5; }
+  .playing-title h2 { font-size: 24px; }
+  .focus-time { font-size: 52px; }
+  .focus-dial { width: min(240px, 76vw); }
+  .toast, .motion-notice { bottom: 150px; font-size: 11px; padding: 12px 18px; }
+}
+
+@media (max-width: 440px) {
+  .portrait-shell { padding-left: 16px; padding-right: 16px; }
+  .intro h1 { font-size: 34px; }
+  .intro > p { font-size: 12px; }
+  .view-tabs { width: 100%; justify-content: space-between; }
+  .view-tabs > button { padding: 8px 10px; font-size: 10px; }
+  .cabinet-layout { grid-template-columns: 1fr; gap: 26px; }
+  .record-grid { column-gap: 14px; row-gap: 24px; padding: 0; }
+  .cabinet { padding: 18px 14px 0; }
+  .cabinet-base { margin: 0 -14px; padding: 0 14px; }
+  .cover-title { font-size: 17px; }
+  .record-notes { border-top: 1px solid var(--bold-line); padding-top: 22px; display: block; }
+  .record-notes > .fine-rule { display: none; }
+  .notes-disc { display: none; }
+  .dock-record strong { max-width: 128px; font-size: 11px; }
+  .main-play { width: 40px; height: 40px; }
+  .transport { gap: 0; }
+  .transport .icon-button, .order-button, .channel-button { width: 28px; height: 28px; }
+  .channel-buttons { gap: 2px; margin-left: 2px; }
+  .toast, .motion-notice { bottom: 132px; }
+  .modal-content { padding: 26px 22px; }
+  .modal h2 { font-size: 23px; }
+  .focus-time { font-size: 46px; letter-spacing: -2px; }
+  .playing-title h2 { font-size: 22px; }
+}
+
+@media (hover: none) {
+  .record-card[data-flip="open"] .case-front { transform: rotateY(-65deg); opacity: .9; }
+  .record-card[data-flip="closed"] .case-front { transform: none !important; }
+  .record-card.inspected .disc-pocket { transform: translateX(17%); }
+  .record-card.inspected .record-case { transform: rotate(-3deg); }
+}
+
+/* ============================================================
+   A1 计数滚动联动
+   ============================================================ */
+
+/* 必须是 <number>。<integer> 会逐档跳变，不逐帧插值。 */
+@property --roll {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.roll-number {
+  display: inline-flex;
+  align-items: flex-start;
+  /* 让视觉隐藏的 .roll-text 锚定在这里，不会跑到别处去撑出滚动条 */
+  position: relative;
+  height: 1.2em;
+  overflow: hidden;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  vertical-align: baseline;
+  margin-right: .5px;
+}
+
+/* vertical-align 用 baseline：实测四个接线点里 flex/grid 父级下这条属性
+   根本不生效（位置由 align-items 决定），块级父级下 baseline 偏差最小
+   （shelf-label 0.01px、queue-number 0.33px）。换成 middle 会让 queue-number
+   下沉 1.3px，肉眼可见。 */
+
+/* 数字列的外层容器：真正参与排版的是它 */
+.roll-digits {
+  display: inline-flex;
+  align-items: flex-start;
+}
+
+.roll-col {
+  display: block;
+  height: 1.2em;
+  transform: translateY(calc(var(--roll, 0) * -1.2em));
+}
+
+.roll-col > b {
+  display: block;
+  height: 1.2em;
+  line-height: 1.2em;
+  min-width: .58em;
+  text-align: center;
+  font-weight: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* 只有挂载后的一帧之后才允许过渡，避免首帧从 0 滚到真实值 */
+.roll-number[data-roll-ready="true"] .roll-col {
+  transition: --roll 260ms cubic-bezier(.2, .7, .3, 1);
+}
+
+/* 屏幕阅读器读真实文本，不读那十个视觉数字 */
+.roll-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 「正在听」tab 的小圆点：出现时轻微长大，不做弹跳 */
+.tab-dot {
+  transform-origin: 50% 50%;
+  animation: tab-dot-in 180ms cubic-bezier(.2, .7, .3, 1) both;
+}
+@keyframes tab-dot-in {
+  from { opacity: 0; transform: scale(.2); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 全局已经 animation:none / transition:none，这里只是把时序也归零 */
+  .roll-number .roll-col { transition: none !important; }
+  .tab-dot { animation: none !important; opacity: 1; transform: none; }
+}
+
+/* ============================================================
+   A2 拖拽落位后画线
+   顺序：卡片停稳 → 线从中心向两端展开 → 停留 → 淡出
+   ============================================================ */
+
+.music-queue.reorder-queue > .queue-item.settled::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--bold-ink);
+  transform: scaleX(0);
+  transform-origin: 50% 50%;
+  pointer-events: none;
+  animation: queue-drop-line 460ms cubic-bezier(.2, .7, .3, 1) both;
+}
+
+@keyframes queue-drop-line {
+  0%   { transform: scaleX(0); opacity: 0; }
+  8%   { transform: scaleX(0); opacity: 1; }
+  38%  { transform: scaleX(1); opacity: 1; }
+  62%  { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 全局 animation:none 会杀掉上面的关键帧，所以这里直接给终态：
+     线立刻出现、460ms 后随 settled 类一起消失。反馈仍然可辨，只是没有生长过程。 */
+  .music-queue.reorder-queue > .queue-item.settled::after {
+    animation: none !important;
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+/* ============================================================
+   A3 表单错误反馈
+   ============================================================ */
+
+.text-field[data-invalid="true"] input {
+  border-color: #c04a34;
+  background: #fdf6f4;
+  outline: none;
+}
+
+.text-field[data-invalid="true"] input:focus {
+  outline: 2px solid #c04a34;
+  outline-offset: 0;
+  background: #fff;
+}
+
+.field-error {
+  display: block;
+  margin-top: 7px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.6;
+  color: #c04a34;
+  letter-spacing: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 抖动由 JS 判断并跳过；这里只确保颜色反馈仍在 */
+  .text-field[data-invalid="true"] input {
+    border-color: #c04a34;
+    background: #fdf6f4;
+  }
+}
+
+/* ============================================================
+   C 播放按钮按压与图标切换
+   ============================================================ */
+
+/* 基态就把 transform 的过渡声明好，否则松手时会瞬间弹回 */
+.main-play {
+  transition: transform 120ms cubic-bezier(.2, .7, .3, 1),
+              background .2s,
+              color .2s;
+}
+
+/* :not(:disabled) 不能省：实测 disabled 的 <button> 上 :active 仍然命中
+   （el.matches(':active') === true），不加限定的话没选唱片时按下去照样缩放。 */
+.main-play:not(:disabled):active {
+  transform: scale(.9);
+}
+
+/* .main-play 的 display 是 grid，这层也用 grid 保持居中 */
+.main-play-icon {
+  display: grid;
+  place-items: center;
+  animation: play-icon-in 200ms cubic-bezier(.2, .7, .3, 1) both;
+}
+
+@keyframes play-icon-in {
+  from { opacity: 0; transform: scale(.7) rotate(-14deg); }
+  to   { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 全局已经 animation:none / transition:none；
+     这里确保按压不再缩放，图标直接切换 */
+  .main-play { transition: none !important; }
+  .main-play:not(:disabled):active { transform: none; }
+  .main-play-icon { animation: none !important; opacity: 1; transform: none; }
+}
+
+/* ==========================================================================
+   外部音乐输入（虚拟声卡）
+   音乐从别的播放器进到 CABLE，再从这里抓回来，和本地唱片共用同一套避让。
+   ========================================================================== */
+
+.line-in-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.line-in-select > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bold-muted);
+  flex: none;
+}
+
+/* 沿用 .sleep-select 的胶囊下拉，宽度吃满以便放得下设备名 */
+.line-in-select select {
+  flex: 1;
+  min-width: 0;
+  background: #f6f5f2;
+  border: 1px solid var(--bold-line);
+  border-radius: 999px;
+  color: #101010;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.line-in-empty {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--bold-faint);
+  margin: 4px 0 0;
+}
+
+/* 电平条：一条细槽，绿色填充随外部音乐起伏 */
+.line-in-meter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.line-in-meter > span {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: #f0efea;
+  overflow: hidden;
+}
+
+.line-in-meter > span::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--level, 0%);
+  border-radius: 999px;
+  background: var(--bold-mint);
+  transition: width 90ms linear;
+}
+
+.line-in-meter small {
+  flex: none;
+  font-size: 11px;
+  color: var(--bold-muted);
+}
+
+.line-in-error {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #c04a34;
+}
+
+/* 复选框：方形小勾，不用系统默认样式，避免在纯白底上显脏 */
+.line-in-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--bold-muted);
+  cursor: pointer;
+}
+
+.line-in-auto input {
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border: 1px solid var(--bold-line);
+  border-radius: 5px;
+  background: #fff;
+  cursor: pointer;
+  transition: background .16s, border-color .16s;
+}
+
+.line-in-auto input:checked {
+  background: #101010;
+  border-color: #101010;
+}
+
+.line-in-auto input:checked::after {
+  content: "";
+  display: block;
+  width: 7px;
+  height: 4px;
+  margin: 4px auto 0;
+  border-left: 1.5px solid #fff;
+  border-bottom: 1.5px solid #fff;
+  transform: rotate(-45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line-in-meter > span::after { transition: none; }
+  .line-in-auto input { transition: none; }
+}
+
+/* ==========================================================================
+   外部音乐模式（第十二批）
+   开关 + 写死的 CABLE 设备 + 独立音量 + 避让状态。
+   原来的设备下拉不再出现，因为设备是程序自己按名字找的。
+   ========================================================================== */
+
+/* 开关：整行可点，左边是标题说明，右边是胶囊开关 */
+.line-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #f6f5f2;
+  cursor: pointer;
+  transition: background .2s;
+}
+
+.line-mode-toggle:hover { background: #f2f1ec; }
+
+/* 真正的 checkbox 藏起来，但仍然参与焦点与无障碍 */
+.line-mode-toggle > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.line-mode-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.line-mode-copy b {
+  font-size: 13px;
+  font-weight: 700;
+  color: #101010;
+}
+
+.line-mode-copy small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--bold-muted);
+  line-height: 1.5;
+}
+
+/* 胶囊开关本体 */
+.line-mode-switch {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: #dedcd4;
+  transition: background .22s cubic-bezier(.2, .7, .3, 1);
+}
+
+.line-mode-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px #00000024;
+  transition: transform .22s cubic-bezier(.2, .7, .3, 1);
+}
+
+.line-mode-toggle > input:checked ~ .line-mode-switch { background: #101010; }
+.line-mode-toggle > input:checked ~ .line-mode-switch::after { transform: translateX(18px); }
+.line-mode-toggle > input:focus-visible ~ .line-mode-switch { outline: 2px solid #101010; outline-offset: 3px; }
+
+/* 外部音乐音量：和主音量同一套滑杆手感，但更宽、带百分比 */
+.line-volume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.line-volume > span {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bold-muted);
+}
+
+.line-volume > input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.line-volume > small {
+  flex: none;
+  width: 34px;
+  text-align: right;
+  font: 600 11px "Inter", sans-serif;
+  color: #101010;
+}
+
+.line-in-hint {
+  margin: 14px 0 0;
+  font-size: 11px;
+  line-height: 1.75;
+  color: var(--bold-faint);
+}
+
+/* 环境音队列：没有「正在播这一首」，所以标题是静态文本，序号换成圈数 */
+.music-queue.ambient-queue li { border-bottom: 1px solid var(--bold-line); }
+
+.queue-title.static {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: #101010;
+  text-align: left;
+  cursor: default;
+}
+
+.queue-title.static small {
+  display: block;
+  color: var(--bold-muted);
+  font-size: 11px;
+  font-weight: 400;
+  margin-top: 4px;
+}
+
+/* 环境音单独开关：和 X 一样贴在行尾，但状态要一眼看出来 */
+.queue-toggle {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 999px;
+  background: #f0efea;
+  color: var(--bold-faint);
+  transition: background .2s, color .2s, transform .16s;
+}
+
+.queue-toggle.on {
+  background: #101010;
+  color: #ffffff;
+}
+
+.queue-toggle:not(:disabled):hover {
+  transform: scale(1.08);
+}
+
+.queue-title.static.is-muted {
+  color: var(--bold-faint);
+}
+
+/* 被单独暂停的那一路：整行压低，和还在响的拉开层次 */
+.music-queue.ambient-queue li:has(.queue-title.is-muted) {
+  opacity: .55;
+}
+
+.music-queue.ambient-queue li:has(.queue-title.is-muted) .queue-number {
+  background: var(--bold-line);
+  color: var(--bold-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queue-toggle:not(:disabled):hover { transform: none; }
+}
+
+/* 正在听页脚提示：外部音乐模式下说明声音从哪来 */
+.line-mode-hint {
+  margin: 16px 0 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--bold-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line-mode-toggle,
+  .line-mode-switch,
+  .line-mode-switch::after { transition: none; }
+}
+
+@media (max-width: 599px) {
+  .line-mode-toggle { padding: 12px 14px; gap: 12px; }
+  .line-mode-copy b { font-size: 12px; }
+  .line-mode-copy small { font-size: 10px; }
+  .line-volume { gap: 10px; }
+  .line-volume > small { width: 30px; }
+}
+
+.now-playing-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 20px;
+  background: #f6f5f2;
+  animation: now-playing-in 260ms cubic-bezier(.2, .7, .3, 1) both;
+}
+
+@keyframes now-playing-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.now-playing-cover {
+  position: relative;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #101010;
+  box-shadow: 0 6px 16px #0000001f;
+}
+
+.now-playing-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 没有封面时用一圈唱片沟槽占位，别留个黑方块 */
+.now-playing-cover.empty {
+  display: grid;
+  place-items: center;
+  background:
+    repeating-radial-gradient(circle at center, #1c1c1c 0, #1c1c1c 1px, #0d0d0d 1px, #232323 2px, #111 3px);
+}
+
+.now-playing-cover.empty::after {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bold-lemon);
+}
+
+.now-playing-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+
+.now-playing-copy > small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--bold-faint);
+}
+
+.now-playing-copy > b {
+  font-size: 14px;
+  font-weight: 700;
+  color: #101010;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.4;
+}
+
+.now-playing-copy > span {
+  font-size: 11px;
+  color: var(--bold-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.now-playing-card.idle .now-playing-copy > b { color: var(--bold-muted); font-weight: 600; }
+
+.now-playing-state {
+  flex: none;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  background: #101010;
+  color: #fff;
+}
+
+.now-playing-state.paused { background: #dedcd4; color: #101010; }
+
+@media (prefers-reduced-motion: reduce) {
+  .now-playing-card { animation: none; }
+}
+
+@media (max-width: 599px) {
+  .now-playing-card { gap: 12px; padding: 13px; border-radius: 16px; }
+  .now-playing-cover { width: 52px; height: 52px; border-radius: 12px; }
+  .now-playing-copy > b { font-size: 13px; }
+}
+
+/* ---------- 第十三批：Today 式头部与列表 ---------- */
+
+/* 头部：左对齐超大标题，右上角期号与大号计数 */
+.today-head {
+  padding: 30px 0 26px;
+}
+
+.today-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.today-title {
+  margin: 0;
+  font-size: 62px;
+  line-height: 0.96;
+  letter-spacing: -3px;
+  font-weight: 800;
+  color: #101010;
+}
+
+.today-stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  padding-top: 8px;
+  text-align: right;
+}
+
+.today-stamp > span:first-child {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  color: var(--bold-faint);
+}
+
+.today-stamp > i {
+  width: 22px;
+  height: 1px;
+  background: var(--bold-line);
+}
+
+.today-count {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -1.2px;
+  color: #101010;
+}
+
+.today-count small {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  color: var(--bold-faint);
+}
+
+/* 标题下面那一行：英文小标签 + 分隔竖线 + 中文一句话 */
+.today-tag {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+
+.today-tag > i {
+  width: 1px;
+  height: 10px;
+  background: var(--bold-line);
+}
+
+.today-tag > span {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--bold-muted);
+  text-transform: none;
+}
+
+
+/* ---------- 第十四批：导航胶囊展开 ---------- */
+
+/* 未选中：图标 + 英文，中文收起 */
+/* 只有中文：选中项靠字重与字号撑开，滑块宽度自然跟着变 */
+.view-tabs > button .tab-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+  transition: font-weight .18s ease, letter-spacing .18s ease;
+}
+
+.view-tabs > button.active .tab-label {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+/* 选中项图标也加粗一点，跟文字一起「压下去」 */
+.view-tabs > button.active svg {
+  stroke-width: 2.1;
+}
+
+@media (max-width: 599px) {
+  .view-tabs {
+    gap: 2px;
+    padding: 4px;
+  }
+
+  .view-tabs > button {
+    gap: 5px;
+    padding: 8px 9px;
+  }
+
+  .view-tabs > button.active {
+    gap: 5px;
+    padding-right: 11px;
+  }
+
+  .view-tabs > button .tab-label {
+    font-size: 10px;
+  }
+
+  .view-tabs > button svg {
+    width: 13px;
+    height: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-tabs > button .tab-label {
+    transition: none;
+  }
+}
+
+/* ---------- 第十五批：封面网格 ---------- */
+
+/* 网格卡片上的名字行 */
+.select-record > span { font: 600 11px/1 "Inter", sans-serif; }
+
+/* 名字跟在选中圈后面 */
+.record-card > p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.record-card .record-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #101010;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.record-card { list-style: none; }
+
+.record-card .playing-bars { margin-left: 0; }
+.record-card .playing-bars i { background: #101010; }
+
+/* 网格：明亮版保持两列，和大圆角块的气质一致 */
+.record-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 18px;
+  row-gap: 26px;
+  padding: 0 2px;
+}
+
+/* 封面网格里，唱片盒沿用原有的掀开动作，只是圆角和阴影换成明亮版的 */
+.record-card .record-case {
+  border-radius: 20px;
+  filter: none;
+}
+
+.record-card .case-front {
+  border: 0;
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px #00000008, 0 2px 10px #0000000a;
+  overflow: hidden;
+}
+
+.record-card.selected .record-case {
+  filter: drop-shadow(2px 7px 5px #4b67482b);
+}
+
+@media (max-width: 599px) {
+  .record-grid { column-gap: 13px; row-gap: 22px; }
+  .record-card .record-name { font-size: 11px; }
+}
+
+/* ---------- 第十六批：圆形扩散换页 ---------- */
+
+/*
+ * 点页签时，新页面从指尖按下处像墨水一样铺开，盖住整个内容区。
+ * 圆心和半径由 App.tsx 的 selectView 量好写进 --wipe-x / --wipe-y / --wipe-r，
+ * 半径取到内容区最远的那个角，扩散结束时一定盖满，不会留一角。
+ *
+ * 旧页面只负责快速退场，新页面负责铺开——两个动作错开，不叠成一团。
+ */
+.view-stage {
+  position: relative;
+}
+
+.view-stage[data-motion="exit"] {
+  animation: page-wipe-out 130ms cubic-bezier(.4, 0, 1, 1) both;
+}
+
+.view-stage[data-motion="enter"] {
+  animation: page-wipe-in 520ms cubic-bezier(.3, .72, .22, 1) both;
+}
+
+@keyframes page-wipe-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes page-wipe-in {
+  from {
+    opacity: 1;
+    clip-path: circle(0 at var(--wipe-x, 50%) var(--wipe-y, 0%));
+    transform: scale(.994);
+  }
+  62% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    clip-path: circle(var(--wipe-r, 140%) at var(--wipe-x, 50%) var(--wipe-y, 0%));
+    transform: scale(1);
+  }
+}
+
+/* 唱片柜内部的筛选切换：同一套扩散，但作用域只有唱片柜那一块 */
+.cabinet-layout { position: relative; }
+.cabinet-layout[data-motion="exit"] { animation: page-wipe-out 130ms cubic-bezier(.4, 0, 1, 1) both; }
+.cabinet-layout[data-motion="enter"] {
+  animation: page-wipe-in 520ms cubic-bezier(.3, .72, .22, 1) both;
+}
+
+/* 顶部大字：换页时旧字轻轻退、新字从下方追上来。
+   比下面那块慢一拍，观感上是「先换名字，再换内容」。 */
+.today-title {
+  animation: title-swap 460ms cubic-bezier(.2, .9, .25, 1) both;
+}
+@keyframes title-swap {
+  from { opacity: 0; transform: translateY(14px); filter: blur(4px); }
+  55% { opacity: 1; filter: blur(0); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cabinet-layout[data-motion="exit"],
+  .cabinet-layout[data-motion="enter"],
+  .today-title { animation: none !important; }
+  .view-stage[data-motion="exit"],
+  .view-stage[data-motion="enter"] {
+    animation: none !important;
+    clip-path: none !important;
+    transform: none !important;
+  }
+
+  .view-tabs > .nav-marker {
+    transition: none !important;
+  }
+}
+
+/* ---------- 第十七批：连续曲率圆角 ----------
+   胶囊和卡片的 corner 都是「标准圆角」：一段半径恒定的圆弧，接到直边时
+   曲率从 1/r 一下掉到 0，眼睛能看出那个折点，尤其在大尺寸的底栏上。
+   苹果的图标和 macOS 控件用的是连续曲率（超椭圆），没有这个折点。
+
+   只在支持 corner-shape 的浏览器生效：不支持的照旧是标准圆角，不会变形。
+   半径为 50% 的纯圆形（播放键、通道键、唱片）不在此列——超椭圆会把它们
+   变成圆角方形，那就不是圆了。
+
+   档位说明：squircle 约等于超椭圆 n=4（苹果图标用的那档）。实测在 638×97 的
+   底栏上，n=4 的端点收得太快，看上去偏方；n=1.2 的轮廓落在标准圆角与 n=4 的
+   正中间，直边到弧线的过渡最自然。 */
+@supports (corner-shape: superellipse(1.2)) {
+  /* 胶囊：页签、筛选、搜索框、按钮、底栏 */
+  .view-tabs,
+  .view-tabs > .nav-marker,
+  .view-tabs > button,
+  .filter-tabs button,
+  .search,
+  .notes-select,
+  .primary-button,
+  .secondary-button,
+  .sleep-select select,
+  .line-in-select select,
+  .ambient-chips button,
+  .focus-mode,
+  .focus-presets button,
+  .queue-toggle,
+  .now-playing-state,
+  .toggle,
+  .line-mode-switch,
+  .toast,
+  .motion-notice,
+  /* 播放卡：浮在页面上的一颗大胶囊 */
+  .play-card,
+  /* 卡片与面板 */
+  .modal,
+  .turntable,
+  .focus-stage,
+  .cabinet,
+  .record-case,
+  .case-front,
+  .cover-art,
+  .now-playing-card,
+  .now-playing-cover,
+  .add-to-shelf,
+  .music-queue li,
+  .transition-options button,
+  .import-types button,
+  .text-field input,
+  .text-field textarea {
+    corner-shape: superellipse(1.2);
+  }
+}
+
+/* ---------- 圆碟与播放卡（第十九批） ---------- */
+
+/* 圆碟：贴在页签栏右边外侧。页签栏本身是 width:fit-content，加在它内部会把页签撑松，
+   所以用绝对定位挂在外面，页签栏宽度一点不变。 */
+.dock-disc-slot {
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+}
+
+.view-tabs {
+  position: relative;
+}
+
+.dock-disc {
+  position: relative;
+  display: block;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: #ffffff;
+  background-color: #101010;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 6px 18px #1010102e, 0 0 0 1px #10101014;
+  /* 暂停时回正：不在半路上停住，看着像卡住 */
+  transition: transform 320ms cubic-bezier(.3, 1.3, .5, 1), box-shadow 220ms ease;
+}
+
+.dock-disc:hover { box-shadow: 0 8px 22px #1010103d, 0 0 0 1px #1010101f; }
+.dock-disc:focus-visible { outline: 2px solid #101010; outline-offset: 3px; }
+
+/* 播放时上下浮动。2.4s 一周期、只走 3px：慢到不抢眼，又能看出「在转」。 */
+.dock-disc.playing { animation: dock-float 2400ms ease-in-out infinite; }
+@keyframes dock-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* 在转的时候外面套一圈细高光，比整块转起来轻 */
+.dock-disc.playing::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1px solid #1010101f;
+  animation: dock-halo 2400ms ease-in-out infinite;
+}
+@keyframes dock-halo {
+  0%, 100% { opacity: .35; transform: scale(1); }
+  50% { opacity: .8; transform: scale(1.04); }
+}
+
+/* 睡眠倒计时的角标：原来在底栏最右边那行小字，底栏删了得有地方去 */
+.dock-disc-sleep {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bold-lemon, #d9eb6c);
+  box-shadow: 0 0 0 2px #ffffff;
+}
+
+/* 播放卡：从圆碟正下方展开 */
+.play-card-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: transparent;
+}
+
+.play-card {
+  position: fixed;
+  left: var(--anchor-x, 16px);
+  top: var(--anchor-y, 80px);
+  z-index: 41;
+  width: 360px;
+  padding: 18px 18px 14px;
+  border-radius: 24px;
+  background: #101010;
+  color: #ffffff;
+  box-shadow: 0 24px 60px #00000047, 0 0 0 1px #ffffff14;
+  animation: card-drop 260ms cubic-bezier(.2, .9, .25, 1) both;
+}
+@keyframes card-drop {
+  from { opacity: 0; transform: translateY(-10px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+
+.play-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.play-card-cover {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 12px;
+  background-color: #ffffff1f;
+  background-size: cover;
+  background-position: center;
+  color: #ffffff8c;
+}
+
+.play-card-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.play-card-copy b { font-size: 14px; font-weight: 700; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.play-card-copy small { font-size: 11px; color: #ffffff8c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.play-card-close {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff14;
+  color: #ffffffb3;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease;
+}
+.play-card-close:hover { background: #ffffff26; color: #ffffff; }
+
+/* 波形：48 根柱子，高度由 JS 每帧写 --h（0–1） */
+.play-card-wave {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 46px;
+  margin: 16px 0 12px;
+}
+.play-card-wave > span {
+  flex: 1;
+  min-width: 2px;
+  height: calc(var(--h, 0) * 100%);
+  min-height: 2px;
+  border-radius: 2px;
+  background: #ffffff;
+  opacity: calc(.35 + var(--h, 0) * .65);
+  transition: height 90ms linear, opacity 90ms linear;
+}
+
+.play-card-progress {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #ffffff73;
+  font-variant-numeric: tabular-nums;
+}
+.play-card-progress > span { flex: none; min-width: 30px; }
+.play-card-progress > span:last-of-type { text-align: right; }
+.play-card-progress input[type='range'] { flex: 1; }
+
+.play-card-transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 14px 0 12px;
+}
+
+/* 卡里的圆形按钮统一白底黑字，和外面的黑底白字反过来 */
+.play-card .icon-button {
+  background: #ffffff14;
+  color: #ffffff;
+}
+.play-card .icon-button:hover:not(:disabled) { background: #ffffff26; }
+.play-card .icon-button:disabled { opacity: .35; }
+.play-card .main-play {
+  width: 44px;
+  height: 44px;
+  background: #ffffff;
+  color: #101010;
+}
+.play-card .icon-button.on { background: #ffffff; color: #101010; }
+.play-card .order-button { opacity: .7; }
+
+.play-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-top: 12px;
+  border-top: 1px solid #ffffff1a;
+  font-size: 10px;
+  color: #ffffff73;
+}
+.play-card-foot .master-slider { flex: 1; }
+.play-card-order { flex: none; font-weight: 600; letter-spacing: .02em; }
+
+/* 卡里的浅色滑杆：外部是黑底，轨道与填充都要换 */
+.play-card input[type='range'] {
+  background: linear-gradient(to right, #ffffff 0 var(--fill, 0%), #ffffff33 var(--fill, 0%) 100%);
+  height: 3px;
+}
+/* 卡里的通道按钮：斜线是绝对定位的，按钮自己必须是定位上下文，否则会跑到卡片中心 */
+.play-card .channel-toggle {
+  position: relative;
+}
+
+.play-card input[type='range']::-webkit-slider-thumb {
+  width: 11px;
+  height: 11px;
+  background: #ffffff;
+  border: 0;
+}
+
+@media (max-width: 520px) {
+  .play-card { width: calc(100vw - 32px); left: 16px; padding: 16px 14px 12px; }
+  .play-card-wave { height: 34px; }
+  .dock-disc-slot { left: calc(100% + 8px); }
+  .dock-disc { width: 38px; height: 38px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock-disc.playing,
+  .dock-disc.playing::after { animation: none; }
+  .play-card { animation: none; }
+  .play-card-wave > span { transition: none; }
+  .dock-disc { transition: none; }
+}
+
+/* 窄屏：页签栏本身就占满一行，圆碟挂在外面会顶出屏幕。
+   先把页签栏的上限压住（留出圆碟 + 间距），再收起唱片柜后面那个计数给它腾地方。 */
+@media (max-width: 599px) {
+  .view-tabs { max-width: calc(100% - 46px); }
+  .view-tabs > button { padding: 8px 8px; gap: 4px; }
+  .view-tabs > button small { display: none; }
+  .dock-disc-slot { left: calc(100% + 8px); }
+  .dock-disc { width: 38px; height: 38px; }
+}

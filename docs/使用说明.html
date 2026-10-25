@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raven Ambient Bold · 使用说明</title>
+<style>
+  :root {
+    --ink: #101010;
+    --muted: #6f6f6a;
+    --faint: #a3a29b;
+    --line: #eceae5;
+    --page: #f6f5f2;
+    --mint: #a8e6c1;
+    --lemon: #d9eb6c;
+    --lilac: #c7c0f0;
+    --coral: #f7b7a8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 24px 120px;
+    background: #fff;
+    color: var(--ink);
+    font: 400 15px/1.75 "Inter", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; }
+
+  header { padding: 72px 0 40px; }
+  .eyebrow {
+    font: 700 10px/1 "Inter", sans-serif;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  h1 {
+    margin: 18px 0 0;
+    font-size: 60px;
+    line-height: .98;
+    letter-spacing: -3px;
+    font-weight: 800;
+  }
+  h1 em { font-style: normal; color: var(--faint); }
+  .lede { margin: 22px 0 0; font-size: 15px; color: var(--muted); max-width: 34em; }
+
+  h2 {
+    margin: 64px 0 0;
+    font-size: 30px;
+    line-height: 1.2;
+    letter-spacing: -1px;
+    font-weight: 800;
+    padding-top: 28px;
+    border-top: 1px solid var(--line);
+  }
+  h2 .num {
+    display: inline-block;
+    min-width: 34px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--faint);
+    vertical-align: 6px;
+  }
+  h3 { margin: 34px 0 10px; font-size: 16px; font-weight: 700; }
+  p { margin: 12px 0; }
+  ul, ol { margin: 12px 0; padding-left: 22px; }
+  li { margin: 7px 0; }
+  strong { font-weight: 700; }
+  code {
+    font: 500 13px/1.5 "Cascadia Mono", Consolas, monospace;
+    background: var(--page);
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+  a { color: var(--ink); text-underline-offset: 3px; }
+
+  figure { margin: 26px 0; }
+  figure img {
+    width: 100%;
+    display: block;
+    border-radius: 20px;
+    border: 1px solid var(--line);
+  }
+  figcaption { margin-top: 10px; font-size: 12px; color: var(--faint); }
+
+  .card {
+    margin: 22px 0;
+    padding: 22px 24px;
+    border-radius: 20px;
+    background: var(--page);
+  }
+  .card.mint { background: var(--mint); }
+  .card.lemon { background: var(--lemon); }
+  .card.lilac { background: var(--lilac); }
+  .card.coral { background: var(--coral); }
+  .card h3 { margin-top: 0; }
+  .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+
+  .steps { counter-reset: step; list-style: none; padding: 0; }
+  .steps > li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 44px;
+    margin: 18px 0;
+  }
+  .steps > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0; top: 1px;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: #fff;
+    font: 700 13px/28px "Inter", sans-serif;
+    text-align: center;
+  }
+
+  .pill {
+    display: inline-block;
+    padding: 3px 11px;
+    border-radius: 999px;
+    background: var(--ink);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    vertical-align: 1px;
+  }
+  .pill.ghost { background: var(--page); color: var(--ink); }
+
+  table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 700; font-size: 12px; letter-spacing: .3px; color: var(--faint); text-transform: uppercase; }
+
+  details {
+    margin: 14px 0;
+    padding: 16px 20px;
+    border-radius: 16px;
+    background: var(--page);
+  }
+  details summary { cursor: pointer; font-weight: 700; font-size: 14px; }
+  details[open] summary { margin-bottom: 8px; }
+  details p { margin: 10px 0; font-size: 14px; color: var(--muted); }
+
+  footer {
+    margin-top: 80px;
+    padding-top: 28px;
+    border-top: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--faint);
+  }
+  @media (max-width: 640px) {
+    body { padding: 0 18px 80px; }
+    h1 { font-size: 40px; letter-spacing: -2px; }
+    h2 { font-size: 24px; margin-top: 48px; }
+    header { padding: 48px 0 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">A Private Collection of Sounds</div>
+  <h1>把声音，<br><em>收藏成生活。</em></h1>
+  <p class="lede">
+    Raven Ambient 是一个本地的声音唱片柜。你把喜欢的音乐和自然声收进来，
+    它按你的顺序播放音乐，同时让几路环境音一起流动——
+    音乐响起时环境音会自己退后一点，安静下来再慢慢回来。
+  </p>
+  <p class="lede">
+    全部在本机运行，不联网、不上传、不需要注册。这是提前体验版。
+  </p>
+</header>
+
+<h2><span class="num">01</span>开始用</h2>
+
+<ol class="steps">
+  <li>
+    <strong>解压后双击 <code>Raven Ambient Bold.exe</code></strong><br>
+    不需要安装。建议把整个文件夹放在一个固定的位置，之后直接从那里打开。
+    文件夹里的其他文件是运行库，不要单独删掉。
+  </li>
+  <li>
+    <strong>点顶部导航的「收藏声音」，或者唱片柜里的「再收藏一个声音」</strong><br>
+    可以一次选多个音频文件，也可以整个文件夹导入。支持 MP3、M4A、WAV、FLAC、OGG 等常见格式。
+  </li>
+  <li>
+    <strong>选好类型：音乐还是环境音</strong><br>
+    音乐按顺序一首首放；环境音是叠在音乐底下一直循环的（最多 8 路）。
+    雨声、火炉、咖啡馆这类适合放环境音。
+  </li>
+  <li>
+    <strong>点唱片左下角的 ＋，把它放进此刻</strong><br>
+    音乐的数字是播放顺序，环境音的 ✓ 表示已在流动。
+  </li>
+  <li>
+    <strong>点页签栏右边那颗黑圆碟，开始播放</strong>
+  </li>
+</ol>
+
+<figure>
+  <img src="images/01-cabinet.png" alt="唱片柜">
+  <figcaption>唱片柜：左边是唱片，右边是当前选中唱片的介绍和音量。</figcaption>
+</figure>
+
+<h2><span class="num">02</span>四个页面</h2>
+
+<h3>唱片柜</h3>
+<p>
+  你的所有唱片。默认显示「已选择」的那些；上面三个按钮可以切到「音乐」或「环境音」看全部。
+  鼠标停在唱片上，封面会像唱片盒一样打开、露出里面的黑胶；点一下可以钉住，再点一下合上。
+  右边面板永远显示一张唱片——点过哪张显示哪张，没点过就是第一张。
+</p>
+<p>
+  每张唱片都能单独调音量，环境音还能调「左右位置」「柔和程度」和「避让幅度」。
+  避让幅度是 0–24 dB：设 0 就是这张不随音乐变轻。
+</p>
+
+<h3>正在听</h3>
+<figure>
+  <img src="images/03-listening.png" alt="正在听">
+  <figcaption>唱盘上转的就是当前这首。下面可以调播放顺序、把某首移出队列。</figcaption>
+</figure>
+<p>
+  唱盘上转的那张碟，外圈的颜色和纹理是从封面主色生成的，每张唱片都不一样，
+  同一次使用中固定不变，重开软件才会重新分配。
+</p>
+<p>
+  队列里<strong>长按一首约 0.35 秒</strong>可以把它拿起来，条目会上浮跟着手指走，
+  拖到新位置松手即完成排序。右侧的 × 把它移出队列。
+</p>
+<p>
+  环境音每一行右边有播放/暂停按钮，可以单独停掉某一路（比如今天不想听雨声）。
+  这个暂停只对本次运行有效，重开软件会回到全部流动。
+</p>
+
+<h3>专注</h3>
+<figure>
+  <img src="images/05-focus.png" alt="专注">
+  <figcaption>番茄钟。计时独立于播放器，暂停音乐不会暂停计时。</figcaption>
+</figure>
+<p>
+  默认 25 分钟专注 + 5 分钟小憩，每四轮一次 15 分钟长休息。
+  右边可以切换 25/5、45/10、15/3 三档，也能关掉完成提示音。
+  计时过程中可以随时暂停、跳过当前阶段或重置。
+</p>
+<p>
+  右上角那个「专注」标签固定不变，当前在哪个阶段看计时盘中央的
+  FOCUS / SHORT BREAK / LONG BREAK。
+</p>
+
+<h3>播放卡</h3>
+<figure>
+  <img src="images/04-playcard.png" alt="播放卡">
+  <figcaption>点页签栏右边那颗圆碟弹出来。Escape 或点空白处收起。</figcaption>
+</figure>
+<p>
+  那颗圆碟在播放时会轻轻上下浮动，暂停时停住。点它弹出播放卡：
+  封面上方是实时波形，中间是进度条（可以拖），下面是顺序、上一首、播放、下一首、
+  环境音开关，最底下是音乐开关和总音量。
+</p>
+
+<h2><span class="num">03</span>几个值得知道的细节</h2>
+
+<div class="card mint">
+  <h3>环境音会自己让路</h3>
+  <p>
+    音乐响起来的时候，环境音会自动退后一点；音乐停了先保持一小段，再慢慢回来。
+    这不是硬切的压低，是按包络平滑过渡的，所以句子之间不会来回抽动。
+  </p>
+  <p>
+    每种环境音的手感不一样：森林、风、雪这类绵延的声音慢进慢出，
+    键盘、鸟、虫这类有明确起音的跟得紧、收得快。这些数值是按封面类型定好的，不需要你调。
+  </p>
+</div>
+
+<div class="card lemon">
+  <h3>导入时会自动统一响度</h3>
+  <p>
+    不同来源的音频响度常常差十几个 dB，混在一起会一段盖住另一段。
+    导入时程序会测每段的实际响度并补到同一基准，最多补 15 dB、最多压 12 dB，
+    后面还挂了一个软限幅器兜住峰值。
+  </p>
+  <p>
+    所以你会看到不同唱片的音量滑杆都在差不多的位置，但它们听起来是一样响的。
+  </p>
+</div>
+
+<div class="card lilac">
+  <h3>封面会自动配</h3>
+  <p>
+    导入时会读文件里内嵌的封面。环境音如果没有封面，会按文件名和曲名去匹配
+    17 款内置的线描封面（树、浪、火苗、雨云、雪花、鸟……）。
+    匹配不到也没关系，可以手动挑一张，或者上传自己的图。
+  </p>
+  <p>
+    没有封面的唱片，每次启动会随机配一款封套：底色取自唱片色调，
+    配晨光、地平线、拱门、轨道、涟漪、潮汐六种构图之一。
+  </p>
+</div>
+
+<div class="card coral">
+  <h3>换唱片的方式</h3>
+  <p>
+    设置里可以选「直接切换」「交叉淡化」「淡出后淡入」三种。
+    默认是交叉淡化：上一首往下走的同时下一首往上走，1 秒完成。
+  </p>
+  <p>
+    这项只作用于你手动切歌。一首歌自然播完自动接下一首时是直接接的，
+    避免收尾被拖慢。
+  </p>
+</div>
+
+<h2><span class="num">04</span>可选：让别的播放器当音乐来源</h2>
+
+<p>
+  如果你不打算下载音乐文件、平时就用网易云或 Spotify 听，有个「外部音乐」模式：
+  音乐交给那些播放器，本程序只负责环境音和避让。
+</p>
+
+<div class="card">
+  <p>
+    <strong>这条路需要额外装一个虚拟声卡（VB-Cable），不装也能用上面所有功能。</strong>
+    装它的原因是：程序没法直接读到别的播放器在放什么，只能绕一道——
+    让那个播放器的声音先进入一块虚拟声卡，本程序再从那里取出来。
+  </p>
+</div>
+
+<h3>怎么装</h3>
+<ol class="steps">
+  <li>打开文件夹里的 <code>可选-虚拟声卡</code>，右键 <code>VBCABLE_Setup_x64.exe</code>，选「以管理员身份运行」。</li>
+  <li>点 <code>Install Driver</code>。安装过程中窗口可能短暂显示「未响应」，等它自己结束就好。</li>
+  <li><strong>装完必须重启电脑</strong>，否则设备不会出现。</li>
+</ol>
+
+<h3>怎么用</h3>
+<ol class="steps">
+  <li>右键任务栏音量图标 →「声音设置」→ 把「输出」选成 <code>CABLE Input</code>。</li>
+  <li>打开你的音乐播放器，正常放歌。这时候你自己听不到声音，是正常的——声音已经进了虚拟声卡。</li>
+  <li>打开 Raven Ambient，进「设置」，把「外部音乐」开关打开。程序会自动找到 <code>CABLE Output</code>。</li>
+  <li>现在环境音会从你的真实音箱出来，并且跟着音乐自动避让。底部控制器可以直接控制那个播放器（暂停、上一首、下一首）。</li>
+</ol>
+
+<div class="card">
+  <h3>如果唱盘上没有碟、底部显示「等外部音乐」</h3>
+  <p>
+    声音是通的，但程序读不到歌名和封面。这是播放器自己没把信息交给系统，
+    <strong>不是程序的 bug</strong>。
+  </p>
+  <p>
+    网易云有个自己的开关（不同版本位置会变，可能叫「系统媒体控制」或「锁屏歌词」），
+    默认可能是关的，版本更新或重装后会回到关闭。打开它就好。
+  </p>
+</div>
+
+<details>
+  <summary>我不想用了，怎么恢复原来的声音输出</summary>
+  <p>
+    右键音量图标 →「声音设置」→ 把「输出」改回你的音箱或耳机。
+    虚拟声卡留着不占资源，想彻底删掉的话在「设置 → 应用 → 已安装的应用」里卸载 VB-Cable，
+    然后重启。
+  </p>
+</details>
+
+<details>
+  <summary>用虚拟声卡之后，别的软件没声音了</summary>
+  <p>
+    说明系统输出还停在 <code>CABLE Input</code>。改回真实设备即可。
+    虚拟声卡的作用是把声音「截走」，所以当输出设备是它的时候，你自己是听不到的。
+  </p>
+</details>
+
+<h2><span class="num">05</span>你的数据在哪</h2>
+
+<p>
+  所有东西都存在这台电脑上，路径是：
+</p>
+<pre style="margin:14px 0;padding:16px 20px;border-radius:16px;background:var(--page);font:500 13px/1.7 'Cascadia Mono',Consolas,monospace;overflow-x:auto">%APPDATA%\raven-ambient-bold</pre>
+<p>
+  导入的音频会复制一份到里面，所以原文件移动或删掉之后仍然能播。
+  这个文件夹可以整体备份，换电脑时拷过去就能接着用。
+</p>
+<p>
+  程序不会上传任何东西，也不联网。文件只在你选择的范围内读取，
+  文件夹导入是一次性扫描，不会在后台一直盯着。
+</p>
+
+<h2><span class="num">06</span>遇到问题时</h2>
+
+<table>
+  <tr><th>现象</th><th>怎么办</th></tr>
+  <tr>
+    <td>双击后闪一下就没了</td>
+    <td>先看看有没有杀毒软件拦了。如果之前装过开发环境，检查环境变量里有没有 <code>ELECTRON_RUN_AS_NODE</code>，有的话删掉再试。</td>
+  </tr>
+  <tr>
+    <td>导入的文件夹是空的</td>
+    <td>确认里面确实有音频文件，且格式在上面列的范围里。子文件夹会一起扫描，但隐藏文件夹会跳过。</td>
+  </tr>
+  <tr>
+    <td>某张唱片播不出声</td>
+    <td>先看它的音量滑杆是不是被拉到 0，再看通道开关是不是关着（关着的时候图标上有一道斜线）。</td>
+  </tr>
+  <tr>
+    <td>环境音听不见</td>
+    <td>音乐很响的时候环境音会退让，这是设计如此。把音乐暂停，或者把那张环境音的「避让幅度」调到 0。</td>
+  </tr>
+  <tr>
+    <td>专注计时重置了</td>
+    <td>关掉软件会丢。切页面、暂停音乐都不会影响计时。</td>
+  </tr>
+  <tr>
+    <td>播放卡挡住了唱盘</td>
+    <td>点空白处或按 Escape 收起即可。</td>
+  </tr>
+</table>
+
+<h2><span class="num">07</span>关于这个体验版</h2>
+
+<p>
+  这是 Windows 的提前体验版，还没做安装程序和自动更新，所以是解压即用的形式。
+  界面是「明亮版」，另有一个奶白玻璃风格的原版在开发，功能一致。
+</p>
+<p>
+  目前的限制：
+</p>
+<ul>
+  <li>只有 Windows 版。macOS 和手机版还没做。</li>
+  <li>没有签名证书，第一次运行时 Windows 可能提示「已保护你的电脑」，点「更多信息」→「仍要运行」即可。</li>
+  <li>音乐单文件上限 200 MB，环境音 50 MB / 10 分钟。</li>
+  <li>移除唱片只是移出目录，缓存还在（暂时没有清理界面的入口）。</li>
+</ul>
+<p>
+  用下来有任何觉得别扭的地方，都欢迎直接说。尤其是「哪里需要点两下才顺手」「哪个动效看着卡」
+  这类具体的感受，比笼统的评价有用得多。
+</p>
+
+<footer>
+  Raven Ambient Bold · 体验版 0.3.0 · DumbRaven · 2026
+</footer>
+
+</div>
+</body>
+</html>

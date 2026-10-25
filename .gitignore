@@ -1,0 +1,58 @@
+# 依赖与构建产物
+node_modules/
+dist/
+release/
+.cache/
+.runtime/
+.qa/
+# 用 scripts/build-nowplaying.cjs 从同目录的 .cs 编译出来，不入库
+electron/nowplaying/NowPlaying.exe
+
+# 本地工具与实验记录，不进仓库
+.research/
+.tools/
+.cable/
+
+# 开发过程中的记录与素材，不进仓库（留着本地备查）
+docs/shots/
+docs/*.mp4
+docs/动效参考与DeepSeek交接.md
+docs/动效交接规格-实施说明.md
+docs/交互修复-2026-10-20.md
+docs/修复记录-2026-10-20.md
+docs/源码审核-2026-10-20.md
+docs/主AI接手说明.md
+docs/协作风格.md
+docs/ambient-marks.jpg
+docs/color-vinyl.jpg
+docs/glass-cabinet-021.png
+docs/glass-cabinet-windows.png
+docs/bold-cabinet.png
+docs/bold-focus.png
+docs/bold-listening.png
+docs/bold-narrow.png
+docs/bold-settings.png
+
+# 探针脚本与临时文件（每次验证都会新建，不该提交）
+/.*.cjs
+/.*.ps1
+/.*.txt
+/.*.json
+/.*.png
+/blank.html
+
+# 编辑器与系统文件
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 日志与临时文件
+*.log
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+
+# 打包用的中间产物
+build/icon-preview.png

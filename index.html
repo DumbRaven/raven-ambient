@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws://127.0.0.1:5173; object-src 'none'; base-uri 'self'; frame-src 'none'" />
+    <title>Raven Ambient Bold · 唱片柜</title>
+    <!--
+      开屏动画写在这里而不是 React 里：这一段 HTML 一到就开始渲染，
+      正好盖住 bundle 下载、React 挂载、IndexedDB 读收藏那一段空白。
+      入场由下面的 CSS 自己跑；淡出由 src/splash.ts 在「动画播完 + 应用就绪」后触发。
+    -->
+    <style>
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: grid;
+        place-items: center;
+        background: #ffffff;
+        font-family: "Inter", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        transition: opacity 520ms cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      #splash.is-leaving {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .splash-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 0 34px;
+        width: 100%;
+        max-width: 460px;
+        box-sizing: border-box;
+      }
+      /* logo 原图四周留白很大（内容只占 21.9%），这里按内容框裁剪再用，否则会显得很小 */
+      .splash-mark {
+        position: relative;
+        width: 172px;
+        height: 155px;
+        overflow: hidden;
+        margin-bottom: 30px;
+        animation: splash-mark-in 1000ms cubic-bezier(0.25, 0.8, 0.35, 1) both;
+      }
+      .splash-mark img {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 465px;
+        transform: translate(-50%, -50%);
+        backface-visibility: hidden;
+      }
+      .splash-edition {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 1.7px;
+        text-transform: uppercase;
+        color: #b6b5ae;
+        animation: splash-rise 820ms cubic-bezier(0.25, 0.8, 0.35, 1) 420ms both;
+      }
+      .splash-title {
+        margin: 16px 0 0;
+        font-size: 44px;
+        line-height: 1.14;
+        letter-spacing: -1.4px;
+        font-weight: 800;
+        color: #101010;
+        animation: splash-rise 900ms cubic-bezier(0.25, 0.8, 0.35, 1) 700ms both;
+      }
+      .splash-title em {
+        font-style: normal;
+      }
+      .splash-sub {
+        margin: 20px 0 0;
+        font-size: 13px;
+        line-height: 1.7;
+        letter-spacing: -0.1px;
+        color: #8b8b85;
+        animation: splash-rise 880ms cubic-bezier(0.25, 0.8, 0.35, 1) 1000ms both;
+      }
+      .splash-sub span {
+        margin-left: 6px;
+      }
+      .splash-rule {
+        width: 100%;
+        height: 1px;
+        margin-top: 30px;
+        background: #eceae5;
+        transform-origin: center;
+        animation: splash-rule-in 900ms cubic-bezier(0.25, 0.8, 0.35, 1) 1240ms both;
+      }
+      /*
+        看不见的计时器：开屏停留多久由这条动画说了算（见 src/splash.ts）。
+        它是唯一的时长来源——不在这里另写一个数字，免得两边对不上把动画截断。
+      */
+      .splash-clock {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+        animation: splash-clock 4000ms linear both;
+      }
+      @keyframes splash-mark-in {
+        from {
+          opacity: 0;
+          transform: translateY(12px) scale(0.94);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes splash-rise {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes splash-rule-in {
+        from {
+          opacity: 0;
+          transform: scaleX(0);
+        }
+        to {
+          opacity: 1;
+          transform: scaleX(1);
+        }
+      }
+      @keyframes splash-clock {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 0;
+        }
+      }
+      @media (max-width: 520px) {
+        .splash-mark {
+          width: 138px;
+          height: 124px;
+          margin-bottom: 26px;
+        }
+        .splash-mark img {
+          width: 373px;
+        }
+        .splash-title {
+          font-size: 34px;
+          letter-spacing: -1.1px;
+        }
+        .splash-sub {
+          font-size: 12px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #splash .splash-mark,
+        #splash .splash-edition,
+        #splash .splash-title,
+        #splash .splash-sub,
+        #splash .splash-rule {
+          animation-duration: 1ms !important;
+          animation-delay: 0ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="splash" aria-hidden="true">
+      <div class="splash-inner">
+        <div class="splash-mark"><img src="./raven-logo.png" alt="" /></div>
+        <div class="splash-edition">A Private Collection of Sounds</div>
+        <h1 class="splash-title">把声音，<br /><em>收藏成生活。</em></h1>
+        <p class="splash-sub">喜欢的旋律，窗外的雨。<span>为自己留一面唱片柜。</span></p>
+        <div class="splash-rule"></div>
+      </div>
+      <div class="splash-clock"></div>
+    </div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

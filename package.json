@@ -1,0 +1,63 @@
+{
+  "name": "raven-ambient-bold",
+  "version": "0.3.0",
+  "private": true,
+  "description": "DumbRaven 的沉浸式声音空间 · 明亮版",
+  "author": "DumbRaven",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "desktop": "npm run build && electron .",
+    "package:win": "node scripts/build-nowplaying.cjs && node scripts/package-win.cjs",
+    "test": "node --test tests/*.test.ts",
+    "build:nowplaying": "node scripts/build-nowplaying.cjs"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "music-metadata": "^12.2.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.0.12",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.0"
+  },
+  "build": {
+    "appId": "studio.dumbraven.ambient.bold",
+    "productName": "Raven Ambient Bold",
+    "electronDist": "node_modules/electron/dist",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "build/raven-logo.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/raven-logo.png",
+        "to": "raven-logo.png"
+      }
+    ],
+    "win": {
+      "target": "dir",
+      "icon": "build/icon.ico",
+      "signExecutable": false
+    },
+    "asar": true,
+    "asarUnpack": [
+      "electron/nowplaying/NowPlaying.exe"
+    ]
+  }
+}
