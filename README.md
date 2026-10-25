@@ -171,6 +171,8 @@ Node 24；`npm install`（Electron 下载慢时可设 `electron_config_cache` �
 - `npm run build:nowplaying`：编译 SMTC 辅助程序（需要系统自带的 `csc.exe`，不依赖 .NET SDK）。`package:win` 会自动先跑这一步。
 - `npm run package:win`：生成 Windows 目录版。
 
+推送到 `main` 会触发 GitHub Actions：类型检查、单元测试、构建，然后把实际通过数写回上面的徽章。打 `v*` 标签会自动打包并发布到 Release；也可以在 Actions 页面手动跑一次 Release 只取构建产物。
+
 `src/player.ts` 管理队列和环境音，`src/audio.ts` 管理 Web Audio（音乐用两块音频元素轮换，切换时只推各自增益，所以能真正交叉淡化），`src/records.ts` 管理唱片模型。Electron 只提供安全桌面窗口；渲染器无 Node 权限，不加载外部网页。macOS 包和移动端后台音频尚未实现；手机宽度下介绍移至唱片柜下方。
 
 外部音乐那条链路分布在四个文件里：`src/line-in.ts` 只负责找设备、抓流、把错误翻译成中文；`src/now-playing.ts` 是纯数据层（快照解析、播放器中文名、副标题拼接），可以脱离 Electron 测；`src/now-playing-bridge.ts` 是页面与外壳的唯一通道；`electron/now-playing.cjs` 管辅助进程的生命周期和 stdin 命令队列。
