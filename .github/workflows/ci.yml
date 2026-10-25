@@ -84,6 +84,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
       - name: 把测试数写进 README 徽章
         env:
           PASSED: ${{ needs.check.outputs.passed }}
