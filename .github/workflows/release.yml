@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '要构建并发布的版本标签，例如 v0.3.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: 构建 Windows 包
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      # 这里不设 ELECTRON_SKIP_BINARY_DOWNLOAD：scripts/package-win.cjs 的
+      # electronDist 指向 node_modules/electron/dist，必须让 npm ci 正常装下二进制
+      - name: 安装依赖
+        run: npm ci --no-audit --no-fund
+
+      - name: 编译辅助程序
+        run: node scripts/build-nowplaying.cjs
+
+      - name: 打包
+        run: node scripts/package-win.cjs
+
+      - name: 打包产物自检
+        shell: bash
+        run: |
+          exe="release/win-unpacked/Raven Ambient Bold.exe"
+          asar="release/win-unpacked/resources/app.asar"
+          unpacked="release/win-unpacked/resources/app.asar.unpacked/electron/nowplaying/NowPlaying.exe"
+          test -f "$exe" || { echo "缺少 $exe"; exit 1; }
+          test -f "$asar" || { echo "缺少 $asar"; exit 1; }
+          test -f "$unpacked" || { echo "缺少 $unpacked（辅助程序没解包出来）"; exit 1; }
+          echo "exe:  $(stat -c%s "$exe") 字节"
+          echo "asar: $(stat -c%s "$asar") 字节"
+
+      - name: 压缩成 zip
+        shell: pwsh
+        run: |
+          $tag = '${{ inputs.tag }}'
+          if (-not $tag) { $tag = '${{ github.ref_name }}' }
+          $name = "Raven-Ambient-$tag-win-x64.zip"
+          Compress-Archive -Path 'release/win-unpacked/*' -DestinationPath "release/$name" -CompressionLevel Optimal
+          "ARCHIVE=release/$name" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: raven-ambient-win-x64
+          path: ${{ env.ARCHIVE }}
+          if-no-files-found: error
+
+      - name: 发布到 Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ARCHIVE }}
+          generate_release_notes: true
+          body: |
+            解压后直接运行 `Raven Ambient Bold.exe`，免安装。
+
+            外部音乐模式需要先装 [VB-Audio Virtual Cable](https://vb-audio.com/Cable/)。

@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# 同一分支只留最新一次，连推时自动取消排队中的旧任务
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: 类型检查 / 测试 / 构建
+    runs-on: windows-latest
+    timeout-minutes: 15
+    outputs:
+      passed: ${{ steps.test.outputs.passed }}
+    env:
+      # CI 不启动 Electron，省掉 ~100MB 的二进制下载
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci --no-audit --no-fund
+
+      - name: 类型检查
+        run: node node_modules/typescript/bin/tsc -b --force
+
+      - name: 单元测试
+        id: test
+        shell: pwsh
+        run: |
+          npm test *> test.log
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content test.log -Tail 40
+            Write-Error "测试失败（退出码 $LASTEXITCODE）"
+            exit 1
+          }
+          $log = Get-Content test.log -Raw
+          # 汇总行形如 "ℹ pass 175" / "ℹ fail 0"
+          if ($log -notmatch 'pass (\d+)') { Write-Error '没读到测试通过数'; exit 1 }
+          $passed = [int]$Matches[1]
+          if ($log -notmatch 'fail (\d+)') { Write-Error '没读到测试失败数'; exit 1 }
+          $failed = [int]$Matches[1]
+          if ($failed -ne 0) { Write-Error "$failed 项测试失败"; exit 1 }
+          "passed=$passed" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Output "通过 $passed 项"
+
+      - name: 构建渲染层
+        run: npm run build
+
+      - name: 检查构建产物
+        shell: pwsh
+        run: |
+          $problems = @()
+          if (-not (Test-Path dist/index.html)) { $problems += '缺少 dist/index.html' }
+          if (-not (Test-Path dist/raven-logo.png)) { $problems += '缺少 dist/raven-logo.png（开屏用的 logo 没随构建产出）' }
+          if ($problems.Count -eq 0) {
+            $html = Get-Content dist/index.html -Raw
+            if ($html -notmatch 'id="splash"') { $problems += 'dist/index.html 里没有开屏节点' }
+          }
+          if ($problems.Count) { $problems | ForEach-Object { Write-Error $_ }; exit 1 }
+          Write-Output '构建产物齐全'
+
+  badge:
+    name: 更新测试徽章
+    # 只在自己仓库的 main 上更新；PR 和 fork 一律跳过
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'DumbRaven/raven-ambient'
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 把测试数写进 README 徽章
+        env:
+          PASSED: ${{ needs.check.outputs.passed }}
+        run: node scripts/sync-badge.cjs
+
+      - name: 有变化才提交
+        run: |
+          if git diff --quiet README.md; then
+            echo "徽章已是最新，跳过提交"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md
+          git commit -m "docs: 同步测试徽章 [skip ci]"
+          git push
