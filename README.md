@@ -2,7 +2,7 @@
 
 <img src="docs/images/00-logo.png" width="180" alt="Raven Ambient">
 
-# Raven Ambient · 明亮版
+# Raven Ambient
 
 **把声音，收藏成生活。**
 
@@ -185,20 +185,14 @@ Node 24；`npm install`（Electron 下载慢时可设 `electron_config_cache` �
 
 应用图标由 `build/icon.ico` 提供，窗口与任务栏图标用 `build/raven-logo.png`；打包时该 logo 会复制到 `resources/raven-logo.png`，随应用一起分发。`build/icon-*.png` 是同一份图标的各档尺寸，需要换图时重新生成即可。
 
-## 设计参考
+## 视觉层结构
 
-参考用户提供的 [Oliscat Glass 主题展示](https://www.douyin.com/note/7696845333595699941) 的奶白、细线、透明器物和衬线排版，以及用户提供的抖音小程序 UI 合集的明亮风格（纯白底、超大黑体标题、纯色大圆角卡片、黑色胶囊底栏）。唱片封套、唱机、图形和文字为本项目独立实现，没有下载或复制参考作品素材。
+界面样式分两层：
 
-## 视觉层结构（明亮版）
+- `src/styles.css`：基础样式，负责布局、唱片盒、唱盘、队列等结构。
+- `src/skin-bold.css`：视觉覆盖层，选择器优先级略高于基础样式，负责颜色、圆角、字体、唱机、专注盘、播放卡、弹窗等。由 `src/main.tsx` 在 `import './styles.css';` 之后追加 `import './skin-bold.css';` 挂上去。
 
-原版的 `src/styles.css` 一字未改，明亮版是一层覆盖样式：
-
-- `src/skin-bold.css`：全部新视觉都写在这里，选择器优先级略高于原样式，负责颜色、圆角、字体、唱机、专注盘、播放卡、弹窗等。
-- `src/main.tsx`：`import './styles.css';` 之后追加 `import './skin-bold.css';`。
-
-**回退到奶白玻璃版**：删掉 `src/main.tsx` 里的 `import './skin-bold.css';` 这一行即可，不需要改其他文件。
-
-改明亮版时优先调 `skin-bold.css` 里的设计令牌（文件开头的 `--bold-*` 变量），而不是逐个组件改颜色。
+改视觉时优先调 `skin-bold.css` 里的设计令牌（文件开头的 `--bold-*` 变量），而不是逐个组件改颜色。
 
 ## 动效层
 
