@@ -35,6 +35,10 @@ jobs:
       - name: 编译辅助程序
         run: node scripts/build-nowplaying.cjs
 
+      # package-win.cjs 直接把 dist 和 electron 拷进暂存目录，dist 得先有
+      - name: 构建渲染层
+        run: npm run build
+
       - name: 打包
         run: node scripts/package-win.cjs
 
