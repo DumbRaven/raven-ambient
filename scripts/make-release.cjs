@@ -83,6 +83,10 @@ execFileSync('tar', ['-c', '-J', '-f', archive, '-C', OUT, 'Raven Ambient Bold']
   stdio: 'inherit', windowsHide: true,
 });
 
+// 暂存目录压完就没用了。不删的话 release/dist 里会留着 265 MB 的副本，
+// 下次再打包又会先 rmSync 掉重建一遍，白占磁盘。
+fs.rmSync(STAGE, { recursive: true, force: true });
+
 // 6. 一个双击就能解压的小脚本，省得用户去翻 7-Zip
 fs.writeFileSync(path.join(OUT, '解压后运行我.cmd'), [
   '@echo off',

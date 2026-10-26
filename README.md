@@ -86,7 +86,7 @@ npm run package:win
 # → release/win-unpacked/Raven Ambient Bold.exe
 
 npm run make:release
-# → release/dist/Raven-Ambient-v0.3.0-win-x64.tar.xz（约 82 MB）
+# → release/dist/Raven-Ambient-v0.3.1-win-x64.tar.xz（约 82 MB）
 ```
 
 用 `make:release` 而不是 `Compress-Archive`：Electron 的 dll 与 exe 用 deflate 只能压到 43%，`tar.xz` 能到 30%，整包从 134 MB 降到 82 MB。Windows 10 1803 之后系统自带 bsdtar，所以解压不需要装 7-Zip；脚本会顺手生成一个双击就能解压的 `解压后运行我.cmd`。
