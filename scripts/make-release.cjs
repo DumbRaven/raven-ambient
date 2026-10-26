@@ -2,12 +2,12 @@
 //
 // 为什么不用 zip：Electron 的 dll 与 exe 用 deflate 只能压到 43%，
 // tar + gzip 把全体数据连成一个流再压，整体能到 41%，包小一截。
-// 格式用 .tar.gz 而不是 .tar.xz：xz 能再省 28 MB，但 bsdtar 内置的 liblzma
-// 在 GitHub Actions 上压 260 MB 会段错误崩掉（本地没事），发版不能押在它上面。
+// 格式用 .tar.gz 而不是 .tar.xz：xz 能再省 28 MB，但压缩慢、代价大，
+// 且系统 tar 的 xz 编码器在 CI 上不稳（见下面第 5 步的说明）。
 // Windows 10 1803 之后系统自带 bsdtar，解压不需要装 7-Zip，双击 .cmd 就行。
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { pack } = require('./tar-gz.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'release', 'win-unpacked');
@@ -75,27 +75,14 @@ fs.writeFileSync(path.join(STAGE, '先看这里.txt'), [
 
 // 5. 压缩：整包连成一个流才压得动
 //
-// 用 gzip 而不是 xz：xz 能压到 82 MB、gzip 是 110 MB，但 bsdtar 内置的 liblzma
-// 在 GitHub Actions 的 runner 上压 260 MB 会以 0xC0000005（访问冲突）崩掉，
-// 本地单机跑得通、CI 上每次必崩。发版流程不能押在一个会随机段错误的编码器上，
-// 所以退 28 MB 换稳定。gzip 的解压兼容性也最好：Windows 自带 tar、7-Zip、WinRAR 都认。
+// 不用系统的 tar 程序：bsdtar 在 GitHub Actions 的 runner 上压 260 MB 会以
+// 0xC0000005（访问冲突）崩掉，本地每次成功；换成 xz 也一样崩。发版流程不能
+// 押在一个「本地能跑、CI 崩」的二进制上，所以用 scripts/tar-gz.cjs 自己写 tar 格式。
+// 产物与 `tar -c -z` 等价，用户端仍用系统自带 tar 解压。
 const archive = path.join(OUT, `Raven-Ambient-${tag}-win-x64.tar.gz`);
-const bytes = (function walk(dir) {
-  return fs.readdirSync(dir, { withFileTypes: true }).reduce((sum, entry) => sum
-    + (entry.isDirectory() ? walk(path.join(dir, entry.name)) : fs.statSync(path.join(dir, entry.name)).size), 0);
-})(STAGE);
-console.log('待压缩', (bytes / 1024 / 1024).toFixed(1), 'MB，开始 gzip（这一步要一分钟左右）');
-
-execFileSync('tar', ['-c', '-z', '-f', archive, '-C', OUT, 'Raven Ambient Bold'], {
-  stdio: 'inherit', windowsHide: true,
-});
-
-// 暂存目录压完就没用了。不删的话 release/dist 里会留着 265 MB 的副本，
-// 下次再打包又会先 rmSync 掉重建一遍，白占磁盘。
-fs.rmSync(STAGE, { recursive: true, force: true });
 
 // 6. 一个双击就能解压的小脚本，省得用户去翻 7-Zip
-fs.writeFileSync(path.join(OUT, '解压后运行我.cmd'), [
+const launcher = [
   '@echo off',
   'chcp 65001 >nul',
   'cd /d "%~dp0"',
@@ -110,8 +97,32 @@ fs.writeFileSync(path.join(OUT, '解压后运行我.cmd'), [
   'echo 完成，正在打开文件夹…',
   'start "" "Raven Ambient Bold"',
   'exit',
-].join('\r\n'), 'utf8');
+].join('\r\n');
 
-const size = fs.statSync(archive).size;
-console.log('分发包', (size / 1024 / 1024).toFixed(1), 'MB ->', archive);
-console.log('目录', OUT);
+(async () => {
+  const bytes = (function walk(dir) {
+    return fs.readdirSync(dir, { withFileTypes: true }).reduce((sum, entry) => sum
+      + (entry.isDirectory() ? walk(path.join(dir, entry.name)) : fs.statSync(path.join(dir, entry.name)).size), 0);
+  })(STAGE);
+  console.log('待压缩', (bytes / 1024 / 1024).toFixed(1), 'MB，开始 gzip（这一步要半分钟到一分钟）');
+
+  let lastShown = 0;
+  const size = await pack(STAGE, 'Raven Ambient Bold', archive, (done, total) => {
+    const percent = Math.floor((done / total) * 100);
+    if (percent >= lastShown + 25) {
+      lastShown = percent;
+      console.log(`  ${percent}%`);
+    }
+  }, bytes);
+
+  // 暂存目录压完就没用了。不删的话 release/dist 里会留着 265 MB 的副本，
+  // 下次再打包又会先 rmSync 掉重建一遍，白占磁盘。
+  fs.rmSync(STAGE, { recursive: true, force: true });
+  fs.writeFileSync(path.join(OUT, '解压后运行我.cmd'), launcher, 'utf8');
+
+  console.log('分发包', (size / 1024 / 1024).toFixed(1), 'MB ->', archive);
+  console.log('目录', OUT);
+})().catch((error) => {
+  console.error('打包失败：', error.message);
+  process.exitCode = 1;
+});
