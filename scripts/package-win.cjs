@@ -21,4 +21,19 @@ const result = spawnSync(process.execPath, [path.join(root, 'node_modules/electr
 // 打包用的暂存目录用完即删，避免 .qa 里堆一串 package-main-*
 fs.rmSync(input, { recursive: true, force: true });
 if (result.error) throw result.error;
+
+// 裁掉这台机器上永远用不到的着色器编译器。
+// dxcompiler.dll + dxil.dll 是 Dawn 编译 WebGPU 着色器用的；本程序只用 Canvas 2D 与 CSS 渐变，
+// WebGL 走的是另一份 d3dcompiler_47.dll。实测删掉后 Canvas 2D 逐像素一致、WebGL 着色器照常编译。
+// 注意不要动 vk_swiftshader.dll / vulkan-1.dll：那是没有显卡或显卡驱动出问题时的软件渲染兜底，
+// 省 6 MB 换一个「换台电脑就白屏」的风险不划算。
+const outDir = path.join(root, 'release', 'win-unpacked');
+for (const name of ['dxcompiler.dll', 'dxil.dll']) {
+  const target = path.join(outDir, name);
+  if (fs.existsSync(target)) {
+    fs.rmSync(target, { force: true });
+    console.log('已裁掉', name);
+  }
+}
+
 process.exitCode = result.status ?? 1;

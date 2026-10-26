@@ -13,7 +13,8 @@
     "desktop": "npm run build && electron .",
     "package:win": "node scripts/build-nowplaying.cjs && node scripts/package-win.cjs",
     "test": "node --test tests/*.test.ts",
-    "build:nowplaying": "node scripts/build-nowplaying.cjs"
+    "build:nowplaying": "node scripts/build-nowplaying.cjs",
+    "make:release": "node scripts/make-release.cjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -58,6 +59,10 @@
     "asar": true,
     "asarUnpack": [
       "electron/nowplaying/NowPlaying.exe"
+    ],
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
     ]
   }
 }
