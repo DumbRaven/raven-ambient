@@ -13,6 +13,10 @@ electron/nowplaying/NowPlaying.exe
 .tools/
 .cable/
 
+# 协作约定与本地启动脚本：是给本地开发用的，不是项目运行需要的东西
+AGENTS.md
+启动开发预览.cmd
+
 # 开发过程中的记录与素材，不进仓库（留着本地备查）
 docs/shots/
 docs/*.mp4
