@@ -1,8 +1,10 @@
 // 把 win-unpacked 打成一个「解压即用」的分发包。
 //
-// 为什么用 tar.xz 而不是 zip：Electron 的 dll 与 exe 压缩率只有 43%（zip 用 deflate），
-// 换成 xz 能到 30% 左右，整个包从 134 MB 降到 80 MB，下载时间少一大截。
-// Windows 10 1803 之后系统自带 bsdtar，所以解压不需要装 7-Zip，双击 .cmd 就行。
+// 为什么不用 zip：Electron 的 dll 与 exe 用 deflate 只能压到 43%，
+// tar + gzip 把全体数据连成一个流再压，整体能到 41%，包小一截。
+// 格式用 .tar.gz 而不是 .tar.xz：xz 能再省 28 MB，但 bsdtar 内置的 liblzma
+// 在 GitHub Actions 上压 260 MB 会段错误崩掉（本地没事），发版不能押在它上面。
+// Windows 10 1803 之后系统自带 bsdtar，解压不需要装 7-Zip，双击 .cmd 就行。
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
@@ -71,15 +73,20 @@ fs.writeFileSync(path.join(STAGE, '先看这里.txt'), [
   '再装「可选-虚拟声卡」里的驱动。不装不影响其他功能。',
 ].join('\r\n'), 'utf8');
 
-// 5. 压缩：xz -9e，全体数据连成一个流才压得动（-9 单独压 exe 只能到 31%）
-const archive = path.join(OUT, `Raven-Ambient-${tag}-win-x64.tar.xz`);
+// 5. 压缩：整包连成一个流才压得动
+//
+// 用 gzip 而不是 xz：xz 能压到 82 MB、gzip 是 110 MB，但 bsdtar 内置的 liblzma
+// 在 GitHub Actions 的 runner 上压 260 MB 会以 0xC0000005（访问冲突）崩掉，
+// 本地单机跑得通、CI 上每次必崩。发版流程不能押在一个会随机段错误的编码器上，
+// 所以退 28 MB 换稳定。gzip 的解压兼容性也最好：Windows 自带 tar、7-Zip、WinRAR 都认。
+const archive = path.join(OUT, `Raven-Ambient-${tag}-win-x64.tar.gz`);
 const bytes = (function walk(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).reduce((sum, entry) => sum
     + (entry.isDirectory() ? walk(path.join(dir, entry.name)) : fs.statSync(path.join(dir, entry.name)).size), 0);
 })(STAGE);
-console.log('待压缩', (bytes / 1024 / 1024).toFixed(1), 'MB，开始 xz -9e（这一步要一两分钟）');
+console.log('待压缩', (bytes / 1024 / 1024).toFixed(1), 'MB，开始 gzip（这一步要一分钟左右）');
 
-execFileSync('tar', ['-c', '-J', '-f', archive, '-C', OUT, 'Raven Ambient Bold'], {
+execFileSync('tar', ['-c', '-z', '-f', archive, '-C', OUT, 'Raven Ambient Bold'], {
   stdio: 'inherit', windowsHide: true,
 });
 
@@ -93,10 +100,10 @@ fs.writeFileSync(path.join(OUT, '解压后运行我.cmd'), [
   'chcp 65001 >nul',
   'cd /d "%~dp0"',
   'echo 正在解压，请稍候…',
-  `tar -xf "Raven-Ambient-${tag}-win-x64.tar.xz"`,
+  `tar -xf "Raven-Ambient-${tag}-win-x64.tar.gz"`,
   'if errorlevel 1 (',
   '  echo.',
-  '  echo 解压失败。如果系统很旧，请自己用 7-Zip 解压上面的 .tar.xz 文件。',
+  '  echo 解压失败。如果系统很旧，请自己用 7-Zip 解压上面的 .tar.gz 文件。',
   '  pause',
   '  exit /b 1',
   ')',
