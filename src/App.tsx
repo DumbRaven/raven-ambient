@@ -84,10 +84,32 @@ function SleeveMarks({ motif }: { motif: SleeveMotif }) {
  */
 // 唱片盒的开合是三态：'open' 钉住掀开、'closed' 钉住合上、undefined 交给鼠标悬停。
 // 之所以要 'closed'，是因为刚合上时鼠标还停在卡片上，光去掉 'open' 会被 hover 立刻again掀开。
-function RecordCard({ record, cover, art, selected, order, flip, playing, onFocus, onSelect }: { record: RecordItem; cover?: string; art?: SleeveArt; selected: boolean; order: number; flip?: 'open' | 'closed'; playing: boolean; onFocus: () => void; onSelect: () => void }) {
+function RecordCard({ record, cover, art, selected, justAdded, order, flip, playing, onFocus, onSelect }: { record: RecordItem; cover?: string; art?: SleeveArt; selected: boolean; justAdded?: boolean; order: number; flip?: 'open' | 'closed'; playing: boolean; onFocus: () => void; onSelect: () => void }) {
+  const mark = useRef<HTMLButtonElement>(null);
+  // 加进队列的那一下：圆圈弹一下，外面荡开一圈淡环。
+  // 用 WAAPI 而不是切 class——同名 CSS animation 在同一元素上重加不会重播，
+  // 而用户连着点同一张是完全可能的。
+  useEffect(() => {
+    const node = mark.current;
+    if (!justAdded || !node || typeof node.animate !== 'function') return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    node.animate([
+      { transform: 'scale(0.7)' },
+      { transform: 'scale(1.16)', offset: 0.55 },
+      { transform: 'scale(1)' },
+    ], { duration: 420, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
+    const ring = document.createElement('span');
+    ring.className = 'select-ring';
+    node.append(ring);
+    ring.animate([
+      { transform: 'scale(0.7)', opacity: 0.34 },
+      { transform: 'scale(2)', opacity: 0 },
+    ], { duration: 460, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' }).finished
+      .then(() => ring.remove(), () => ring.remove());
+  }, [justAdded]);
   return <li className={`record-card ${selected ? 'selected' : ''}`} data-flip={flip}>
     <button className="record-preview" onClick={onFocus} aria-label={`打开 ${record.name} 的唱片盒`}><Sleeve record={record} cover={cover} art={art} playing={playing} /></button>
-    <p><button className={`select-record ${selected ? 'on' : ''}`} aria-pressed={selected} aria-label={`${selected ? '取消选择' : '选择'}${record.name}`} onClick={onSelect}>{selected ? (order > 0 && order <= 9 ? <RollNumber value={order} /> : <Check size={11} />) : null}</button><span className="record-name">{record.name}</span>{playing && <span className="playing-bars" aria-label="正在播放"><i /><i /><i /></span>}</p>
+    <p><button ref={mark} className={`select-record ${selected ? 'on' : ''}`} aria-pressed={selected} aria-label={`${selected ? '取消选择' : '选择'}${record.name}`} onClick={onSelect}>{selected ? (order > 0 && order <= 9 ? <RollNumber value={order} /> : <Check size={11} />) : null}</button><span className="record-name">{record.name}</span>{playing && <span className="playing-bars" aria-label="正在播放"><i /><i /><i /></span>}</p>
   </li>;
 }
 export default function App() {
@@ -104,6 +126,9 @@ export default function App() {
   const [focusId, setFocusId] = useState<string>();
   // 唱片盒当前被点开的是哪一张。open=false 表示刚合上、正在压住鼠标悬停。
   const [flip, setFlip] = useState<{ id: string; open: boolean }>();
+  // 刚加进队列的那一张，用来让加号弹一下。token 让同一张连续加两次也能重播动画。
+  const [justAdded, setJustAdded] = useState<{ id: string; token: number }>();
+  const justAddedTimer = useRef<number | undefined>(undefined);
   const [modal, setModal] = useState<Modal>(null);
   const [importType, setImportType] = useState<RecordType>('music');
   const [busy, setBusy] = useState('');
@@ -247,7 +272,9 @@ export default function App() {
   const titleRecord = outgoing ?? current;
   // 外部音乐模式下唱盘上转的是别的播放器正在放的那首：没有真唱片，就用封面和歌名拼一张
   const externalDisc: TurntableDisc | undefined = cabinet.lineMode && hasTrack(nowPlaying) ? { kind: 'external', info: nowPlaying } : undefined;
-  const selectedCount = cabinet.queue.length + cabinet.ambience.length;
+  // 外部音乐模式下唱片柜不显示音乐那一栏，所以「已选择」也只能算环境音。
+  // 照旧把 queue 加进去的话，模式一开就会显示「已选择 7」而柜子里只有 2 张。
+  const selectedCount = (cabinet.lineMode ? 0 : cabinet.queue.length) + cabinet.ambience.length;
   const coverFor = (record: RecordItem) => ambientCoverUrl(record.coverPreset) ?? (record.coverId ? covers[record.id] : undefined);
 
   // 圆碟和播放卡共用的「现在在放什么」。外部音乐优先，其次本地音乐，最后退回环境音。
@@ -311,7 +338,20 @@ export default function App() {
   // 合上是「钉住」而不是「这一瞬间」：鼠标移开、焦点还在按钮上都不能把它掀开。
   // 之前这里会在指针离开时清掉状态，结果 :focus-within 立刻接管，卡片自己弹开。
   // 想再看悬停预览就点别的唱片，那张的锁定会随之让位。
-  function choose(record: RecordItem) { try { commit(toggleRecord(cabinetRef.current, record.id)); setFocusId(record.id); } catch (error) { notify(message(error)); } }
+  // 「刚刚加进去」的那一张留个记号，让圆圈弹一下再归位。
+  // 只在「加进来」的时候放，取消选择不放——撤销不需要庆祝。
+  function choose(record: RecordItem) {
+    try {
+      const wasSelected = selected(record);
+      commit(toggleRecord(cabinetRef.current, record.id));
+      setFocusId(record.id);
+      if (!wasSelected) {
+        setJustAdded({ id: record.id, token: (justAdded?.token ?? 0) + 1 });
+        window.clearTimeout(justAddedTimer.current);
+        justAddedTimer.current = window.setTimeout(() => setJustAdded(undefined), 460);
+      }
+    } catch (error) { notify(message(error)); }
+  }
   /**
    * 单独开关某一路环境音。只改 muted 名单，不动 ambience——
    * 暂停的那一路留在队列里，随时能恢复，也不会把它从唱片柜里取消选择。
@@ -391,7 +431,7 @@ export default function App() {
         if (active) notify(`本地收藏读取失败：${message(error)}。旧数据仍保留。`);
       }
     })();
-    return () => { active = false; line.current.close(); player.current?.dispose(); player.current = null; for (const url of urls.current.values()) URL.revokeObjectURL(url); urls.current.clear(); };
+    return () => { active = false; line.current.close(); player.current?.dispose(); player.current = null; window.clearTimeout(justAddedTimer.current); for (const url of urls.current.values()) URL.revokeObjectURL(url); urls.current.clear(); };
   }, []);
   useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(''), 6000); return () => clearTimeout(timer); }, [notice]);
   // Escape 走自己的关闭路径：dialog 的 cancel 事件不冒泡，React 的 onCancel 收不到，
@@ -489,7 +529,7 @@ export default function App() {
             {!cabinet.records.length ? <div className="empty-cabinet"><div className="empty-art"><Sleeve playing={false} preview /></div><span className="shelf-line" /><div className="empty-copy"><span>YOUR FIRST RECORD</span><h2>第一张，留给最喜欢的声音。</h2><p>把本地音乐或环境音放进来，<br />这面小小的唱片柜就有了故事。</p><button className="primary-button" disabled={!ready || !!busy} onClick={() => openImport()}><Plus size={14} />放入第一张唱片</button></div></div> : <>
               <div className="shelf-label"><span>{filter === 'music' ? 'SIDE A / MELODIES' : filter === 'ambient' ? 'SIDE B / ATMOSPHERES' : 'YOUR SELECTION / 此刻的声音'}</span><span><RollNumber value={visible.length} minDigits={2} /></span></div>
 
-              <ul className="record-grid">{shown.map(record => <RecordCard key={record.id} record={record} cover={coverFor(record)} art={artFor(record)} selected={selected(record)} order={cabinet.queue.indexOf(record.id) + 1} flip={flip?.id === record.id ? (flip.open ? 'open' : 'closed') : undefined} playing={isPlaying(record)} onFocus={() => { if (!modal) toggleFlip(record.id); }} onSelect={() => choose(record)} />)}</ul>
+              <ul className="record-grid">{shown.map(record => <RecordCard key={record.id} record={record} cover={coverFor(record)} art={artFor(record)} selected={selected(record)} justAdded={justAdded?.id === record.id} order={cabinet.queue.indexOf(record.id) + 1} flip={flip?.id === record.id ? (flip.open ? 'open' : 'closed') : undefined} playing={isPlaying(record)} onFocus={() => { if (!modal) toggleFlip(record.id); }} onSelect={() => choose(record)} />)}</ul>
               {pages > 1 && <nav className="shelf-pager" aria-label="唱片分页">
                 <button className="pager-arrow" aria-label="上一页" disabled={currentPage === 0} onClick={() => turnPage(-1)}><ChevronLeft size={13} /></button>
                 <div className="pager-numbers">{Array.from({ length: pages }, (_, index) => <button key={index} className={index === currentPage ? 'active' : ''} aria-label={`第 ${index + 1} 页`} aria-current={index === currentPage ? 'page' : undefined} onClick={() => goToPage(index)}>{String(index + 1).padStart(2, '0')}</button>)}</div>

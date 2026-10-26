@@ -2434,3 +2434,72 @@ input[type="range"]::-webkit-slider-thumb {
   .dock-disc-slot { left: calc(100% + 8px); }
   .dock-disc { width: 38px; height: 38px; }
 }
+
+/* ---------- 添加按钮的反馈（第二十批） ---------- */
+
+/* 两个「加一个声音」的入口：唱片柜底部那条虚线，和每张唱片名前面的小圆圈。
+   都是加法，反馈就统一成「按下去缩一下、松开的时候转半圈」——
+   转的方向和唱片的转向一致，看起来像把新唱片放上转盘。 */
+
+.add-to-shelf {
+  /* 单独把 transform 拿出来，避免动到基础样式里的布局属性 */
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.16s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.add-to-shelf:not(:disabled):active {
+  transform: scale(0.985);
+}
+/* 图标本身在被按下时转一点，按钮整体不动，读起来更轻 */
+.add-to-shelf > svg {
+  transition: transform 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.add-to-shelf:not(:disabled):hover > svg {
+  transform: rotate(90deg);
+}
+.add-to-shelf:not(:disabled):active > svg {
+  transform: rotate(135deg);
+}
+
+/* 圆圈加号：用一条会收放的十字线，不用字符，这样不同浏览器里粗细一致。
+   未选中时是「+」，选中后变成对勾或序号，所以只在未选中态画十字。 */
+.select-record {
+  position: relative;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.16s cubic-bezier(0.23, 1, 0.32, 1);
+}
+/* 加进去时荡开的淡环，由 RecordCard 用 WAAPI 创建和移除 */
+.select-ring {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1px solid #101010;
+  pointer-events: none;
+}
+.select-record:not(:disabled):active {
+  transform: scale(0.88);
+}
+/* 悬停时圆圈微微放大，暗示「这里可以点」 */
+@media (hover: hover) and (pointer: fine) {
+  .select-record:not(:disabled):hover {
+    transform: scale(1.08);
+  }
+}
+
+/* 刚加进队列的那一下：圆圈弹一下、外面荡开一圈淡环，告诉用户「已经进去了」。
+   触发不用 class 切换而用 Web Animations（在 RecordCard 里调），
+   因为 CSS animation 在同一个元素上重加一次同名 class 不会重播，
+   而用户完全可能连着点两下同一张。 */
+
+/* 减少动画：只留下颜色变化，去掉位移、缩放与扩散环 */
+@media (prefers-reduced-motion: reduce) {
+  .add-to-shelf,
+  .add-to-shelf > svg,
+  .select-record {
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+  }
+  .add-to-shelf:not(:disabled):active,
+  .add-to-shelf:not(:disabled):hover > svg,
+  .select-record:not(:disabled):active,
+  .select-record:not(:disabled):hover {
+    transform: none;
+  }
+}
+

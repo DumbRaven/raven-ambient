@@ -112,7 +112,11 @@ function attachNowPlaying() {
   // 页面没有 preload，只能靠主进程主动去取它的 outbox。
   // 400ms 一次，空数组时几乎不花钱；拿到就清空，避免重复执行。
   setInterval(async () => {
-    const win = require('electron').BrowserWindow.getAllWindows()[0];
+    // 必须排除专注小窗：它也是 BrowserWindow，而且里面没有 outbox 这套变量。
+    // 以前按 [0] 取，只有一个窗口时没事；有了小窗之后可能取到小窗，
+    // 于是命令永远读不到，传输键看着像失灵。
+    const win = require('electron').BrowserWindow.getAllWindows()
+      .find((item) => !item.isDestroyed() && !String(item.webContents.getURL()).includes('mini.html'));
     if (!win || win.isDestroyed()) return;
     let actions;
     try {
