@@ -63,7 +63,7 @@ jobs:
           node scripts/make-release.cjs
           $name = "Raven-Ambient-$tag-win-x64.tar.gz"
           "ARCHIVE=release/dist/$name" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "LAUNCHER=release/dist/解压后运行我.cmd" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "LAUNCHER=release/dist/RUN-ME.cmd" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
@@ -83,8 +83,8 @@ jobs:
             ${{ env.LAUNCHER }}
           generate_release_notes: true
           body: |
-            下载 `Raven-Ambient-*-win-x64.tar.gz` 和 `解压后运行我.cmd`，把两个文件放到同一个文件夹里，
-            双击 `解压后运行我.cmd` 就会解压并打开目录，然后运行里面的 `Raven Ambient Bold.exe`。免安装。
+            下载 `Raven-Ambient-*-win-x64.tar.gz` 和 `RUN-ME.cmd`，把两个文件放到同一个文件夹里，
+            双击 `RUN-ME.cmd` 就会解压并打开目录，然后运行里面的 `Raven Ambient Bold.exe`。免安装。
 
             也可以自己用 7-Zip 解压那个 `.tar.gz`。Windows 10 1803 之后系统自带的 tar 也能解。
 

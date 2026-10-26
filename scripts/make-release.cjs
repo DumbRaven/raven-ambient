@@ -82,6 +82,11 @@ fs.writeFileSync(path.join(STAGE, '先看这里.txt'), [
 const archive = path.join(OUT, `Raven-Ambient-${tag}-win-x64.tar.gz`);
 
 // 6. 一个双击就能解压的小脚本，省得用户去翻 7-Zip
+//
+// 文件名用 ASCII：GitHub 的 upload-artifact 处理不了非 ASCII 文件名，
+// 会把「解压后运行我.cmd」改写成 default.cmd，用户下下来就不知道那是什么了。
+// 中文说明写在脚本内容和 Release 正文里。
+const LAUNCHER = 'RUN-ME.cmd';
 const launcher = [
   '@echo off',
   'chcp 65001 >nul',
@@ -118,7 +123,7 @@ const launcher = [
   // 暂存目录压完就没用了。不删的话 release/dist 里会留着 265 MB 的副本，
   // 下次再打包又会先 rmSync 掉重建一遍，白占磁盘。
   fs.rmSync(STAGE, { recursive: true, force: true });
-  fs.writeFileSync(path.join(OUT, '解压后运行我.cmd'), launcher, 'utf8');
+  fs.writeFileSync(path.join(OUT, LAUNCHER), launcher, 'utf8');
 
   console.log('分发包', (size / 1024 / 1024).toFixed(1), 'MB ->', archive);
   console.log('目录', OUT);

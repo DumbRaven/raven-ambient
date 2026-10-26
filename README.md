@@ -89,7 +89,7 @@ npm run make:release
 # → release/dist/Raven-Ambient-v0.3.1-win-x64.tar.gz（约 110 MB）
 ```
 
-用 `make:release` 而不是 `Compress-Archive`：Electron 的 dll 与 exe 用 deflate 只能压到 43%，把整包连成一个流用 gzip 能到 41%，包小一截。格式选了 `.tar.gz` 而不是压缩率更高的 `.tar.xz`——后者在 GitHub Actions 的 runner 上会段错误崩掉，发版不能押在一个会随机崩的编码器上。Windows 10 1803 之后系统自带 bsdtar，所以解压不需要装 7-Zip；脚本会顺手生成一个双击就能解压的 `解压后运行我.cmd`。
+用 `make:release` 而不是 `Compress-Archive`：Electron 的 dll 与 exe 用 deflate 只能压到 43%，把整包连成一个流用 gzip 能到 41%，包小一截。tar 格式由 `scripts/tar-gz.cjs` 自己写（见下面「动效层」之前的说明），不调用系统的 `tar`——那个程序在 GitHub Actions 的 runner 上压大文件会段错误，本地却每次都成功。Windows 10 1803 之后系统自带 bsdtar，所以解压不需要装 7-Zip；脚本会顺手生成一个双击就能解压的 `RUN-ME.cmd`。
 
 首次打开会播放一段开屏动画，随后进入唱片柜。点「收藏声音」导入音乐或环境音即可。
 
