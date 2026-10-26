@@ -68,6 +68,8 @@
 - **纯本地。** 文件只在你自己选的范围内读取，不连音乐平台、不上传、不联网。音频副本存在本地 IndexedDB，原文件挪走了照样能放。
 - **没有音乐文件也能用。** 「外部音乐模式」让网易云、Spotify 这些播放器去放歌，本程序只管环境音和避让（需要 VB-Cable 虚拟声卡）。
 
+**关于体积：** 分发包约 82 MB，解压后 261 MB。其中 204 MB 是 Electron 运行时（Chromium + V8 + Node），我们自己的代码与全部 SVG 封面只有 1.2 MB。已经压掉的部分：语言包只留中英文、去掉本项目用不到的 WebGPU 着色器编译器、下载格式改 `tar.xz`。
+
 ## 快速开始
 
 需要 **Node 24**。
@@ -82,7 +84,12 @@ npm run desktop      # 构建并启动
 ```bash
 npm run package:win
 # → release/win-unpacked/Raven Ambient Bold.exe
+
+npm run make:release
+# → release/dist/Raven-Ambient-v0.3.0-win-x64.tar.xz（约 82 MB）
 ```
+
+用 `make:release` 而不是 `Compress-Archive`：Electron 的 dll 与 exe 用 deflate 只能压到 43%，`tar.xz` 能到 30%，整包从 134 MB 降到 82 MB。Windows 10 1803 之后系统自带 bsdtar，所以解压不需要装 7-Zip；脚本会顺手生成一个双击就能解压的 `解压后运行我.cmd`。
 
 首次打开会播放一段开屏动画，随后进入唱片柜。点「收藏声音」导入音乐或环境音即可。
 
@@ -189,9 +196,10 @@ Node 24；`npm install`（Electron 下载慢时可设 `electron_config_cache` �
 
 - `npm run dev`：本地前端。
 - `npm run desktop`：构建并启动 Electron。
-- `npm test`：音频避让及节点连接、队列、封面匹配、数据恢复边界，避让包络的淡入淡出与迟滞防抖、按封面类型分配手感，专注时钟的时长与阶段切换，唱片柜分页的页码收敛，随机封套的稳定哈希与款式清单，彩色胶盘的压片工艺分配与封面取色、暗封面的明度兜底，音乐/环境音双通道的独立开关与播放顺序切换，队列拖拽排序的位置计算，换唱片过渡的双唱盘轮换与过渡方式持久化，存储层在切换 driver 后的读写与镜像降级，环境音单独暂停的名单语义与不进存档，响度归一化的测量与上下限、混音配平（音乐总音量共用、环境音系数、叠加补偿），外部音乐的歌名解析与封面白名单、虚拟声卡的设备匹配与错误文案，以及动效层（滚动数字的数值插值、拖拽落位的插入线、表单错误反馈、播放键图标切换）。
+- `npm test`：音频避让及节点连接、队列、封面匹配、数据恢复边界，避让包络的淡入淡出与迟滞防抖、按封面类型分配手感，专注时钟的时长与阶段切换，唱片柜分页的页码收敛，随机封套的稳定哈希与款式清单，彩色胶盘的压片工艺分配与封面取色、暗封面的明度兜底，音乐/环境音双通道的独立开关与播放顺序切换，队列拖拽排序的位置计算，换唱片过渡的双唱盘轮换与过渡方式持久化，存储层在切换 driver 后的读写与镜像降级，环境音单独暂停的名单语义与不进存档，响度归一化的测量与上下限、混音配平（音乐总音量共用、环境音系数、叠加补偿），外部音乐的歌名解析与封面白名单、虚拟声卡的设备匹配与错误文案，专注小窗的窗口尺寸与位置约束，以及动效层（滚动数字的数值插值、拖拽落位的插入线、表单错误反馈、播放键图标切换、加号反馈的触发条件）。
 - `npm run build:nowplaying`：编译 SMTC 辅助程序（需要系统自带的 `csc.exe`，不依赖 .NET SDK）。`package:win` 会自动先跑这一步。
 - `npm run package:win`：生成 Windows 目录版。
+- `npm run make:release`：生成免安装分发包（先跑 `package:win`）。
 
 推送到 `main` 会触发 GitHub Actions：类型检查、单元测试、构建，然后把实际通过数写回上面的徽章。打 `v*` 标签会自动打包并发布到 Release；也可以在 Actions 页面手动跑一次 Release 只取构建产物。
 
@@ -248,6 +256,10 @@ Node 24；`npm install`（Electron 下载慢时可设 `electron_config_cache` �
 - 唱片盒开合：点击态用 `data-flip="open" | "closed"` 并加 `!important`，压过原样式的 `:hover` 和 **`:focus-within`**。
   - 只靠 `:hover` 不够。点过卡片后内部按钮获得焦点，鼠标移开时 `:hover` 消失但焦点还在，`:focus-within` 会立刻把盒子重新掀开，表现成「合上后又自己打开」。
   - 不要在 `pointerleave` 时清掉 `closed` 状态，那正好给 `:focus-within` 让路。想恢复悬停预览就点别的唱片。
+- 加号反馈：两个「加一个声音」的入口（唱片柜底部虚线、每张唱片名前的圆圈）按下缩一下、图标转半圈；加进队列时圆圈弹一下并荡开一圈淡环。
+  - **用 WAAPI（`node.animate()`）而不是切 class**。同名 CSS animation 在同一元素上重加一次不会重播，而用户连着点同一张是完全可能的。
+  - 扩散环是运行时 `document.createElement('span')` 插进去的，动画 `finished` 后自己 `remove()`，不留残留节点。
+  - 只有「从未选中变成选中」才触发，取消选择不放——撤销不需要庆祝。`justAdded` 带 `token` 递增，保证同一张连点两次也能重播。
 - 连续曲率圆角：`skin-bold.css` 末尾「第十七批」用 `corner-shape: superellipse(1.2)` 统一 21 处胶囊，外层 `@supports` 包着。
   - 标准 `border-radius: 999px` 在 638×97 的胶囊上会被钳到高度一半，两端是标准半圆、中间直线，曲率从 1/r 突降到 0，看起来有折点。`squircle` 约等于超椭圆 n=4（苹果图标那档），但在这条长胶囊上端点收得太快、偏方；n=1.2 落在两者正中间。
   - **圆形元素要排除**（`border-radius: 50%` 的播放键、通道按钮、顺序按钮）——超椭圆会把圆变成圆角方形。
@@ -260,6 +272,8 @@ Node 24；`npm install`（Electron 下载慢时可设 `electron_config_cache` �
 - **打不开、一闪就退**：检查环境变量里有没有残留 `ELECTRON_RUN_AS_NODE`，它会让 exe 退化成纯 Node，跑完就退出。清掉再启动。
 - **打包报 `EBUSY: resource busy or locked`**：先彻底关掉正在运行的旧版本，再删 `release/win-unpacked`，然后重跑 `package:win`。不删的话 exe 的版本信息会退化成 `Electron`、文件大小也会小一点。
 - **歌名对不上、封面是空白**：先跑 `electron\nowplaying\NowPlaying.exe --list` 看有没有会话输出。会话挑的是「按可执行名排序 + 播放状态」打分最低的那个，所以开着浏览器暂停着的会话不会抢到。
+- **播放卡上的上一首/下一首对网易云没反应**：先单独跑一次 `NowPlaying.exe --watch`，如果能收到快照，说明辅助程序没问题，是主进程没找到页面去取命令。`electron/now-playing.cjs` 轮询 `outbox` 时要**排除专注小窗**——它也是 `BrowserWindow`，按数组下标取可能取到它，而小窗里没有那套变量。日志里搜 `mini.html` 能确认。
+- **唱片柜显示「已选择 7」但柜子里只有 2 张**：外部音乐模式下音乐那一栏被隐藏了，计数就不能再把 `queue` 算进去。
 
 本版为未签名的本地预览包，尚未包含安装器或自动更新。
 
