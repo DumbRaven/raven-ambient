@@ -73,23 +73,35 @@ jobs:
           path: ${{ env.ARCHIVE }}
           if-no-files-found: error
 
+      # 说明从 CHANGELOG.md 里按版本号抽，而不是从提交记录拼：
+      # 提交信息是写给改代码的人看的（fix(batch23)、perf(build)），
+      # 用户想知道的是「这一版多了什么功能」。写不在 CHANGELOG 里的提交就不该出现在说明里。
       # 这里不能写 here-string：缩进会被原样保留，整段 Markdown 会变成代码块
       - name: 整理这一版的更新内容
         shell: pwsh
         run: |
-          $prev = git describe --tags --abbrev=0 'HEAD^' 2>$null
-          if (-not $prev) { $prev = 'v0.3.0' }
-          # 发版流程自身的提交对用户没有意义，别写进更新清单
-          $log = git log "$prev..HEAD" --pretty=format:'%s' |
-            Where-Object { $_ -notmatch '^(docs|chore)\(release\)' } |
-            ForEach-Object { "- $_" }
-          if (-not $log) { $log = @('- 细节修补') }
+          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $lines = Get-Content CHANGELOG.md -Encoding utf8
+          $start = -1
+          for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match "^##\s+$([regex]::Escape($version))\s*$") { $start = $i + 1; break }
+          }
+          if ($start -lt 0) {
+            Write-Error "CHANGELOG.md 里没有 $version 这一节"
+            exit 1
+          }
+          $section = @()
+          for ($i = $start; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match '^##\s') { break }
+            $section += $lines[$i]
+          }
+          # 去掉首尾空行
+          while ($section.Count -gt 0 -and -not $section[0].Trim()) { $section = $section[1..($section.Count - 1)] }
+          while ($section.Count -gt 0 -and -not $section[-1].Trim()) { $section = $section[0..($section.Count - 2)] }
           $parts = @()
           $parts += '## 这一版改了什么'
           $parts += ''
-          $parts += $log
-          $parts += ''
-          $parts += '完整对比：https://github.com/DumbRaven/raven-ambient/compare/{0}...{1}' -f $prev, $env:GITHUB_REF_NAME
+          $parts += $section
           $parts += ''
           $parts += '## 怎么用'
           $parts += ''
