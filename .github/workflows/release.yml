@@ -20,7 +20,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
+      # fetch-depth: 0 才能读到历史与 tag——生成「这一版改了什么」要用 git describe 找上一个版本
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -70,14 +73,32 @@ jobs:
           path: ${{ env.ARCHIVE }}
           if-no-files-found: error
 
+      # 这里不能写 here-string：缩进会被原样保留，整段 Markdown 会变成代码块
+      - name: 整理这一版的更新内容
+        shell: pwsh
+        run: |
+          $prev = git describe --tags --abbrev=0 'HEAD^' 2>$null
+          if (-not $prev) { $prev = 'v0.3.0' }
+          $log = git log "$prev..HEAD" --pretty=format:'- %s'
+          $parts = @()
+          $parts += '## 这一版改了什么'
+          $parts += ''
+          $parts += $log
+          $parts += ''
+          $parts += '完整对比：https://github.com/DumbRaven/raven-ambient/compare/{0}...{1}' -f $prev, $env:GITHUB_REF_NAME
+          $parts += ''
+          $parts += '## 怎么用'
+          $parts += ''
+          $parts += '下载 `Raven-Ambient-*-win-x64.zip`，解压后双击里面的 `Raven Ambient Bold.exe`。免安装。'
+          $parts += ''
+          $parts += '## 必要组件'
+          $parts += ''
+          $parts += '外部音乐模式（可选）需要 [VB-Audio Virtual Cable](https://vb-audio.com/Cable/)，分发包里的「可选-虚拟声卡」文件夹有安装包和使用说明。不装不影响其他功能。'
+          Set-Content -Path RELEASE-NOTES.md -Value $parts -Encoding utf8
+
       - name: 发布到 Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.ARCHIVE }}
-          generate_release_notes: true
-          body: |
-            下载 `Raven-Ambient-*-win-x64.zip`，解压后双击里面的 `Raven Ambient Bold.exe`。免安装。
-
-            外部音乐模式需要先装 [VB-Audio Virtual Cable](https://vb-audio.com/Cable/)，
-            分发包里的「可选-虚拟声卡」文件夹有安装包和使用说明。
+          body_path: RELEASE-NOTES.md
