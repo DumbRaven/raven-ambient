@@ -1,8 +1,12 @@
 const { app, BrowserWindow, screen, session } = require('electron');
 const path = require('node:path');
 const { attachNowPlaying } = require('./now-playing.cjs');
+const { attachFocusMini } = require('./focus-mini.cjs');
 
 if (process.env.RAVEN_DATA_DIR) app.setPath('userData', path.resolve(process.env.RAVEN_DATA_DIR));
+
+/** 主窗口。小组件是独立窗口，所有「找窗口」的地方都得认准这个。 */
+let mainWindow = null;
 
 // 窗口与任务栏图标。打包后图标在 resources 里，开发时直接用 build 目录。
 function appIcon() {
@@ -41,6 +45,10 @@ function createWindow() {
   // 兜底：万一首帧迟迟不来（加载失败、显卡异常），也要把窗口亮出来，不能卡在后台。
   setTimeout(() => { if (!win.isDestroyed() && !win.isVisible()) win.show(); }, 5000);
   win.loadFile(path.join(__dirname, '../dist/index.html'));
+  mainWindow = win;
+  win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
+  attachFocusMini(win);
+  return win;
 }
 
 // Electron 的锁按 userData 目录隔离，验证目录不会占用正式收藏的实例。
@@ -48,7 +56,8 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
 app.on('second-instance', () => {
-  const win = BrowserWindow.getAllWindows()[0];
+  // 只找主窗口：小组件也是 BrowserWindow，按数组下标取会拿到它。
+  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : BrowserWindow.getAllWindows().find(w => w.isVisible() && !w.isAlwaysOnTop());
   if (!win) return;
   if (win.isMinimized()) win.restore();
   win.show(); win.focus();
@@ -68,7 +77,8 @@ app.whenReady().then(() => {
     return types.length === 0 || types.every((type) => type === 'audio');
   });
   createWindow();
-  app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+  app.on('activate', () => { if (!mainWindow || mainWindow.isDestroyed()) createWindow(); });
 });
+// 小组件是独立窗口，主窗口关掉后它还在，所以不能靠「窗口全关」来退出。
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 }

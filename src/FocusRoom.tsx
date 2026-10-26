@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
-import { ArrowRight, Pause, Play, RotateCcw, SkipForward } from 'lucide-react';
+import { ArrowRight, Pause, PictureInPicture2, Play, RotateCcw, SkipForward } from 'lucide-react';
 import {
   clock,
   applyFocusSettings,
@@ -24,6 +24,7 @@ import {
   type FocusState,
 } from './focus';
 import { getText, setText } from './store.ts';
+import { listenFocusCommand, publishFocus, requestMiniFocus } from './focus-bridge';
 
 const SETTINGS_KEY = 'raven-focus-settings-v1';
 const HISTORY_KEY = 'raven-focus-history-v1';
@@ -148,6 +149,21 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
   const roundsBeforeLong = state.session?.roundsBeforeLong ?? settings.roundsBeforeLong;
   const chapter = Math.min(state.rounds + 1, roundsBeforeLong);
 
+  // 把计时状态交给桌面的小窗口。规则是：只要开始过（或者暂停着没走完）就显示，
+  // 彻底重置回初始状态之后就收起来——那时桌面上留一个 25:00 的框没有意义。
+  useEffect(() => {
+    const hasBegun = Boolean(state.session) || state.running || remaining < total;
+    publishFocus({
+      phase: state.phase,
+      running: state.running,
+      remaining: Math.max(0, remaining),
+      total: Math.max(1, total),
+      rounds: state.rounds,
+      roundsBeforeLong,
+      visible: hasBegun,
+    });
+  }, [state, remaining, total, roundsBeforeLong]);
+
   useEffect(() => {
     if (!state.running) return;
     const timer = window.setInterval(() => setNow(Date.now()), 250);
@@ -201,6 +217,19 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [active, toggle]);
+
+  // 桌面小窗上的按钮：暂停/继续、跳过。
+  // 小窗不认计时逻辑，只把动作丢回来，真正的状态推进还是在这里发生。
+  const skip = useCallback(() => {
+    const at = Date.now();
+    setNow(at);
+    setState((current) => skipFocus(current, settings));
+  }, [settings]);
+
+  useEffect(() => listenFocusCommand((action) => {
+    if (action === 'toggle') toggle();
+    else if (action === 'skip') skip();
+  }), [toggle, skip]);
 
   function applySettings(patch: Partial<FocusSettings>) {
     const next = sanitizeFocusSettings({ ...settings, ...patch });
@@ -268,6 +297,16 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
               aria-label={`跳过${phaseNames[state.phase]}`}
             >
               <SkipForward size={14} />
+            </button>
+            {/* 小窗被收起之后从这里找回来。没开始计时就没有小窗，按钮也就没意义。 */}
+            <button
+              className="secondary-button"
+              onClick={requestMiniFocus}
+              disabled={!(state.session || state.running || remaining < total)}
+              aria-label="在桌面上显示计时小窗"
+              title="在桌面上显示计时小窗"
+            >
+              <PictureInPicture2 size={14} />
             </button>
           </div>
           <p className="focus-hint">
