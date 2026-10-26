@@ -79,7 +79,11 @@ jobs:
         run: |
           $prev = git describe --tags --abbrev=0 'HEAD^' 2>$null
           if (-not $prev) { $prev = 'v0.3.0' }
-          $log = git log "$prev..HEAD" --pretty=format:'- %s'
+          # 发版流程自身的提交对用户没有意义，别写进更新清单
+          $log = git log "$prev..HEAD" --pretty=format:'%s' |
+            Where-Object { $_ -notmatch '^(docs|chore)\(release\)' } |
+            ForEach-Object { "- $_" }
+          if (-not $log) { $log = @('- 细节修补') }
           $parts = @()
           $parts += '## 这一版改了什么'
           $parts += ''
