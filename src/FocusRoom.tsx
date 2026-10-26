@@ -10,7 +10,6 @@ import {
   focusStats,
   initialFocusState,
   pauseFocus,
-  phaseCaptions,
   phaseNames,
   remainingFocus,
   resetFocus,
@@ -147,7 +146,6 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
   const fraction = elapsedFraction(state, settings, now);
   const stats = focusStats(records, now);
   const roundsBeforeLong = state.session?.roundsBeforeLong ?? settings.roundsBeforeLong;
-  const chapter = Math.min(state.rounds + 1, roundsBeforeLong);
 
   // 把计时状态交给桌面的小窗口。规则是：只要开始过（或者暂停着没走完）就显示，
   // 彻底重置回初始状态之后就收起来——那时桌面上留一个 25:00 的框没有意义。
@@ -252,9 +250,6 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
       <div className="focus-layout">
         <div className="focus-stage">
           <div className="focus-head">
-            <span className="notes-eyebrow">
-              FOCUS SESSION <span>{String(chapter).padStart(2, '0')} / {String(roundsBeforeLong).padStart(2, '0')}</span>
-            </span>
             <span className="focus-mode">专注</span>
           </div>
           <div className={`focus-dial${state.running ? ' is-running' : ''}${state.phase === 'focus' ? '' : ' is-break'}`}>
@@ -270,7 +265,6 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
               />
             </svg>
             <div className="focus-readout">
-              <span className="focus-phase">{phaseCaptions[state.phase]}</span>
               <strong className="focus-time" role="timer" aria-label={`剩余 ${clock(remaining)}`}>
                 {clock(remaining)}
               </strong>
@@ -309,13 +303,6 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
               <PictureInPicture2 size={14} />
             </button>
           </div>
-          <p className="focus-hint">
-            {playing
-              ? '声音正在陪你。空格暂停或继续。'
-              : hasSelection
-                ? '带着所选声音开始，一秒进入状态。按空格也能开始。'
-                : '先去唱片柜挑一张，专注时就有声音陪着。按空格也能开始。'}
-          </p>
           {!playing && hasSelection && (
             <button className="text-button focus-play" onClick={onPlaySelection}>
               播放所选声音<ArrowRight size={12} />
@@ -324,9 +311,6 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
         </div>
 
         <aside className="focus-notes">
-          <div className="notes-eyebrow">
-            TODAY <span>↗</span>
-          </div>
           <div className="focus-numbers">
             <div>
               <strong>{stats.todayCount}</strong>
@@ -338,7 +322,7 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
             </div>
           </div>
           <p className="focus-line">
-            累计 {stats.totalCount} 个番茄 · {stats.totalMinutes} 分钟。数据只存在本机，随时可清空。
+            累计 {stats.totalCount} 个番茄 · {stats.totalMinutes} 分钟。
           </p>
           <div className="fine-rule" />
           <h3>这次的节奏</h3>

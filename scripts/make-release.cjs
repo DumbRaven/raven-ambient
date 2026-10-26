@@ -1,13 +1,16 @@
-// 把 win-unpacked 打成一个「解压即用」的分发包。
+// 把 win-unpacked 打成一个「解压即用」的压缩包。
 //
-// 为什么不用 zip：Electron 的 dll 与 exe 用 deflate 只能压到 43%，
-// tar + gzip 把全体数据连成一个流再压，整体能到 41%，包小一截。
-// 格式用 .tar.gz 而不是 .tar.xz：xz 能再省 28 MB，但压缩慢、代价大，
-// 且系统 tar 的 xz 编码器在 CI 上不稳（见下面第 5 步的说明）。
-// Windows 10 1803 之后系统自带 bsdtar，解压不需要装 7-Zip，双击 .cmd 就行。
+// 为什么是 zip：双击就能解压，用户不用先看说明再找个脚本跑。
+//
+// 关于体积的实测（release/win-unpacked 261.5 MB / 23 个文件）：
+//   zip（deflate 9）      114.1 MB   5.6 秒
+//   tar.gz（gzip 9）      110.9 MB   9   秒
+// 差 1%～3%，为这点体积让用户多跑一个解压脚本不划算，所以用 zip。
+// 之前用 tar.gz 是因为 zip 比 tar.gz 大 23 MB——那是在裁语言包之前测的，
+// locales 从 45 MB 降到 1 MB 之后，两者的差距被抹平了。
 const fs = require('node:fs');
 const path = require('node:path');
-const { pack } = require('./tar-gz.cjs');
+const { pack } = require('./zip-pack.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'release', 'win-unpacked');
@@ -62,7 +65,7 @@ if (fs.existsSync(cableSrc)) {
 fs.writeFileSync(path.join(STAGE, '先看这里.txt'), [
   `Raven Ambient Bold ${tag} · 免安装版`,
   '',
-  '双击「Raven Ambient Bold.exe」开始，不用安装。',
+  '解压后双击「Raven Ambient Bold.exe」开始，不用安装。',
   '',
   '第一次打开时 Windows 可能提示「已保护你的电脑」，',
   '点「更多信息」→「仍要运行」即可（这个版本没有签名证书）。',
@@ -73,46 +76,22 @@ fs.writeFileSync(path.join(STAGE, '先看这里.txt'), [
   '再装「可选-虚拟声卡」里的驱动。不装不影响其他功能。',
 ].join('\r\n'), 'utf8');
 
-// 5. 压缩：整包连成一个流才压得动
+// 5. 压缩
 //
 // 不用系统的 tar 程序：bsdtar 在 GitHub Actions 的 runner 上压 260 MB 会以
 // 0xC0000005（访问冲突）崩掉，本地每次成功；换成 xz 也一样崩。发版流程不能
-// 押在一个「本地能跑、CI 崩」的二进制上，所以用 scripts/tar-gz.cjs 自己写 tar 格式。
-// 产物与 `tar -c -z` 等价，用户端仍用系统自带 tar 解压。
-const archive = path.join(OUT, `Raven-Ambient-${tag}-win-x64.tar.gz`);
-
-// 6. 一个双击就能解压的小脚本，省得用户去翻 7-Zip
-//
-// 文件名用 ASCII：GitHub 的 upload-artifact 处理不了非 ASCII 文件名，
-// 会把「解压后运行我.cmd」改写成 default.cmd，用户下下来就不知道那是什么了。
-// 中文说明写在脚本内容和 Release 正文里。
-const LAUNCHER = 'RUN-ME.cmd';
-const launcher = [
-  '@echo off',
-  'chcp 65001 >nul',
-  'cd /d "%~dp0"',
-  'echo 正在解压，请稍候…',
-  `tar -xf "Raven-Ambient-${tag}-win-x64.tar.gz"`,
-  'if errorlevel 1 (',
-  '  echo.',
-  '  echo 解压失败。如果系统很旧，请自己用 7-Zip 解压上面的 .tar.gz 文件。',
-  '  pause',
-  '  exit /b 1',
-  ')',
-  'echo 完成，正在打开文件夹…',
-  'start "" "Raven Ambient Bold"',
-  'exit',
-].join('\r\n');
+// 押在一个「本地能跑、CI 崩」的二进制上，所以用 scripts/zip-pack.cjs 自己写。
+const archive = path.join(OUT, `Raven-Ambient-${tag}-win-x64.zip`);
 
 (async () => {
   const bytes = (function walk(dir) {
     return fs.readdirSync(dir, { withFileTypes: true }).reduce((sum, entry) => sum
       + (entry.isDirectory() ? walk(path.join(dir, entry.name)) : fs.statSync(path.join(dir, entry.name)).size), 0);
   })(STAGE);
-  console.log('待压缩', (bytes / 1024 / 1024).toFixed(1), 'MB，开始 gzip（这一步要半分钟到一分钟）');
+  console.log('待压缩', (bytes / 1024 / 1024).toFixed(1), 'MB，开始 deflate');
 
   let lastShown = 0;
-  const size = await pack(STAGE, 'Raven Ambient Bold', archive, (done, total) => {
+  const size = await pack(STAGE, archive, (done, total) => {
     const percent = Math.floor((done / total) * 100);
     if (percent >= lastShown + 25) {
       lastShown = percent;
@@ -120,10 +99,8 @@ const launcher = [
     }
   }, bytes);
 
-  // 暂存目录压完就没用了。不删的话 release/dist 里会留着 265 MB 的副本，
-  // 下次再打包又会先 rmSync 掉重建一遍，白占磁盘。
+  // 暂存目录压完就没用了。不删的话 release/dist 里会留着 265 MB 的副本。
   fs.rmSync(STAGE, { recursive: true, force: true });
-  fs.writeFileSync(path.join(OUT, LAUNCHER), launcher, 'utf8');
 
   console.log('分发包', (size / 1024 / 1024).toFixed(1), 'MB ->', archive);
   console.log('目录', OUT);

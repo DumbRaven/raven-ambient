@@ -68,7 +68,7 @@
 - **纯本地。** 文件只在你自己选的范围内读取，不连音乐平台、不上传、不联网。音频副本存在本地 IndexedDB，原文件挪走了照样能放。
 - **没有音乐文件也能用。** 「外部音乐模式」让网易云、Spotify 这些播放器去放歌，本程序只管环境音和避让（需要 VB-Cable 虚拟声卡）。
 
-**关于体积：** 分发包约 110 MB，解压后 261 MB。其中 204 MB 是 Electron 运行时（Chromium + V8 + Node），我们自己的代码与全部 SVG 封面只有 1.2 MB。已经压掉的部分：语言包只留中英文、去掉本项目用不到的 WebGPU 着色器编译器、改用整包 tar.gz 而不是 zip。
+**关于体积：** 分发包 115 MB，解压后 262 MB。其中 204 MB 是 Electron 运行时（Chromium + V8 + Node），我们自己的代码与全部 SVG 封面只有 1.2 MB。已经压掉的部分：语言包只留中英文、去掉本项目用不到的 WebGPU 着色器编译器。
 
 ## 快速开始
 
@@ -86,10 +86,10 @@ npm run package:win
 # → release/win-unpacked/Raven Ambient Bold.exe
 
 npm run make:release
-# → release/dist/Raven-Ambient-v0.3.1-win-x64.tar.gz（约 110 MB）
+# → release/dist/Raven-Ambient-<版本>-win-x64.zip（约 115 MB）
 ```
 
-用 `make:release` 而不是 `Compress-Archive`：Electron 的 dll 与 exe 用 deflate 只能压到 43%，把整包连成一个流用 gzip 能到 41%，包小一截。tar 格式由 `scripts/tar-gz.cjs` 自己写（见下面「动效层」之前的说明），不调用系统的 `tar`——那个程序在 GitHub Actions 的 runner 上压大文件会段错误，本地却每次都成功。Windows 10 1803 之后系统自带 bsdtar，所以解压不需要装 7-Zip；脚本会顺手生成一个双击就能解压的 `RUN-ME.cmd`。
+`make:release` 用 `scripts/zip-pack.cjs` 自己写 zip 格式，不调用系统 `tar`：那个程序在 GitHub Actions 的 runner 上压 260 MB 会段错误，本地却每次成功。自己写还有个好处——中文文件名走 UTF-8 标志位，解压不会变乱码。
 
 首次打开会播放一段开屏动画，随后进入唱片柜。点「收藏声音」导入音乐或环境音即可。
 
@@ -200,7 +200,6 @@ Node 24；`npm install`（Electron 下载慢时可设 `electron_config_cache` �
 - `npm run build:nowplaying`：编译 SMTC 辅助程序（需要系统自带的 `csc.exe`，不依赖 .NET SDK）。`package:win` 会自动先跑这一步。
 - `npm run package:win`：生成 Windows 目录版。
 - `npm run make:release`：生成免安装分发包（先跑 `package:win`）。
-
 推送到 `main` 会触发 GitHub Actions：类型检查、单元测试、构建，然后把实际通过数写回上面的徽章。打 `v*` 标签会自动打包并发布到 Release；也可以在 Actions 页面手动跑一次 Release 只取构建产物。
 
 `src/player.ts` 管理队列和环境音，`src/audio.ts` 管理 Web Audio（音乐用两块音频元素轮换，切换时只推各自增益，所以能真正交叉淡化），`src/records.ts` 管理唱片模型。Electron 只提供安全桌面窗口；渲染器无 Node 权限，不加载外部网页。macOS 包和移动端后台音频尚未实现；手机宽度下介绍移至唱片柜下方。

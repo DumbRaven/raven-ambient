@@ -54,39 +54,30 @@ jobs:
           echo "exe:  $(stat -c%s "$exe") 字节"
           echo "asar: $(stat -c%s "$asar") 字节"
 
-      - name: 打成 tar.gz 分发包
+      - name: 打成 zip 分发包
         shell: pwsh
         run: |
           $tag = '${{ inputs.tag }}'
           if (-not $tag) { $tag = '${{ github.ref_name }}' }
           $env:RAVEN_VERSION = $tag
           node scripts/make-release.cjs
-          $name = "Raven-Ambient-$tag-win-x64.tar.gz"
-          "ARCHIVE=release/dist/$name" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "LAUNCHER=release/dist/RUN-ME.cmd" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "ARCHIVE=release/dist/Raven-Ambient-$tag-win-x64.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
           name: raven-ambient-win-x64
-          path: |
-            ${{ env.ARCHIVE }}
-            ${{ env.LAUNCHER }}
+          path: ${{ env.ARCHIVE }}
           if-no-files-found: error
 
       - name: 发布到 Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            ${{ env.ARCHIVE }}
-            ${{ env.LAUNCHER }}
+          files: ${{ env.ARCHIVE }}
           generate_release_notes: true
           body: |
-            下载 `Raven-Ambient-*-win-x64.tar.gz` 和 `RUN-ME.cmd`，把两个文件放到同一个文件夹里，
-            双击 `RUN-ME.cmd` 就会解压并打开目录，然后运行里面的 `Raven Ambient Bold.exe`。免安装。
-
-            也可以自己用 7-Zip 解压那个 `.tar.gz`。Windows 10 1803 之后系统自带的 tar 也能解。
+            下载 `Raven-Ambient-*-win-x64.zip`，解压后双击里面的 `Raven Ambient Bold.exe`。免安装。
 
             外部音乐模式需要先装 [VB-Audio Virtual Cable](https://vb-audio.com/Cable/)，
             分发包里的「可选-虚拟声卡」文件夹有安装包和使用说明。
