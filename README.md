@@ -280,9 +280,3 @@ Node 24；`npm install`（Electron 下载慢时可设 `electron_config_cache` �
 
 代码以 MIT 许可证发布，见 [`LICENSE`](LICENSE)。`public/covers/` 里的 17 款 SVG 封面、`build/` 里的应用图标与乌鸦 logo 均为本项目原创，同样适用该许可证。
 
-## 支持这个项目
-
-这个软件免费、开源、纯本地，所有功能都不需要付费解锁，以后也不会。
-
-如果它对你有点用，可以在[爱发电](https://afdian.com/a/DUMBRAVEN)请我喝杯咖啡。不赞助完全不影响使用，也别指望赞助能换来什么额外的东西——它换不到，这不是售卖。
-
