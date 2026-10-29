@@ -16,12 +16,12 @@
   }
   .card {
     box-sizing: border-box;
-    width: 264px;
+    width: 306px;
     height: 96px;
-    padding: 0 14px 0 16px;
+    padding: 0 10px 0 12px;
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
     border-radius: 26px;
     background: #101010;
     color: #ffffff;
@@ -29,20 +29,96 @@
     box-shadow: 0 14px 34px rgba(0, 0, 0, .34), 0 0 0 1px rgba(255, 255, 255, .06) inset;
   }
 
-  /* 进度环：svg 画底圈 + 进度圈，靠 stroke-dashoffset 推进。 */
-  .ring { position: relative; width: 52px; height: 52px; flex: none; }
+  /* ---------- 计时圈 ---------- */
+  .dial { position: relative; width: 60px; height: 60px; flex: none; }
+  .ring { position: absolute; inset: 0; }
   .ring svg { display: block; transform: rotate(-90deg); }
   .ring .track { stroke: rgba(255, 255, 255, .14); }
   .ring .bar { stroke: #ffffff; stroke-linecap: round; transition: stroke-dashoffset .5s linear, stroke .3s ease; }
-  .ring .dot {
-    position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px;
-    border-radius: 50%; background: rgba(255, 255, 255, .55); transition: background .3s ease;
-  }
-  /* 休息阶段用另一种颜色，扫一眼就知道现在该干什么。 */
+  /* 休息阶段换颜色，扫一眼就知道现在该干什么。 */
   .card.break .ring .bar { stroke: #c7c0f0; }
-  .card.break .ring .dot { background: #c7c0f0; }
   .card.longBreak .ring .bar { stroke: #a8e6c1; }
-  .card.longBreak .ring .dot { background: #a8e6c1; }
+
+  /* ---------- 圈里那张碟 ---------- */
+  /*
+   * 小窗是独立渲染进程，加载不到 skin-bold.css，所以彩胶的渐变要在这里重画一遍。
+   * 颜色由页面算好后随快照推过来（--v-* 变量），这里只负责摆。
+   * 直径 38 刚好让 3px 的进度环露在外面，不打架。
+   */
+  .disc {
+    position: absolute; left: 50%; top: 50%;
+    width: 38px; height: 38px; margin: -19px 0 0 -19px;
+    border-radius: 50%;
+    background-color: var(--v-base, #2a2a28);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .45), inset 0 0 0 1px rgba(255, 255, 255, .12);
+    /* 换碟时淡入并轻轻放大，旧的那张同时缩回去 */
+    transition: opacity .22s ease, transform .22s cubic-bezier(.2, .9, .25, 1);
+  }
+  /* 沟槽 + 高光叠在花色之上，任何工艺都有唱片的质感 */
+  .disc::before {
+    content: ""; position: absolute; inset: 0; border-radius: 50%;
+    background:
+      conic-gradient(from var(--v-angle, 30deg), transparent, rgba(255, 255, 255, .30) 12%, transparent 22%,
+                     rgba(0, 0, 0, .10) 44%, rgba(255, 255, 255, .18) 62%, transparent 74%),
+      repeating-radial-gradient(circle at center, rgba(0, 0, 0, 0) 0 1.2px, rgba(0, 0, 0, .08) 1.2px 1.9px);
+  }
+  /* 盘心：有封面就是封面，没有就留一个浅色小圆 */
+  .disc::after {
+    content: ""; position: absolute; left: 50%; top: 50%;
+    width: 13px; height: 13px; margin: -6.5px 0 0 -6.5px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, .82);
+    background-image: var(--v-art, none);
+    background-size: cover; background-position: center;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .22);
+  }
+  .disc.is-light::after { background-color: #3c4634; }
+
+  /* 四种压片工艺，参数与 styles.css 里的 .pressing-* 对齐 */
+  .disc.pressing-swirl {
+    background-image:
+      radial-gradient(ellipse 66% 46% at 28% 22%, var(--v-accent) 0%, transparent 64%),
+      radial-gradient(ellipse 54% 64% at 76% 66%, var(--v-accent-2) 0%, transparent 62%),
+      radial-gradient(ellipse 88% 38% at 52% 94%, var(--v-accent) 0%, transparent 58%),
+      radial-gradient(circle at 50% 50%, var(--v-sheen) 16%, var(--v-base) 76%);
+  }
+  .disc.pressing-marble {
+    background-image:
+      repeating-conic-gradient(from var(--v-angle, 168deg) at 50% 50%, transparent 0 6deg, rgba(255, 255, 255, .14) 6deg 7deg, rgba(0, 0, 0, .05) 7deg 13deg),
+      radial-gradient(circle at 36% 30%, var(--v-accent) 0%, transparent 52%),
+      radial-gradient(circle at 70% 74%, var(--v-accent-2) 0%, transparent 48%),
+      radial-gradient(circle at 50% 50%, var(--v-base) 32%, var(--v-sheen) 100%);
+  }
+  .disc.pressing-splatter {
+    background-image:
+      radial-gradient(circle at 24% 18%, var(--v-accent) 0 2.4%, transparent 2.9%),
+      radial-gradient(circle at 82% 34%, var(--v-accent) 0 2.8%, transparent 3.3%),
+      radial-gradient(circle at 16% 52%, var(--v-accent-2) 0 2.1%, transparent 2.6%),
+      radial-gradient(circle at 74% 62%, var(--v-accent-2) 0 2.6%, transparent 3.1%),
+      radial-gradient(circle at 32% 78%, var(--v-accent) 0 2.2%, transparent 2.7%),
+      radial-gradient(circle at 90% 82%, var(--v-accent) 0 2%, transparent 2.5%),
+      radial-gradient(circle at 50% 50%, var(--v-base) 26%, var(--v-sheen) 100%);
+  }
+  .disc.pressing-glow, .disc.pressing-halo {
+    background-image:
+      radial-gradient(circle at 50% 50%, var(--v-base) 24%, var(--v-accent) 56%, var(--v-base) 76%, var(--v-sheen) 100%);
+  }
+
+  /* 转起来。有碟就一直挂着 spinning 类，靠 play-state 冻住——
+     摘掉类会让 transform 回到 none，碟瞬间跳回 0 度，看着像被弹了一下。 */
+  .disc.spinning { animation: disc-spin 9s linear infinite; }
+  @keyframes disc-spin { to { transform: rotate(360deg); } }
+  .disc.stalled { animation-play-state: paused; }
+
+  /* 换碟：新碟从略小处淡入，旧碟缩回去。两段动画叠在同一个元素上会打架，
+     所以由脚本在切 key 时加一次 .swap，播完自己摘掉。 */
+  .disc.swap { animation: disc-swap .42s cubic-bezier(.2, .9, .25, 1) both; }
+  @keyframes disc-swap {
+    0% { opacity: 0; transform: scale(.72) rotate(-24deg); }
+    55% { opacity: 1; transform: scale(1.06) rotate(6deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0); }
+  }
+  /* 只有碟、没有计时环时（没开始计时），碟自己也别转太急 */
 
   .copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .time {
@@ -53,48 +129,82 @@
   /* 暂停时整块变淡，不用盯着数字猜停没停。 */
   .card.paused .time, .card.paused .meta { opacity: .45; }
   .card.paused .ring .bar { stroke: #5a5a56; }
-  .card.paused .ring .dot { background: #5a5a56; }
 
-  .actions { display: flex; flex-direction: column; gap: 6px; flex: none; }
+  /* 右半边：左边一列切歌键，右边一列暂停 + 关闭。
+     暂停的是番茄钟、关闭的是小窗，两件事的层级一样，所以竖着排在一起、
+     不跟切歌键挤成一行 —— 一行排开会把卡片撑得又长又扁。 */
+  .controls { display: flex; align-items: center; gap: 6px; flex: none; }
+  .skips { display: flex; flex-direction: column; gap: 3px; flex: none; }
+  .stack { display: flex; flex-direction: column; gap: 3px; flex: none; }
   button {
     -webkit-app-region: no-drag;
     width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%;
     display: grid; place-items: center;
     background: rgba(255, 255, 255, .12); color: #ffffff;
-    cursor: pointer; transition: background .16s ease, transform .12s ease;
+    cursor: pointer; transition: background .16s ease, transform .12s ease, opacity .16s ease;
   }
   button:hover { background: rgba(255, 255, 255, .24); }
   button:active { transform: scale(.9); }
   button:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }
+  button:disabled { opacity: .3; cursor: default; }
+  button:disabled:hover { background: rgba(255, 255, 255, .12); }
+  button:disabled:active { transform: none; }
   button svg { display: block; }
+  /* 上下两枚切歌键：压扁成横向胶囊，一眼看得出是一对。
+     高度跟右边的暂停/关闭取齐（26），两列才能上下对齐。 */
+  .skips button { width: 26px; height: 26px; border-radius: 9px; }
+  /* 暂停用实心白，是这块小窗里唯一的主按钮 */
+  #toggle { background: #ffffff; color: #101010; }
+  #toggle:hover { background: rgba(255, 255, 255, .86); }
+  #toggle:active { transform: scale(.9); }
+  #close { background: rgba(255, 255, 255, .12); }
+  #close:hover { background: rgba(255, 255, 255, .26); }
 </style>
 </head>
 <body>
   <div class="card" id="card">
-    <div class="ring">
-      <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true">
-        <circle class="track" cx="26" cy="26" r="22" fill="none" stroke-width="3" />
-        <circle class="bar" id="bar" cx="26" cy="26" r="22" fill="none" stroke-width="3"
-                stroke-dasharray="138.23" stroke-dashoffset="0" />
-      </svg>
-      <i class="dot"></i>
+    <div class="dial">
+      <div class="ring">
+        <svg width="60" height="60" viewBox="0 0 60 60" aria-hidden="true">
+          <circle class="track" cx="30" cy="30" r="27" fill="none" stroke-width="3" />
+          <circle class="bar" id="bar" cx="30" cy="30" r="27" fill="none" stroke-width="3"
+                  stroke-dasharray="169.65" stroke-dashoffset="0" />
+        </svg>
+      </div>
+      <div class="disc" id="disc"></div>
     </div>
     <div class="copy">
       <div class="time" id="time">25:00</div>
       <div class="meta" id="meta">专注 · 第 1 / 4 轮</div>
     </div>
-    <div class="actions">
-      <button id="toggle" type="button" aria-label="暂停" title="暂停">
-        <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
-          <rect x="2" y="1.5" width="3" height="9" rx="1" />
-          <rect x="7" y="1.5" width="3" height="9" rx="1" />
-        </svg>
-      </button>
-      <button id="close" type="button" aria-label="收起小窗" title="收起小窗">
-        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
-          <path d="M3 3l6 6M9 3l-6 6" />
-        </svg>
-      </button>
+    <div class="controls">
+      <div class="skips">
+        <button id="prev" type="button" aria-label="上一曲" title="上一曲">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+            <rect x="1.4" y="2" width="1.7" height="8" rx=".8" />
+            <path d="M10.6 2.4v7.2a.6.6 0 0 1-.93.5L4.5 6.5a.6.6 0 0 1 0-1l5.17-3.6a.6.6 0 0 1 .93.5Z" />
+          </svg>
+        </button>
+        <button id="next" type="button" aria-label="下一曲" title="下一曲">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+            <path d="M1.4 2.4v7.2a.6.6 0 0 0 .93.5L7.5 6.5a.6.6 0 0 0 0-1L2.33 1.9a.6.6 0 0 0-.93.5Z" />
+            <rect x="8.9" y="2" width="1.7" height="8" rx=".8" />
+          </svg>
+        </button>
+      </div>
+      <div class="stack">
+        <button id="toggle" type="button" aria-label="暂停" title="暂停">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+            <rect x="2" y="1.5" width="3" height="9" rx="1" />
+            <rect x="7" y="1.5" width="3" height="9" rx="1" />
+          </svg>
+        </button>
+        <button id="close" type="button" aria-label="收起小窗" title="收起小窗">
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+            <path d="M3 3l6 6M9 3l-6 6" />
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -103,13 +213,17 @@
   // 只负责把状态画出来、把按钮点击攒进队列等人取走。
   var outbox = [];
   var last = null;
-  var CIRCUMFERENCE = 2 * Math.PI * 22;
+  var lastDiscKey = null;
+  var CIRCUMFERENCE = 2 * Math.PI * 27;
 
   var card = document.getElementById('card');
   var bar = document.getElementById('bar');
   var timeEl = document.getElementById('time');
   var metaEl = document.getElementById('meta');
   var toggleEl = document.getElementById('toggle');
+  var prevEl = document.getElementById('prev');
+  var nextEl = document.getElementById('next');
+  var discEl = document.getElementById('disc');
 
   var PAUSE_ICON = '<svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><rect x="2" y="1.5" width="3" height="9" rx="1"/><rect x="7" y="1.5" width="3" height="9" rx="1"/></svg>';
   var PLAY_ICON = '<svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M3 1.6v8.8a.6.6 0 0 0 .92.5l6.6-4.4a.6.6 0 0 0 0-1L3.92 1.1a.6.6 0 0 0-.92.5Z"/></svg>';
@@ -121,10 +235,59 @@
     return m + ':' + (s < 10 ? '0' + s : String(s));
   }
 
+  /**
+   * 画圈里那张碟。
+   * 颜色是页面算好后推过来的（小窗加载不到主样式表），这里只摆位置。
+   * 换碟时加一次 .swap 播切换动画——用 class 而不是重挂节点，
+   * 因为整块 DOM 重建会让 200ms 的轮询看见一闪的空白。
+   */
+  function paintDisc(disc) {
+    if (!disc) {
+      discEl.className = 'disc';
+      discEl.style.setProperty('--v-art', 'none');
+      lastDiscKey = null;
+      return;
+    }
+    var style = discEl.style;
+    style.setProperty('--v-base', disc.base);
+    style.setProperty('--v-accent', disc.accent);
+    style.setProperty('--v-accent-2', disc.accent2);
+    style.setProperty('--v-sheen', disc.sheen);
+    style.setProperty('--v-angle', disc.angle);
+    style.setProperty('--v-art', disc.art ? 'url("' + disc.art + '")' : 'none');
+
+    var className = 'disc pressing-' + disc.pressing
+      + (disc.light ? ' is-light' : '')
+      + ' spinning'
+      + (disc.spinning ? '' : ' stalled');
+
+    if (disc.key !== lastDiscKey) {
+      lastDiscKey = disc.key;
+      // 先摘掉 swap 再重新加，同一个 class 连加两次不会重播
+      discEl.className = className;
+      void discEl.offsetWidth;
+      discEl.className = className + ' swap';
+      // 动画播完把 swap 摘掉，否则它会一直压着 .spinning 的旋转
+      window.setTimeout(function () {
+        if (discEl.className.indexOf(' swap') >= 0) discEl.className = discEl.className.replace(' swap', '');
+      }, 440);
+      return;
+    }
+    discEl.className = className;
+  }
+
   function paint(snap) {
     if (!snap) return;
-    var key = snap.phase + '|' + snap.running + '|' + Math.ceil(snap.remaining / 1000) + '|' + snap.rounds + '|' + snap.roundsBeforeLong;
-    if (key === last) return;   // 同一秒内不重复改 DOM
+
+    var rounds = Math.max(1, Math.min(snap.roundsBeforeLong || 4, (snap.rounds || 0) + 1));
+    var key = snap.phase + '|' + snap.running + '|' + Math.ceil(snap.remaining / 1000) + '|' + snap.rounds
+      + '|' + snap.roundsBeforeLong + '|' + (snap.canSkip ? 1 : 0)
+      + '|' + (snap.disc ? snap.disc.key + ':' + (snap.disc.spinning ? 1 : 0) : 'none');
+
+    // 碟要单独画：换碟、换封面都不该被「同一秒」这条去重挡掉
+    paintDisc(snap.disc);
+
+    if (key === last) return;   // 同一秒内不重复改文字
     last = key;
 
     var names = { focus: '专注', break: '小憩', longBreak: '长休息' };
@@ -132,7 +295,6 @@
 
     timeEl.textContent = clock(snap.remaining);
 
-    var rounds = Math.max(1, Math.min(snap.roundsBeforeLong || 4, (snap.rounds || 0) + 1));
     var tail = snap.phase === 'focus' ? '第 ' + rounds + ' / ' + (snap.roundsBeforeLong || 4) + ' 轮' : '让眼睛歇一下';
     metaEl.textContent = names[snap.phase] + ' · ' + tail + (snap.running ? '' : ' · 已暂停');
 
@@ -144,6 +306,9 @@
     toggleEl.innerHTML = snap.running ? PAUSE_ICON : PLAY_ICON;
     toggleEl.setAttribute('aria-label', snap.running ? '暂停' : '继续');
     toggleEl.setAttribute('title', snap.running ? '暂停' : '继续');
+
+    prevEl.disabled = !snap.canSkip;
+    nextEl.disabled = !snap.canSkip;
   }
 
   window.__ravenMiniPaint = paint;
@@ -155,6 +320,8 @@
   };
 
   toggleEl.addEventListener('click', function () { outbox.push('toggle'); });
+  prevEl.addEventListener('click', function () { if (!prevEl.disabled) outbox.push('prev'); });
+  nextEl.addEventListener('click', function () { if (!nextEl.disabled) outbox.push('next'); });
   document.getElementById('close').addEventListener('click', function () { outbox.push('close'); });
   // 键盘也能用：小窗被点中时按空格暂停，Esc 收起。
   document.addEventListener('keydown', function (event) {

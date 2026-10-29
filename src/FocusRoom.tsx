@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
-import { ArrowRight, Pause, PictureInPicture2, Play, RotateCcw, SkipForward } from 'lucide-react';
+import { Pause, PictureInPicture2, Play, RotateCcw, SkipForward } from 'lucide-react';
 import {
   clock,
   applyFocusSettings,
@@ -24,6 +24,7 @@ import {
 } from './focus';
 import { getText, setText } from './store.ts';
 import { listenFocusCommand, publishFocus, requestMiniFocus } from './focus-bridge';
+import { useMiniDisc, type DiscSource } from './use-mini-disc';
 
 const SETTINGS_KEY = 'raven-focus-settings-v1';
 const HISTORY_KEY = 'raven-focus-history-v1';
@@ -132,9 +133,16 @@ export type FocusRoomProps = {
   hasSelection: boolean;
   onPlaySelection: () => void;
   onNotice: (text: string) => void;
+  /** 现在在放的那张碟，桌面小窗的计时圈里转的就是它。没有音乐时为 null。 */
+  disc: DiscSource | null;
+  /** 小窗上的上一曲/下一曲。外部音乐模式下转给对方的播放器。 */
+  onPrev: () => void;
+  onNext: () => void;
+  /** 有没有歌可切，决定小窗上那两个按钮要不要置灰。 */
+  canSkip: boolean;
 };
 
-export default function FocusRoom({ active, playing, hasSelection, onPlaySelection, onNotice }: FocusRoomProps) {
+export default function FocusRoom({ active, playing, hasSelection, onPlaySelection, onNotice, disc, onPrev, onNext, canSkip }: FocusRoomProps) {
   const [settings, setSettings] = useState<FocusSettings>(loadSettings);
   const [records, setRecords] = useState<FocusRecord[]>(loadHistory);
   const [state, setState] = useState<FocusState>(() => initialFocusState(loadSettings()));
@@ -146,6 +154,7 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
   const fraction = elapsedFraction(state, settings, now);
   const stats = focusStats(records, now);
   const roundsBeforeLong = state.session?.roundsBeforeLong ?? settings.roundsBeforeLong;
+  const miniDisc = useMiniDisc(disc);
 
   // 把计时状态交给桌面的小窗口。规则是：只要开始过（或者暂停着没走完）就显示，
   // 彻底重置回初始状态之后就收起来——那时桌面上留一个 25:00 的框没有意义。
@@ -159,8 +168,10 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
       rounds: state.rounds,
       roundsBeforeLong,
       visible: hasBegun,
+      canSkip,
+      disc: miniDisc,
     });
-  }, [state, remaining, total, roundsBeforeLong]);
+  }, [state, remaining, total, roundsBeforeLong, canSkip, miniDisc]);
 
   useEffect(() => {
     if (!state.running) return;
@@ -224,9 +235,16 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
     setState((current) => skipFocus(current, settings));
   }, [settings]);
 
+  // 上一曲/下一曲直接来自 App，每次状态变化都是新函数。
+  // 放进 ref 里转一手，免得 listenFocusCommand 每 200ms 就重新注册一遍。
+  const discCommands = useRef({ onPrev, onNext });
+  useEffect(() => { discCommands.current = { onPrev, onNext }; }, [onPrev, onNext]);
+
   useEffect(() => listenFocusCommand((action) => {
     if (action === 'toggle') toggle();
     else if (action === 'skip') skip();
+    else if (action === 'prev') discCommands.current.onPrev();
+    else if (action === 'next') discCommands.current.onNext();
   }), [toggle, skip]);
 
   function applySettings(patch: Partial<FocusSettings>) {
@@ -303,11 +321,6 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
               <PictureInPicture2 size={14} />
             </button>
           </div>
-          {!playing && hasSelection && (
-            <button className="text-button focus-play" onClick={onPlaySelection}>
-              播放所选声音<ArrowRight size={12} />
-            </button>
-          )}
         </div>
 
         <aside className="focus-notes">

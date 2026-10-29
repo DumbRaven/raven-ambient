@@ -362,11 +362,22 @@ export class AmbientEngine {
     if (voice) { voice.source.stop(); voice.source.disconnect(); voice.gain.disconnect(); voice.duck.disconnect(); voice.filter.disconnect(); voice.pan.disconnect(); voice.clip.disconnect(); this.voices.delete(id); }
     this.buffers.delete(id);
   }
-  /** 把一首歌装进指定的唱盘，等它元数据就绪（此时还没出声）。 */
-  private async arm(deck: Deck, blob: Blob, signal: AbortSignal) {
+  /**
+   * 把一首歌装进指定的唱盘。
+   *
+   * autoplay 时不等元数据就按下播放：浏览器会在缓冲够的第一刻出声。
+   * 原来的写法是「先等 loadedmetadata、再 play、再等缓冲」，三段等待串成一条链，
+   * 用户点播放到听见声音之间就空出一段。现在元数据等待和播放并行。
+   */
+  private async arm(deck: Deck, blob: Blob, signal: AbortSignal, autoplay = false) {
     if (deck.url) URL.revokeObjectURL(deck.url);
     deck.url = URL.createObjectURL(blob);
+    // preload 从 metadata 改成 auto：本地 blob 不消耗流量，让它一次性把数据备好
+    deck.el.preload = 'auto';
     deck.el.src = deck.url;
+    // play() 的 promise 才是「真正开始响」，元数据的 promise 只说明文件认得出来。
+    // 失败（编解码不支持等）交给下面的 error 事件统一报，这里只吞掉自己的拒绝。
+    const playing = autoplay ? deck.el.play().catch(() => undefined) : Promise.resolve();
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => finish(new Error('读取音乐超时，请换一个文件。')), 12000);
       const success = () => finish();
@@ -382,14 +393,26 @@ export class AmbientEngine {
       signal.addEventListener('abort', cancel, { once: true });
       if (signal.aborted) cancel(); else deck.el.load();
     });
+    await playing;
   }
-  /** 把一首歌装到当前唱盘上（不播放）。 */
+  /**
+   * 把一首歌装到当前唱盘上并开始播。
+   *
+   * 这里不再调用 pauseMusic()：它会把 status 置成「已暂停」再 emit，
+   * 用户看到的是一小段「已暂停 → 播放中」的闪烁。冷启动时只需要把两块唱盘静音。
+   */
   async loadMusic(blob: Blob) {
-    this.init(); this.pauseMusic();
+    this.init();
+    this.cancelMusicWork(); this.clearTransition();
+    for (const deck of this.decks) this.silence(deck);
     const { revision, signal } = this.beginMusicWork(), deck = this.decks[this.activeDeck];
     deck.owner = revision;
-    await this.arm(deck, blob, signal);
+    await this.arm(deck, blob, signal, true);
     if (!this.musicValid(revision)) return false;
+    // arm 里已经按下播放，这里把这块唱盘的增益放回来（silence 刚把它清零）
+    deck.gain.gain.cancelScheduledValues(this.ctx!.currentTime);
+    deck.gain.gain.setValueAtTime(1, this.ctx!.currentTime); deck.level = 1;
+    this.status.musicPlaying = true;
     this.tick(); return true;
   }
   /**

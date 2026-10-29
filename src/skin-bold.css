@@ -541,6 +541,61 @@ body { background: var(--bold-page, #f6f5f2); }
   color: var(--bold-muted);
 }
 .slider-field output { font: 600 11px "Inter", sans-serif; color: #101010; }
+
+/* 数字：平时是一行文字，点上去才变成输入框。
+   原来常驻一个带 padding 的 number input，会自己撑出一块方框、和标签挤在一起；
+   改成「只读文本 → 点击变输入」，安静得多。 */
+.slider-field .slider-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  margin-left: auto;
+}
+.slider-field .slider-read {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: 600 11px "Inter", sans-serif;
+  color: #101010;
+  font-variant-numeric: tabular-nums;
+  cursor: text;
+  border-radius: 5px;
+  transition: background 0.14s ease;
+}
+.slider-field .slider-read:hover { background: #f0efea; }
+.slider-field .slider-read:focus-visible { outline: 2px solid #101010; outline-offset: 2px; }
+
+/* 编辑态：贴着数字原来的位置长出一个同样大小的输入框，宽度由字符数决定，
+   不用固定 38px —— 那会把「0」也撑成一格宽，和百分号之间空出一大块。 */
+.slider-field .slider-number {
+  width: 3.2ch;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: #f0efea;
+  font: 600 11px "Inter", sans-serif;
+  color: #101010;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 1.5px #101010;
+  /* 去掉数字框自带的两条上下箭头：这里一格就是 1，用键盘上下键更准 */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.slider-field .slider-number::-webkit-outer-spin-button,
+.slider-field .slider-number::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+.slider-field .slider-number:focus { outline: none; }
+.slider-field > span em {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--bold-muted);
+  margin-left: 1px;
+}
 input[type="range"] {
   height: 4px;
   border-radius: 999px;
@@ -1077,7 +1132,6 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--bold-muted);
   line-height: 1.8;
 }
-.focus-play { font-size: 12px; margin-top: 8px; }
 
 .focus-notes h3 {
   font-family: "Inter", "Microsoft YaHei UI", sans-serif;
@@ -2222,7 +2276,8 @@ input[type="range"]::-webkit-slider-thumb {
   background-position: center;
   box-shadow: 0 6px 18px #1010102e, 0 0 0 1px #10101014;
   /* 暂停时回正：不在半路上停住，看着像卡住 */
-  transition: transform 320ms cubic-bezier(.3, 1.3, .5, 1), box-shadow 220ms ease;
+  transition: transform 320ms cubic-bezier(.3, 1.3, .5, 1), box-shadow 220ms ease,
+    scale 260ms cubic-bezier(.3, 1.3, .5, 1), opacity 200ms ease;
 }
 
 .dock-disc:hover { box-shadow: 0 8px 22px #1010103d, 0 0 0 1px #1010101f; }
@@ -2261,30 +2316,60 @@ input[type="range"]::-webkit-slider-thumb {
   box-shadow: 0 0 0 2px #ffffff;
 }
 
-/* 播放卡：从圆碟正下方展开 */
+/* 播放卡：从屏幕底部弹出来，像系统窗口那样「展开」而不是「滑入」。
+   原来是从圆碟正下方展开的，会盖住唱片柜右侧的介绍面板 —— 那块正是用户
+   要一边看一边挑的。改成底部抽屉：水平居中、贴住下沿，向上让出 18px 呼吸位。 */
 .play-card-veil {
   position: fixed;
   inset: 0;
   z-index: 40;
   background: transparent;
 }
+.play-card-veil.is-leaving { pointer-events: none; }
 
 .play-card {
   position: fixed;
-  left: var(--anchor-x, 16px);
-  top: var(--anchor-y, 80px);
+  left: 50%;
+  bottom: 18px;
   z-index: 41;
-  width: 360px;
+  width: 420px;
+  max-width: calc(100vw - 32px);
   padding: 18px 18px 14px;
-  border-radius: 24px;
+  border-radius: 26px;
   background: #101010;
   color: #ffffff;
   box-shadow: 0 24px 60px #00000047, 0 0 0 1px #ffffff14;
-  animation: card-drop 260ms cubic-bezier(.2, .9, .25, 1) both;
+  /* 从底边中点长出来，而不是从中心放大：卡片贴着屏幕下沿，
+     以中心缩放会看起来「浮起来」，以底边缩放才是「从这里展开」。 */
+  transform-origin: 50% 100%;
+  animation: card-rise 420ms cubic-bezier(.32, .72, 0, 1) both;
 }
-@keyframes card-drop {
-  from { opacity: 0; transform: translateY(-10px) scale(.97); }
-  to { opacity: 1; transform: none; }
+/* 缩放幅度要够大才看得出来（0.94 几乎等于没动），但不必从 0 开始 ——
+   从 0.82 起步，前 40% 就把不透明度走完，剩下的时间只做「稳住」。 */
+@keyframes card-rise {
+  0% { opacity: 0; transform: translate(-50%, 26px) scale(.82); }
+  40% { opacity: 1; }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+/* 收回：比打开快一半，缩回原处并淡出。
+   窗口关闭动画总是比打开短 —— 收东西时人不想等。 */
+.play-card.is-leaving {
+  animation: card-fall 200ms cubic-bezier(.4, 0, 1, 1) both;
+}
+@keyframes card-fall {
+  0% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, 12px) scale(.9); }
+}
+
+/* 圆碟在卡片弹出时缩一下，把视线从它身上交出去。
+   用 :has 判断卡片是否开着 —— 圆碟和卡片不在同一个父节点里，没有别的抓手。
+   这里必须用独立的 scale 属性而不是 transform：.playing 的浮动动画占着 transform，
+   animation 优先级高于普通声明，写 transform 会被整条盖掉。
+   :not(.is-leaving) 是必须的：否则收回动画期间圆碟会提前弹回来，两件事同时动。 */
+body:has(.play-card:not(.is-leaving)) .dock-disc {
+  scale: .86;
+  opacity: .55;
 }
 
 .play-card-head {
@@ -2411,7 +2496,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 @media (max-width: 520px) {
-  .play-card { width: calc(100vw - 32px); left: 16px; padding: 16px 14px 12px; }
+  .play-card { width: calc(100vw - 24px); padding: 16px 14px 12px; }
   .play-card-wave { height: 34px; }
   .dock-disc-slot { left: calc(100% + 8px); }
   .dock-disc { width: 38px; height: 38px; }
@@ -2423,6 +2508,8 @@ input[type="range"]::-webkit-slider-thumb {
   .play-card { animation: none; }
   .play-card-wave > span { transition: none; }
   .dock-disc { transition: none; }
+  /* 卡片弹出时圆碟那一下缩放也去掉，只留透明度提示 */
+  body:has(.play-card) .dock-disc { scale: none; }
 }
 
 /* 窄屏：页签栏本身就占满一行，圆碟挂在外面会顶出屏幕。

@@ -4,7 +4,7 @@
  * 为什么不做成页面的一部分：这一层要能盖在任何视图上面（唱片柜、正在听、专注），
  * 而且不该影响下面的排版。所以挂一个浮层，点外面或再点圆碟就收起来。
  */
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Music2, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume2, Waves } from 'lucide-react';
 import type { PlayOrder } from './records';
 import { orderNames } from './records';
@@ -13,13 +13,11 @@ import { orderNames } from './records';
 const BARS = 32;
 
 export default function PlayCard({
-  open, anchor, playing, title, subtitle, cover, time, duration, timeValue, durationValue, level,
+  open, playing, title, subtitle, cover, time, duration, timeValue, durationValue, level,
   musicOn, ambientOn, musicReady, lineMode, order, master,
   onClose, onToggle, onPrev, onNext, onSeek, onToggleMusic, onToggleAmbient, onOrder, onMaster,
 }: {
   open: boolean;
-  /** 圆碟的位置，卡片从这里往下展开。 */
-  anchor: { x: number; y: number };
   playing: boolean;
   title: string;
   subtitle: string;
@@ -70,6 +68,23 @@ export default function PlayCard({
     return () => cancelAnimationFrame(frame);
   }, [open]);
 
+  // 卡片收起时不能立刻从 DOM 摘掉：那样没有收回动画，是「啪」地消失。
+  // 所以自己留一份挂载状态，先播完退出动画再卸载。
+  const [mounted, setMounted] = useState(open);
+  const [leaving, setLeaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      setLeaving(false);
+      return;
+    }
+    if (!mounted) return;
+    setLeaving(true);
+    const timer = window.setTimeout(() => { setMounted(false); setLeaving(false); }, 200);
+    return () => window.clearTimeout(timer);
+  }, [open, mounted]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); onClose(); } };
@@ -77,19 +92,18 @@ export default function PlayCard({
     return () => document.removeEventListener('keydown', onKey, true);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   const percent = durationValue > 0 ? Math.min(1, Math.max(0, timeValue / durationValue)) : 0;
 
   return (
     <>
-      <div className="play-card-veil" onClick={onClose} />
+      <div className={`play-card-veil ${leaving ? 'is-leaving' : ''}`} onClick={onClose} />
       <div
-        className="play-card"
+        className={`play-card ${leaving ? 'is-leaving' : ''}`}
         role="dialog"
         aria-modal="false"
         aria-label="正在播放"
-        style={{ '--anchor-x': `${anchor.x}px`, '--anchor-y': `${anchor.y}px` } as CSSProperties}
       >
         <div className="play-card-head">
           <span className="play-card-cover" style={cover ? { backgroundImage: `url("${cover}")` } : undefined}>

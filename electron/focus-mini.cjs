@@ -12,7 +12,9 @@
 const { BrowserWindow, screen } = require('electron');
 const path = require('node:path');
 
-const MINI_WIDTH = 264;
+// 宽度跟着 mini.html 的 .card 走。切歌键与暂停/关闭各自竖成一列之后，
+// 横向只占两列按钮的宽，306 就够，卡片也回到了原来矮胖的形状。
+const MINI_WIDTH = 306;
 const MINI_HEIGHT = 96;
 const POLL = 200;
 

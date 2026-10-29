@@ -168,13 +168,15 @@ export class RoomPlayer {
             this.emit();
             return;
           }
-          this.engine.pauseMusic();
+          // 不再先 pauseMusic：那会让界面闪一下「已暂停」。loadMusic 自己会静音两块唱盘。
           const completed = await this.engine.loadMusic(blob);
           if (!valid() || !completed) return;
           this.loadedId = record.id;
         }
         if (!valid()) { this.engine.pauseMusic(); return; }
         this.applyMix();
+        // loadMusic 内部已经按下播放并放回增益，冷启动到这一步通常已经在响；
+        // 只有「换歌前本来就在响」之外的情况才需要补一次。
         if (!this.audio.musicPlaying) await this.engine.playMusic();
         if (valid()) this.emit();
       } catch (error) { if (valid()) { this.pause(); this.onError(error); } }

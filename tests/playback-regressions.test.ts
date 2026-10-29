@@ -107,7 +107,10 @@ test('卸载中断元数据等待，晚到的事件不再播放或创建定时�
 });
 test('空闲时停止轮询，同样状态不重复通知；恢复播放会重启', async t => {
   installAudio(t); const engine = new AmbientEngine(); t.after(() => engine.dispose());
-  await engine.loadMusic(new Blob(['a'])); let count = 0; engine.subscribe(() => count++);
+  // loadMusic 现在会直接开始播（省掉「等元数据再 play」那段延迟），
+  // 所以先手动暂停回空闲态，才能验证「空闲时不再轮询」这件事本身。
+  await engine.loadMusic(new Blob(['a'])); engine.pauseMusic();
+  let count = 0; engine.subscribe(() => count++);
   const before = count; for (let i = 0; i < 25; i++) inspect(engine).tick();
   assert.equal(count, before); assert.equal(inspect(engine).timer, undefined);
   await engine.playMusic(); assert.notEqual(inspect(engine).timer, undefined);
