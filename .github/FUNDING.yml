@@ -1,0 +1,6 @@
+# 仓库页面右上角会出现一个 Sponsor 按钮。
+#
+# 爱发电不在 GitHub 内置支持的平台列表里（那一列表里是 GitHub Sponsors、Patreon、
+# Ko-fi、Buy Me a Coffee 之类），所以只能走 custom 字段填完整地址。
+# 走这个机制，GitHub 会当成平台功能展示；直接在 README 正文里贴链接，观感上更像广告。
+custom: ['https://afdian.com/a/DUMBRAVEN']
