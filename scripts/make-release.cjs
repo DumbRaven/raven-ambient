@@ -11,6 +11,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { pack } = require('./zip-pack.cjs');
+const { verify } = require('./verify-zip.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'release', 'win-unpacked');
@@ -98,6 +99,21 @@ const archive = path.join(OUT, `Raven-Ambient-${tag}-win-x64.zip`);
       console.log(`  ${percent}%`);
     }
   }, bytes);
+
+  // 压完必须自己验一遍。
+  //
+  // 0.3.1 和 0.3.2 的包都是坏的：zip 头里的 CRC 写成了「压缩后数据」的校验和，
+  // 而规范要求的是「未压缩数据」的。Windows 资源管理器解压时不查 CRC，所以我当时
+  // 用 Expand-Archive 验过就当没事；用 WinRAR / 7-Zip 的用户会看到一屏
+  // 「雜湊驗算發生錯誤」和「壓縮檔已經毀損」。
+  //
+  // 这里的 verify 会逐条解压、重算 CRC 与长度，对不上就抛错。
+  // 打包脚本自己挡住比等用户来报便宜得多。
+  const checked = verify(archive);
+  if (checked.bad.length) {
+    throw new Error(`压缩包自检失败：${checked.bad.length} / ${checked.count} 条对不上\n  ${checked.bad.slice(0, 5).join('\n  ')}`);
+  }
+  console.log('自检通过：', checked.count, '条全部校验一致');
 
   // 暂存目录压完就没用了。不删的话 release/dist 里会留着 265 MB 的副本。
   fs.rmSync(STAGE, { recursive: true, force: true });

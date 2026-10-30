@@ -15,7 +15,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
-const { once } = require('node:events');
+const { Transform } = require('node:stream');
 
 const UTF8_FLAG = 0x0800;
 const METHOD_STORE = 0;
@@ -125,16 +125,26 @@ async function pack(srcDir, destFile, onProgress, totalBytes = 0) {
 
     const source = fs.createReadStream(abs, { highWaterMark: 1024 * 1024 });
     const deflate = zlib.createDeflateRaw({ level: 9 });
-    source.pipe(deflate);
+
+    // zip 头里的 CRC 是**未压缩数据**的校验和，不是压缩流的。
+    // 在 deflate 的输出上算 CRC 会让每个文件都过不了校验，
+    // 解压时整包报「雜湊驗算發生錯誤 / 壓縮檔已經毀損」——曾经就是这么坏的。
+    // 所以先插一个只旁听不改内容的 Transform，在原始字节上算。
+    let crc = 0;
+    const tap = new Transform({
+      transform(chunk, _encoding, callback) {
+        crc = zlib.crc32(chunk, crc);
+        callback(null, chunk);
+      },
+    });
+    source.pipe(tap).pipe(deflate);
 
     // 注意不要在这里再 `await once(source, 'end')`：for-await 把 deflate 读完时
     // source 早就触发过 end 了，补一个 once 会永远挂起，进程在无句柄时静默退出，
     // 产出一个只有第一个文件头的残包。
-    let crc = 0;
     let compSize = 0;
     for await (const chunk of deflate) {
       write(chunk);
-      crc = zlib.crc32(chunk, crc);
       compSize += chunk.length;
     }
 
