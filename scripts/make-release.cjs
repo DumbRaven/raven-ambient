@@ -19,6 +19,9 @@ const OUT = path.join(ROOT, 'release', 'dist');
 const STAGE = path.join(OUT, 'Raven Ambient Bold');
 
 if (!fs.existsSync(SRC)) throw new Error('还没有 win-unpacked，先跑 package:win');
+if (!fs.existsSync(path.join(ROOT, '.cable'))) {
+  console.log('没有 .cable，虚拟声卡驱动不会打进包里（说明文本会改成官网链接）');
+}
 
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
 const tag = process.env.RAVEN_VERSION || 'v' + pkg.version;
@@ -34,9 +37,13 @@ fs.cpSync(path.join(ROOT, 'docs', '使用说明.html'), path.join(STAGE, '使用
 fs.cpSync(path.join(ROOT, 'docs', 'images'), path.join(STAGE, 'images'), { recursive: true });
 
 // 3. 可选虚拟声卡：只带装驱动需要的文件，不带测试音频
+//
+// 注意：.cable 在 .gitignore 里，所以本地打包会带上驱动，CI 上不会。
+// 说明文本必须跟着走——不然 CI 打出来的包里「先看这里」会指着一个不存在的文件夹。
 const cableSrc = path.join(ROOT, '.cable');
 const cableDst = path.join(STAGE, '可选-虚拟声卡');
-if (fs.existsSync(cableSrc)) {
+const cableIncluded = fs.existsSync(cableSrc);
+if (cableIncluded) {
   fs.mkdirSync(cableDst, { recursive: true });
   for (const name of ['VBCABLE_Setup_x64.exe', 'VBCABLE_Setup.exe', 'VBCABLE_ControlPanel.exe', 'readme.txt']) {
     const from = path.join(cableSrc, name);
@@ -73,8 +80,17 @@ fs.writeFileSync(path.join(STAGE, '先看这里.txt'), [
   '',
   '使用方法见「使用说明.html」，双击就能用浏览器打开。',
   '',
-  '如果想用「外部音乐」功能（让网易云之类的播放器当音乐来源），',
-  '再装「可选-虚拟声卡」里的驱动。不装不影响其他功能。',
+  ...(cableIncluded
+    ? [
+      '如果想用「外部音乐」功能（让网易云之类的播放器当音乐来源），',
+      '再装「可选-虚拟声卡」里的驱动。不装不影响其他功能。',
+    ]
+    : [
+      '如果想用「外部音乐」功能（让网易云之类的播放器当音乐来源），',
+      '需要另装一个虚拟声卡：https://vb-audio.com/Cable/',
+      '下载 VBCABLE_Driver_Pack45.zip，以管理员身份运行 VBCABLE_Setup_x64.exe。',
+      '不装不影响其他功能。',
+    ]),
 ].join('\r\n'), 'utf8');
 
 // 5. 压缩
