@@ -25,11 +25,19 @@ export class RoomPlayer {
   private audio: AudioStatus = { playing: false, musicPlaying: false, ducked: false, level: 0, currentTime: 0, duration: 0, lineInput: 0, lineLive: false };
   private listener: (status: RoomStatus) => void;
   private onError: (error: unknown) => void;
+  /**
+   * 试听期间被临时掐掉的东西。
+   * 试听要听得清，所以把当前音乐停了、环境音压低；停下之后按这份记录恢复。
+   * 记的是「试听之前本来是什么状态」，不是恢复成某个固定状态——
+   * 用户本来就没在放音乐的话，试听完也不该自己响起来。
+   */
+  private previewRestore?: { running: boolean; musicPlaying: boolean };
 
   constructor(cabinet: Cabinet, listener: (status: RoomStatus) => void, onError: (error: unknown) => void) {
     this.cabinet = cabinet; this.listener = listener; this.onError = onError;
     this.engine.subscribe(status => { this.audio = status; this.emit(); });
     this.engine.onMusicEnded(() => { if (this.running && this.musicOn) this.next(false); });
+    this.engine.onPreviewEnded(() => { this.restoreAfterPreview(); });
   }
   private emit() {
     if (!this.disposed) this.listener({ ...this.audio, running: this.running, currentId: this.currentId, musicOn: this.musicOn, ambientOn: this.ambientOn });
@@ -75,7 +83,7 @@ export class RoomPlayer {
     this.emit();
     this.schedule();
   }
-  pause() { this.running = false; ++this.revision; this.pendingTransition = undefined; this.engine.stopAll(); this.emit(); }
+  pause() { this.running = false; ++this.revision; this.pendingTransition = undefined; this.previewRestore = undefined; this.engine.stopPreview(); this.engine.stopAll(); this.emit(); }
   toggle() { if (this.running) this.pause(); else this.start(); }
   /** 单独开关音乐：只影响音乐，环境音继续流动。 */
   toggleMusic() {
@@ -128,6 +136,29 @@ export class RoomPlayer {
     this.emit(); this.schedule();
   }
   seek(seconds: number) { if (this.loadedId === this.currentId) this.engine.seek(seconds); }
+  /**
+   * 试听一张唱片。播一段就停，期间暂停当前音乐，停下后按原样恢复。
+   *
+   * 为什么要暂停音乐：两首歌同时响，用户分不清听到的是试听还是正在放的那首。
+   * 为什么不走 playRecord：试听不该改变「现在在放哪一首」，也不该触发切歌过渡。
+   */
+  async preview(recordId: string) {
+    const record = this.cabinet.records.find(r => r.id === recordId);
+    if (!record) throw new Error('这张唱片已经不在了。');
+    const blob = await readAsset(record.assetId);
+    if (!blob) throw new Error(`找不到「${record.name}」的文件，请重新导入。`);
+    if (!this.previewRestore) this.previewRestore = { running: this.running, musicPlaying: this.audio.musicPlaying };
+    if (this.running && this.audio.musicPlaying) this.engine.pauseMusic();
+    await this.engine.preview(blob);
+  }
+  stopPreview() { this.engine.stopPreview(); }
+  private restoreAfterPreview() {
+    const restore = this.previewRestore;
+    this.previewRestore = undefined;
+    if (!restore) return;
+    // 试听之前音乐是响着的，就把那一首接着放（不是从头）
+    if (restore.musicPlaying && restore.running) void this.engine.playMusic().catch(() => undefined);
+  }
   /** 接上外部音乐（虚拟声卡抓来的那股声音）。接上后避让就按它的响度来压环境音。 */
   attachLineIn(stream: MediaStream) { this.engine.attachLineIn(stream); this.emit(); }
   detachLineIn() { this.engine.detachLineIn(); this.emit(); }
@@ -182,5 +213,5 @@ export class RoomPlayer {
       } catch (error) { if (valid()) { this.pause(); this.onError(error); } }
     });
   }
-  dispose() { this.disposed = true; this.running = false; ++this.revision; this.engine.dispose(); }
+  dispose() { this.disposed = true; this.running = false; ++this.revision; this.engine.stopPreview(); this.engine.dispose(); }
 }

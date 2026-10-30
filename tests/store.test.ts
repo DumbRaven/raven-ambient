@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { getText, readAsset, removeText, setText, storeAsset, storeName, useStore, type StoreDriver } from '../src/store.ts';
+import { getText, listAssetKeys, readAsset, removeText, setText, storeAsset, storeName, useStore, type StoreDriver } from '../src/store.ts';
 
 /** 一个纯内存驱动，用来验证接口本身的行为，不依赖浏览器。 */
 function memoryDriver(): StoreDriver & { text: Map<string, string>; blobs: Map<string, Blob>; mirrored: Map<string, string> } {
@@ -17,6 +17,7 @@ function memoryDriver(): StoreDriver & { text: Map<string, string>; blobs: Map<s
     removeText: key => { text.delete(key); },
     readBlob: async key => blobs.get(key),
     writeBlob: async (key, value) => { if (value) blobs.set(key, value); else blobs.delete(key); },
+    listKeys: async () => [...blobs.keys()],
     mirrorText: async (key, value) => { mirrored.set(key, value); },
   };
 }
@@ -77,4 +78,28 @@ test('有 mirrorText 时会把同一份内容镜像出去', async () => {
   setText('raven-cabinet-v2', '{"a":1}');
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(driver.mirrored.get('raven-cabinet-v2'), '{"a":1}');
+});
+
+test('能列出所有资产 key，清理缓存靠它知道库里有什么', async () => {
+  useStore(memoryDriver());
+  await storeAsset('cover-1', new Blob(['a']));
+  await storeAsset('cover-2', new Blob(['b']));
+  await storeAsset('song-1', new Blob(['c']));
+  const keys = await listAssetKeys();
+  assert.deepEqual(keys.sort(), ['cover-1', 'cover-2', 'song-1']);
+});
+
+test('驱动不实现 listKeys 时返回空数组，不报错', async () => {
+  const driver = memoryDriver();
+  delete (driver as { listKeys?: unknown }).listKeys;
+  useStore(driver);
+  await storeAsset('cover-9', new Blob(['x']));
+  assert.deepEqual(await listAssetKeys(), []);
+});
+
+test('listKeys 抛错时也返回空数组——清理是可选能力，不该拖垮界面', async () => {
+  const driver = memoryDriver();
+  driver.listKeys = async () => { throw new Error('索引库打不开'); };
+  useStore(driver);
+  assert.deepEqual(await listAssetKeys(), []);
 });

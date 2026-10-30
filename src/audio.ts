@@ -93,10 +93,21 @@ export class AmbientEngine {
   private status: AudioStatus = { ...initialStatus };
   private listeners = new Set<(status: AudioStatus) => void>();
   private endedListeners = new Set<() => void>();
+  /**
+   * 试听：一个独立的声音，不占主唱盘、不进切歌过渡、也不改「现在在放哪一首」。
+   * 之所以不复用唱盘，是因为试听要能随时掐掉，掐掉之后正在放的那首还得原样接着走。
+   */
+  private previewEl?: HTMLAudioElement;
+  private previewSource?: MediaElementAudioSourceNode;
+  private previewGain?: GainNode;
+  private previewUrl?: string;
+  private previewTimer?: ReturnType<typeof setTimeout>;
+  private previewEnded = new Set<() => void>();
   private destroyed = false;
 
   subscribe(listener: (status: AudioStatus) => void) { this.listeners.add(listener); listener({ ...this.status }); return () => { this.listeners.delete(listener); }; }
   onMusicEnded(listener: () => void) { this.endedListeners.add(listener); return () => { this.endedListeners.delete(listener); }; }
+  onPreviewEnded(listener: () => void) { this.previewEnded.add(listener); return () => { this.previewEnded.delete(listener); }; }
   private emit() {
     const previous = this.lastEmitted, next = this.status, now = this.ctx?.currentTime ?? 0;
     if (previous && (Object.keys(next) as (keyof AudioStatus)[]).every(key => previous[key] === next[key])) return;
@@ -363,6 +374,65 @@ export class AmbientEngine {
     this.buffers.delete(id);
   }
   /**
+   * 试听一张唱片：播一段就停，用来「听一下这张到底是什么」。
+   *
+   * 从 10% 的位置起播而不是从头：很多音乐开头是几秒静音或淡入，
+   * 从头放用户会以为没声音。时长固定，播完自己收。
+   *
+   * 试听期间环境音让到 30%：不然一片风声雨声压着，根本听不出这张唱片长什么样。
+   * 用 gain 而不是 stopAmbience，是不想让环境音重新解码一遍。
+   */
+  async preview(blob: Blob, seconds = 8) {
+    this.init();
+    await this.ctx!.resume();
+    this.stopPreview();
+    const el = new Audio();
+    el.preload = 'auto';
+    const url = URL.createObjectURL(blob);
+    el.src = url;
+    const gain = this.ctx!.createGain();
+    gain.gain.value = 0;
+    const source = this.ctx!.createMediaElementSource(el);
+    source.connect(gain).connect(this.master!);
+    this.previewEl = el; this.previewSource = source; this.previewGain = gain; this.previewUrl = url;
+    this.ambient!.gain.setTargetAtTime(0.3, this.ctx!.currentTime, 0.08);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => finish(new Error('这段音频读得太慢，先别试听了。')), 8000);
+        const done = () => finish();
+        const fail = () => finish(new Error('无法播放这段音频。'));
+        function finish(error?: Error) {
+          clearTimeout(timeout);
+          el.removeEventListener('loadedmetadata', done); el.removeEventListener('error', fail);
+          if (error) reject(error); else resolve();
+        }
+        el.addEventListener('loadedmetadata', done, { once: true });
+        el.addEventListener('error', fail, { once: true });
+        el.load();
+      });
+      if (this.previewEl !== el) return;
+      if (Number.isFinite(el.duration) && el.duration > 0) el.currentTime = el.duration * 0.1;
+      gain.gain.setTargetAtTime(1, this.ctx!.currentTime, 0.06);
+      await el.play().catch(() => undefined);
+      if (this.previewEl !== el) return;
+      this.previewTimer = setTimeout(() => this.stopPreview(), Math.max(1, seconds) * 1000);
+    } catch (error) {
+      if (this.previewEl === el) this.stopPreview();
+      throw error;
+    }
+  }
+  stopPreview() {
+    clearTimeout(this.previewTimer); this.previewTimer = undefined;
+    const el = this.previewEl, source = this.previewSource, gain = this.previewGain, url = this.previewUrl;
+    const had = !!el;
+    this.previewEl = undefined; this.previewSource = undefined; this.previewGain = undefined; this.previewUrl = undefined;
+    if (gain && this.ctx) gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
+    if (this.ctx) this.ambient?.gain.setTargetAtTime(1, this.ctx.currentTime, 0.12);
+    // 30ms 之后再掐断，让上面那条淡出真正走完，不然收尾会有一声脆响
+    if (el) setTimeout(() => { el.pause(); el.removeAttribute('src'); el.load(); source?.disconnect(); gain?.disconnect(); if (url) URL.revokeObjectURL(url); }, 120);
+    if (had) for (const listener of this.previewEnded) listener();
+  }
+  /**
    * 把一首歌装进指定的唱盘。
    *
    * autoplay 时不等元数据就按下播放：浏览器会在缓冲够的第一刻出声。
@@ -492,12 +562,12 @@ export class AmbientEngine {
   seek(seconds: number) { if (this.music && Number.isFinite(this.music.duration)) { this.music.currentTime = Math.max(0, Math.min(seconds, this.music.duration)); this.lastEmissionAt = -Infinity; this.tick(); } }
   dispose() {
     this.destroyed = true;
-    this.stopAll(); clearInterval(this.timer);
+    this.stopAll(); this.stopPreview(); clearInterval(this.timer);
     for (const deck of this.decks) {
       deck.el.pause(); deck.el.removeAttribute('src'); deck.el.load();
       if (deck.url) URL.revokeObjectURL(deck.url);
     }
-    void this.ctx?.close(); this.listeners.clear(); this.endedListeners.clear(); this.buffers.clear();
+    void this.ctx?.close(); this.listeners.clear(); this.endedListeners.clear(); this.previewEnded.clear(); this.buffers.clear();
   }
 }
 

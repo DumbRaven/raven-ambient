@@ -15,6 +15,12 @@ export type StoreDriver = {
   /** 不传 value 表示删除。 */
   writeBlob(key: string, value?: Blob): Promise<void>;
   /**
+   * 可选：列出所有资产 key。
+   * 只有「清理缓存」用得上——要删掉不再被引用的图，就得先知道库里都有什么。
+   * 驱动不实现时返回空数组，清理功能会安静地什么都不做，而不是报错。
+   */
+  listKeys?(): Promise<string[]>;
+  /**
    * 可选：把文本快照镜像到更持久的地方。
    * 移动端 WebView 的 localStorage 在系统存储紧张时可能被清掉，
    * 原生驱动可以在这里把副本写进文件系统，下次启动再从镜像恢复。
@@ -58,6 +64,15 @@ export const browserDriver: StoreDriver = {
     return new Promise((resolve, reject) => {
       const req = database.transaction(DB_STORE).objectStore(DB_STORE).get(key);
       req.onsuccess = () => resolve(req.result as Blob | undefined);
+      req.onerror = () => reject(req.error);
+    });
+  },
+
+  async listKeys() {
+    const database = await db();
+    return new Promise<string[]>((resolve, reject) => {
+      const req = database.transaction(DB_STORE).objectStore(DB_STORE).getAllKeys();
+      req.onsuccess = () => resolve(req.result.filter((key): key is string => typeof key === 'string'));
       req.onerror = () => reject(req.error);
     });
   },

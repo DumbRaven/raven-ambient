@@ -45,6 +45,13 @@ export function removeText(key: string): void {
   active().removeText(key);
 }
 
+/**
+ * 列出所有资产 key。驱动不支持时返回空数组——
+ * 清理缓存是可选能力，缺了它也不该让调用方崩掉。
+ */
+export function listAssetKeys(): Promise<string[]> {
+  return active().listKeys?.().catch(() => []) ?? Promise.resolve([]);
+}
 export function readAsset(key: string): Promise<Blob | undefined> {
   return active().readBlob(key);
 }

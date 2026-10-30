@@ -506,7 +506,36 @@ body { background: var(--bold-page, #f6f5f2); }
   gap: 6px;
 }
 .text-button:not(:disabled):hover { color: #000; }
-.edit-notes { font-size: 11px; margin-top: 16px; }
+.edit-notes { font-size: 11px; }
+/* 「编辑 / 试听 / 移除」排成一行。移除缩到最右边，和常用动作拉开距离——
+   它不是每天都会点的事，但也不该藏进弹窗第二层。 */
+.notes-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+.notes-actions .text-button { margin-right: auto; }
+.notes-preview,
+.notes-remove {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  color: var(--bold-muted);
+  background: transparent;
+  border: 1px solid var(--bold-line);
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+.notes-preview:not(:disabled):hover,
+.notes-remove:not(:disabled):hover { background: #f6f5f2; color: #101010; }
+/* 试听中：实心黑，一眼看出现在响的是试听 */
+.notes-preview.on { background: #101010; color: #fff; border-color: #101010; }
+.notes-preview.on:not(:disabled):hover { background: #000; color: #fff; }
+/* 第一下变红，第二下才删。红色只在这一步出现，平时不吓人。 */
+.notes-remove.armed { background: #c04a34; color: #fff; border-color: #c04a34; }
+.notes-remove.armed:not(:disabled):hover { background: #a13a26; color: #fff; border-color: #a13a26; }
+
 
 .record-meta { margin: 20px 0 16px; }
 .record-meta > div {
