@@ -13,7 +13,7 @@
 ![Platform](https://img.shields.io/badge/platform-Windows-101010?style=flat-square)
 ![Electron](https://img.shields.io/badge/Electron-40-101010?style=flat-square)
 ![React](https://img.shields.io/badge/React-19-101010?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-186%20passing-101010?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-187%20passing-101010?style=flat-square)
 
 </div>
 
