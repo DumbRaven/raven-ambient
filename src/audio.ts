@@ -445,6 +445,13 @@ export class AmbientEngine {
     // preload 从 metadata 改成 auto：本地 blob 不消耗流量，让它一次性把数据备好
     deck.el.preload = 'auto';
     deck.el.src = deck.url;
+    // load() 必须在 play() 之前。
+    // 浏览器里 load() 会中止还没落地的播放请求（play() 的 promise 以 AbortError 被拒），
+    // 而顺序播放接下一首走的正是「换 src → loadMusic」这条路：
+    // 先 play 后 load 的话，第二首装上了、界面也切了，就是不出声。
+    // 单曲循环不重新 arm、手动切歌走 swapMusic（play 在 arm 之后），所以只有顺序播放会中招。
+    if (signal.aborted) return;
+    deck.el.load();
     // play() 的 promise 才是「真正开始响」，元数据的 promise 只说明文件认得出来。
     // 失败（编解码不支持等）交给下面的 error 事件统一报，这里只吞掉自己的拒绝。
     const playing = autoplay ? deck.el.play().catch(() => undefined) : Promise.resolve();
@@ -461,7 +468,7 @@ export class AmbientEngine {
       deck.el.addEventListener('loadedmetadata', success, { once: true });
       deck.el.addEventListener('error', failure, { once: true });
       signal.addEventListener('abort', cancel, { once: true });
-      if (signal.aborted) cancel(); else deck.el.load();
+      if (signal.aborted) cancel();
     });
     await playing;
   }

@@ -132,3 +132,19 @@ test('浏览器晚送达的 pause 事件不能把已恢复播放标成暂停', a
   engine.pauseMusic(); await engine.playMusic(); Media.created[0].dispatchEvent(new Event('pause'));
   assert.equal(status.musicPlaying, true); assert.equal(Media.created[0].paused, false);
 });
+
+test('顺序播放接下一首：新的一首真的播起来，不是装上就停着', async t => {
+  installAudio(t); memory(); let status: any;
+  const player = new RoomPlayer(cabinet(), s => { status = s; }, assert.fail);
+  t.after(() => player.dispose());
+  player.start(); await inspect(player).pending;
+  assert.equal(status.currentId, 'a');
+  const deck = Media.created[0];
+  assert.equal(deck.paused, false, '第一首应该在放');
+  // 放完：引擎发 ended，播放器接下一首，走的正是 loadMusic 这条路
+  deck.dispatchEvent(new Event('ended'));
+  await inspect(player).pending;
+  assert.equal(status.currentId, 'b');
+  assert.equal(status.musicPlaying, true, '第二首应该已经在响');
+  assert.equal(deck.paused, false, '接上的这一首不该停在暂停态');
+});

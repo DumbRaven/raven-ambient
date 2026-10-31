@@ -42,10 +42,35 @@ export class Media extends EventTarget {
   static created: Media[] = [];
   paused = true; src = ''; currentTime = 0; duration = 60; deferMetadata = false; waiting = false;
   playGate?: ReturnType<typeof deferred>; playRequested = false;
+  /**
+   * 有没有一个还没落地的 play()。
+   *
+   * 只有「悬着的那一次」才会被 load() 打断。已经 resolved 的播放请求不受影响——
+   * 浏览器里 load() 之后再 play() 是正常起播，不是 AbortError。
+   */
+  private pendingPlay = false;
+  private interrupted = false;
   constructor() { super(); Media.created.push(this); }
-  load() { if (!this.src) return; if (this.deferMetadata) this.waiting = true; else queueMicrotask(() => this.ready()); }
+  load() {
+    if (!this.src) return;
+    // 浏览器里 load() 会中止还没落地的播放请求。桩必须照做，
+    // 否则「先 play() 再 load()」这种写法在测试里永远看不出问题。
+    if (this.pendingPlay) this.interrupted = true;
+    if (this.deferMetadata) this.waiting = true; else queueMicrotask(() => this.ready());
+  }
   ready() { this.waiting = false; this.dispatchEvent(new Event('loadedmetadata')); }
-  async play() { this.playRequested = true; await this.playGate?.promise; this.paused = false; this.dispatchEvent(new Event('play')); }
+  async play() {
+    this.playRequested = true; this.pendingPlay = true;
+    await this.playGate?.promise;
+    this.pendingPlay = false;
+    if (this.interrupted) {
+      this.interrupted = false;
+      const error = new Error('play interrupted by load');
+      error.name = 'AbortError';
+      throw error;
+    }
+    this.paused = false; this.dispatchEvent(new Event('play'));
+  }
   pause() { if (this.paused) return; this.paused = true; this.dispatchEvent(new Event('pause')); }
   removeAttribute() { this.src = ''; }
 }
