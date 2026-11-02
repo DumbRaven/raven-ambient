@@ -13,6 +13,10 @@ electron/nowplaying/NowPlaying.exe
 .tools/
 .cable/
 
+# tools/ 是仓库里的测量工具链（见 docs/交接文档-放映页.md §12.2），
+# 但探针跑出来的截图是产物，不进仓库。
+tools/**/*.png
+
 # 协作约定与本地启动脚本：是给本地开发用的，不是项目运行需要的东西
 AGENTS.md
 启动开发预览.cmd
