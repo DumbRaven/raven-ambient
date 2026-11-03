@@ -2619,3 +2619,3900 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   }
 }
 
+/* ---------- 放映（媒体库） ---------- */
+
+/* 这一页跟唱片柜共用工具栏，只是右边从搜索换成了「加入文件夹」 */
+.media-room {
+  padding-bottom: 24px;
+}
+
+/* 和左边的筛选胶囊等高（38px），否则工具栏两个控件对不齐 */
+.media-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  margin-left: auto;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--bold-line);
+  background: #fff;
+}
+
+.media-pick:hover {
+  background: #f2f1ed;
+}
+
+/* 来源列表：只显示目录名，完整路径放在 title 里。多数时候用户认得出自己的文件夹。 */
+.media-sources {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin: 0 0 18px;
+}
+
+.media-count {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: var(--bold-muted);
+}
+
+.media-dir-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.media-dir {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 3px 3px 12px;
+  border-radius: 999px;
+  background: #f0efea;
+  font-size: 11px;
+  font-weight: 600;
+  color: #101010;
+}
+
+.media-dir > span {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-dir .icon-button {
+  width: 22px;
+  height: 22px;
+  border: 0;
+  background: transparent;
+  color: var(--bold-muted);
+}
+
+.media-dir .icon-button:hover {
+  background: #fff;
+  color: #101010;
+}
+
+/* 格子。图片和视频混排，视频给一块黑底免得缩略图没出时是白板。 */
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.media-card {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.media-thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #f0efea;
+  box-shadow: 0 0 0 1px #00000008, 0 2px 10px #0000000a;
+  transition: transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 200ms;
+}
+
+.media-card[data-kind='video'] .media-thumb {
+  background: #101010;
+}
+
+.media-thumb img,
+.media-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 视频缩略图停在第一帧，不给控件也不响应指针——它只是个封面 */
+.media-thumb video {
+  pointer-events: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .media-card:hover .media-thumb {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px #00000014, 0 0 0 1px #00000010;
+  }
+
+  .media-card:hover .media-zoom {
+    opacity: 1;
+  }
+}
+
+.media-badge {
+  position: absolute;
+  left: 9px;
+  bottom: 9px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #ffffffd9;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #101010;
+}
+
+.media-zoom {
+  position: absolute;
+  right: 9px;
+  top: 9px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #ffffffd9;
+  color: #101010;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.media-caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 2px 0;
+}
+
+.media-caption b {
+  font-size: 12px;
+  font-weight: 600;
+  color: #101010;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-caption small {
+  flex: none;
+  font-size: 10px;
+  color: var(--bold-faint);
+}
+
+/* 空态。和唱片柜的空态保持同一套呼吸：一个淡底方块，一句说明，一个黑胶囊。 */
+.media-empty {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  padding: 64px 20px 72px;
+  text-align: center;
+}
+
+.media-empty-art {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 24px;
+  background: #f0efea;
+  color: var(--bold-faint);
+}
+
+.media-empty h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #101010;
+}
+
+.media-empty p {
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--bold-muted);
+}
+
+/* 放大。这一版是「看一眼」的灯箱，不是放映器——模板和叠加元素接在这里。 */
+.media-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 4vmin;
+  background: #101010d9;
+  backdrop-filter: blur(10px);
+  animation: media-stage-in 200ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.media-stage-inner {
+  display: flex;
+  flex-direction: column;
+  max-width: min(1100px, 92vw);
+  max-height: 88vh;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #101010;
+  box-shadow: 0 30px 90px #00000066;
+  animation: media-stage-rise 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.media-stage-inner img,
+.media-stage-inner video {
+  display: block;
+  max-width: 100%;
+  max-height: calc(88vh - 48px);
+  object-fit: contain;
+}
+
+.media-stage-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 10px 10px 16px;
+  background: #101010;
+}
+
+.media-stage-bar b {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-stage-bar .icon-button {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 0;
+  background: #ffffff1a;
+  color: #fff;
+}
+
+.media-stage-bar .icon-button:hover {
+  background: #ffffff2e;
+  color: #fff;
+}
+
+@keyframes media-stage-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes media-stage-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .media-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 599px) {
+  .media-sources {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .media-dir > span {
+    max-width: 120px;
+  }
+}
+
+@media (max-width: 440px) {
+  .media-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .media-empty {
+    padding: 44px 8px 52px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-thumb,
+  .media-zoom {
+    transition: none;
+  }
+
+  .media-stage,
+  .media-stage-inner {
+    animation-duration: 1ms;
+  }
+}
+
+/* ---------- 壁纸库 ---------- */
+
+/* 工具栏第二个按钮：和「加入文件夹」并排，样式一致但底色压一档，
+   让主次分得开——多数人第一次来是选文件夹，壁纸库是顺手试的。 */
+.media-pick + .media-pick {
+  margin-left: 8px;
+  background: #f0efea;
+  border-color: transparent;
+}
+
+.media-pick + .media-pick:hover {
+  background: #e8e6e0;
+}
+
+.media-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+/* 来源胶囊里的壁纸那一枚：给它一个星形前置，和用户自己的文件夹区分开。 */
+.media-dir.is-wallpaper {
+  padding-right: 3px;
+  background: #101010;
+  color: #fff;
+}
+
+.media-dir.is-wallpaper .icon-button {
+  color: #ffffff99;
+}
+
+.media-dir.is-wallpaper .icon-button:hover {
+  background: #ffffff1f;
+  color: #fff;
+}
+
+/* 只有预览图的场景壁纸：缩略图压暗一点，标题栏那格写「仅预览」。 */
+.media-card[data-kind="image"] .media-caption small {
+  white-space: nowrap;
+}
+
+@media (max-width: 599px) {
+  .media-empty-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .media-empty-actions > button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-pick + .media-pick {
+    transition: none;
+  }
+}
+
+/* 放映页的工具栏比唱片柜多一个按钮，窄屏会挤成两行，
+   于是筛选胶囊里的文字被压成竖排。这里让它整体换行、各占一行，文字不再折。 */
+@media (max-width: 599px) {
+  .media-room .collection-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .media-room .filter-tabs {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .media-room .filter-tabs button {
+    flex: 1;
+    white-space: nowrap;
+    padding: 7px 10px;
+  }
+
+  .media-room .media-pick {
+    width: 100%;
+    margin-left: 0;
+    justify-content: center;
+  }
+
+  .media-room .media-pick + .media-pick {
+    margin-left: 0;
+  }
+}
+
+/* 唱片柜的筛选胶囊靠 App.tsx 算出来的黑色滑块（.flip-marker）表示选中，
+   放映页是独立组件、没有那个滑块，所以这里的选中项要自己带实底，
+   否则是白字压在浅灰底上，等于看不见。 */
+.media-room .filter-tabs button.active {
+  background: #101010;
+  color: #fff;
+}
+
+.media-room .filter-tabs button.active:hover {
+  background: #101010;
+  color: #fff;
+}
+
+
+/* ---------- 放映：播放台 ---------- */
+
+/* 放映不是「点开看一眼」，是一直开着的一块屏。所以做成页面里常驻的一块，
+   点下面的格子把内容换上来，而不是弹层。 */
+/* 台面本身不画底、不画框——版式铺满就是台面。
+   控制条自己有黑底，不需要这层来垫。 */
+.media-theater {
+  margin: 0 0 20px;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* 视频按 16:9 留位置；图片不能套同一个框——竖图和方图会被压成一条，
+   或者上下留大片黑。图片交给内容自己决定高度，只封顶。 */
+.media-theater[data-kind='video'] .theater-screen {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  max-height: min(58vh, 520px);
+  background: #0a0a0a;
+}
+
+.media-theater[data-kind='image'] .theater-screen {
+  position: relative;
+  display: grid;
+  place-items: center;
+  max-height: min(58vh, 520px);
+  background: #0a0a0a;
+}
+
+/* 图片按宽度铺满，高度跟着自己的比例走。
+   写 width:auto 的话小图会缩成一小块、四周全是黑，看着像没加载出来。 */
+.media-theater[data-kind='image'] .theater-screen img {
+  width: 100%;
+  height: auto;
+  max-height: min(58vh, 520px);
+  object-fit: contain;
+}
+
+/* 图片不裁：壁纸比例五花八门，contain 才不会把画幅切掉。
+   视频同理，宁可留黑边也不切画面。 */
+.theater-screen img,
+.theater-screen video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #0a0a0a;
+}
+
+.theater-note {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ffffff1f;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+}
+
+/* 控制条自带深色底。以前靠台面那层黑底，去掉黑框之后必须自己就是那块暗色，
+   否则白字压白底整条看不见。 */
+.theater-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 14px;
+  margin-top: 8px;
+  border-radius: 16px;
+  background: #101010;
+  color: #ffffff;
+}
+
+.theater-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.theater-bar .icon-button {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff14;
+  color: #fff;
+}
+
+.theater-bar .icon-button:hover {
+  background: #ffffff2e;
+  color: #fff;
+}
+
+/* 播放键是这一排里唯一的主动作，给个白底 */
+.theater-play {
+  background: #fff !important;
+  color: #101010 !important;
+}
+
+.theater-play:hover {
+  background: #e8e8e3 !important;
+}
+
+.theater-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.theater-copy b {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theater-copy small {
+  flex: none;
+  font-size: 11px;
+  font-weight: 500;
+  color: #ffffff8a;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 循环：开着的时候是白字，关掉压暗，一眼能看出状态 */
+.theater-loop {
+  color: #ffffff66 !important;
+}
+
+.theater-loop.on {
+  background: #ffffff2e !important;
+  color: #fff !important;
+}
+
+/* 当前在播放台上的那一格：外框压深，别靠 hover 才知道选的是谁 */
+.media-card.is-current .media-thumb {
+  box-shadow: 0 0 0 2px #101010, 0 6px 18px #0000001f;
+}
+
+.media-card.is-current .media-caption b {
+  color: #101010;
+}
+
+.media-badge-note {
+  left: auto;
+  right: 9px;
+  background: #ffffffd9;
+  color: #101010;
+}
+
+@media (max-width: 599px) {
+  .media-theater {
+    border-radius: 18px;
+  }
+
+  .theater-bar {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+  }
+
+  .theater-copy {
+    order: 3;
+    width: 100%;
+    flex-basis: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-card.is-current .media-thumb {
+    transition: none;
+  }
+}
+
+/* ---------- 放映：桌面壁纸直播 ---------- */
+
+/* 播放台显示桌面时是「活的」画面，和放一张图不一样：
+   底下那层黑不该在边缘露出来，所以整块用 object-fit: cover 铺满。 */
+.media-theater[data-kind="live"] .theater-screen {
+  aspect-ratio: 16 / 9;
+  background: #0d0d0d;
+}
+
+.theater-screen .theater-live {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 还没拿到第一帧时的等待态。抓帧器启动要几十毫秒，
+   这段时间什么都不画会闪一下黑块。 */
+.theater-wait {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  height: 100%;
+  color: #8b8b85;
+}
+
+.theater-wait p {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+/* 直播指示灯：呼吸，表示画面在动。 */
+.theater-live-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: #a8e6c1;
+  box-shadow: 0 0 0 0 #a8e6c166;
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 #a8e6c166; }
+  50% { box-shadow: 0 0 0 5px #a8e6c100; }
+}
+
+/* 「桌面壁纸」按钮按下时反白，和播放台上的循环键同一套状态语言。 */
+.media-pick.on {
+  background: #101010;
+  border-color: #101010;
+  color: #ffffff;
+}
+
+@media (max-width: 599px) {
+  .theater-live-dot {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theater-live-dot {
+    animation: none;
+  }
+}
+
+/* ---------- 放映：全屏 ---------- */
+
+/* 全屏时播放台铺满整个视口，工具栏、格子、来源全部让开。
+   用 position: fixed 而不是把窗口变成真全屏：Wallpaper Engine 检测到真全屏会暂停渲染
+   （config.json 里 playbackfullscreen: pause），但 PrintWindow 每次抓帧都会强制它重绘，
+   所以实测全屏下画面照样在动。用 fixed 铺满是为了不打断窗口本身的状态。 */
+.media-room.is-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  margin: 0;
+  padding: 0;
+  background: #000000;
+  overflow: hidden;
+}
+
+/* 全屏时藏掉除了播放台以外的一切 */
+.media-room.is-expanded .collection-toolbar,
+.media-room.is-expanded .media-sources,
+.media-room.is-expanded .media-grid,
+.media-room.is-expanded .no-results,
+.media-room.is-expanded .media-empty {
+  display: none;
+}
+
+.media-room.is-expanded .media-theater {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  border-radius: 0;
+  background: #000000;
+  display: flex;
+  flex-direction: column;
+}
+
+.media-room.is-expanded .theater-screen {
+  flex: 1;
+  min-height: 0;
+  aspect-ratio: auto;
+  background: #000000;
+}
+
+.media-room.is-expanded .theater-screen video,
+.media-room.is-expanded .theater-screen img,
+.media-room.is-expanded .theater-live {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: contain;
+}
+
+/* 控制条浮在画面底部，平时淡出，鼠标或键盘动一下才出现——
+   全屏看东西的时候不该一直有一条黑带。
+
+   这里不能靠 :hover。全屏看电影时鼠标常常停在画面正中不动，
+   父元素一直处于 hover 状态，黑带就永远压在画面底下。
+   所以由 MediaRoom 记「多久没动静」，2.6 秒后把 data-chrome 设成 hidden。 */
+.media-room.is-expanded .theater-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  border-radius: 0;
+  padding: 16px 22px;
+  background: linear-gradient(to top, #000000d9, #00000000);
+  border: 0;
+  opacity: 1;
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+
+/* 淡出时一并往下挪一点，收得干净；重新出现时从原位浮上来 */
+.media-room.is-expanded[data-chrome="hidden"] .theater-bar {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+
+/* 键盘用户仍然能用 Tab 把焦点移进来，这时不该继续藏着 */
+.media-room.is-expanded .theater-bar:focus-within {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.media-room.is-expanded .theater-copy b {
+  color: #ffffff;
+}
+
+.media-room.is-expanded .theater-copy small {
+  color: #ffffff8c;
+}
+
+.media-room.is-expanded .theater-controls .icon-button,
+.media-room.is-expanded .theater-loop,
+.media-room.is-expanded .theater-expand {
+  color: #ffffff;
+  border-color: #ffffff2e;
+  background: #ffffff14;
+}
+
+.media-room.is-expanded .theater-loop.on,
+.media-room.is-expanded .theater-expand[aria-pressed="true"] {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #101010;
+}
+
+/* 全屏按钮：和循环键同一套尺寸语言，平时不抢戏 */
+.theater-expand {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-room.is-expanded .theater-bar {
+    transition: none;
+  }
+}
+
+/* ---------- 放映：全屏修正 ---------- */
+
+/* 全屏时页面本身不能再滚。
+   原来 html 高 1134、视口 1080，多出来的部分把滚动条顶了出来；
+   滚动条占掉右边 4px，而 position:fixed 的定位基准不含滚动条，
+   所以播放台只铺到 1916，右边露出 4px 的页面底色（白）——就是那条白线。 */
+html:has(.media-room.is-expanded),
+body:has(.media-room.is-expanded) {
+  overflow: hidden;
+}
+
+/* 直播画面叠着放：新的一帧解码好才显形，旧的一直垫在下面，
+   这样换帧的瞬间不会闪出一片白。 */
+.theater-screen {
+  position: relative;
+}
+
+.theater-screen .theater-live {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 全屏时铺满，不留黑边。壁纸和屏幕通常都是 16:9，差值很小；
+   宁可裁掉几个像素也不要上下两条黑带。 */
+.media-room.is-expanded .theater-screen .theater-live {
+  object-fit: cover;
+}
+
+/* ---------- 放映：场景壁纸 ---------- */
+
+/* 场景壁纸只有一张正方形的小预览图（实测 192×192 到 300×300），
+   按 16:9 铺满会在两边留出大片黑边。所以整块缩到预览图自己的尺寸，
+   居中放着，旁边留白——像一张贴在台上的小样，而不是硬撑满屏。 */
+.media-theater[data-kind="scene"] .theater-screen {
+  aspect-ratio: auto;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: #101010;
+  min-height: 260px;
+}
+
+.media-theater[data-kind="scene"] .theater-screen img {
+  width: auto;
+  height: auto;
+  max-width: min(100%, 420px);
+  max-height: min(52vh, 420px);
+  border-radius: 14px;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+/* 全屏时让它大一点，但仍然是等比放大，不裁不压。 */
+.media-room.is-expanded .media-theater[data-kind="scene"] .theater-screen img {
+  max-width: min(72vw, 720px);
+  max-height: min(70vh, 720px);
+}
+
+@media (max-width: 599px) {
+  .media-theater[data-kind="scene"] .theater-screen {
+    padding: 16px;
+    min-height: 200px;
+  }
+}
+
+/* ---------- 放映：播放台按视口收 ---------- */
+
+/* 播放台的高度不能只按视口比例算。
+   实测 1280×900 的窗口，内容区只有 837 高：上面已经占了 369（标题 + 页签 + 工具栏），
+   播放台再吃掉 538，底边就落到 907——来源行和格子全在屏幕外，
+   用户得先滚一屏才能看见自己的东西。放映页想要的是「一屏看全」，
+   所以改成按剩余空间收：给下面的来源行和至少一行格子留位置。
+
+   只收 .theater-screen，不收 .media-theater：后者是外壳，底下还挂着 52px 的
+   控制条。给外壳设 max-height 会把控制条一起裁掉（overflow: hidden），
+   播放台看着正常但没有了暂停、换件、全屏那一排按钮。 */
+/* 注意：这里只封顶「没有套版式」的裸台面。
+   套了版式的台面（.theater-screen 里有 .template）高度由 .template-collage 那条管，
+   两边都设 max-height 会互相压——实测版式的台面被这条压到 305px，
+   右栏只剩 220×267，整套版式立不住。 */
+.media-room .media-theater[data-kind='video'] .theater-screen:not(:has(> .template)),
+.media-room .media-theater[data-kind='image'] .theater-screen:not(:has(> .template)) {
+  max-height: min(46vh, calc(100vh - 532px));
+}
+
+.media-room .media-theater[data-kind='image'] .theater-screen:not(:has(> .template)) img {
+  max-height: min(46vh, calc(100vh - 532px));
+}
+
+/* 屏幕矮的时候（笔记本 768 高减去窗口边框），上面那个减法会把播放台压到很小。
+   给一个下限，到这儿就不再缩，宁可让页面滚一下。 */
+@media (max-height: 700px) {
+  .media-room .media-theater[data-kind='video'] .theater-screen,
+  .media-room .media-theater[data-kind='image'] .theater-screen,
+  .media-room .media-theater[data-kind='image'] .theater-screen img {
+    max-height: min(40vh, 300px);
+  }
+}
+
+/* 来源胶囊上的「移出」。
+   原来那里是个 22px 的灰色垃圾桶图标，和旁边的刷新键长得一样，
+   用户找不到出口。壁纸库是从别处读进来的，更需要一个说得明白的断开动作，
+   所以这里用文字 + 小叉，并且压出一点灰度差，能和刷新分开。 */
+.chip-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  margin-left: 2px;
+  padding: 0 9px 0 7px;
+  border: 0;
+  border-radius: 999px;
+  background: #101010;
+  color: #fff;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.chip-action:hover {
+  background: #b4332a;
+}
+
+/* 壁纸那一枚本来就整颗是黑的，移出键要反过来才看得见。 */
+.media-dir.is-wallpaper .chip-action {
+  background: #ffffff1f;
+  color: #fff;
+}
+
+.media-dir.is-wallpaper .chip-action:hover {
+  background: #b4332a;
+}
+
+/* ---------- 放映：「从本地添加」下拉 ---------- */
+
+/* 为什么不一键选：Windows 的原生打开对话框没法同时当文件和文件夹选择器，
+   传 ['openFile','openDirectory'] 会退化成只能选目录。所以让用户先挑一件。 */
+.media-add {
+  position: relative;
+  display: inline-flex;
+}
+
+.media-add-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.media-add-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 41;
+  width: 260px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid var(--bold-line);
+  box-shadow: 0 18px 44px #10101026, 0 1px 2px #1010100f;
+  animation: add-menu-in 160ms cubic-bezier(.2,.7,.3,1) both;
+}
+
+@keyframes add-menu-in {
+  from { opacity: 0; transform: translateY(-6px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.media-add-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--bold-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.media-add-menu > button:hover {
+  background: #f4f2ee;
+}
+
+.media-add-menu > button:focus-visible {
+  outline: 2px solid var(--bold-ink);
+  outline-offset: 1px;
+}
+
+.media-add-menu > button > svg {
+  flex: none;
+  color: var(--bold-muted);
+}
+
+.media-add-menu > button > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.media-add-menu b {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.media-add-menu small {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--bold-faint);
+  line-height: 1.35;
+}
+
+@media (max-width: 599px) {
+  .media-add-menu {
+    width: min(260px, calc(100vw - 56px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-add-menu {
+    animation: none;
+  }
+}
+
+/* ---------- 放映：工具条重排 ---------- */
+
+/* 动作在右、分类在左不行——用户的原话是「你咋又把从本地添加放在左边了」。
+   所以这一行分成两簇：左边是视图切换（图片 / 视频），右边是「从本地添加 / 读取壁纸库」。
+   和唱片柜那一行一致：那里也是分类在左、搜索在右。 */
+.media-room .collection-toolbar.media-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.media-room .media-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* .media-pick 自带 margin-left:auto（本来是给「工具栏只有一个按钮」那版用的）。
+   现在它在右侧容器里，再 auto 一次会把两个按钮撑开，所以要清掉。 */
+.media-room .media-actions .media-pick {
+  margin-left: 0;
+}
+
+/* 空台：库里一件都没有时播放台的样子。保持和正常播放台同样的占位高度，
+   免得列表一出现整个版面往上跳。 */
+.media-theater.is-blank .theater-screen {
+  display: grid;
+  place-items: center;
+}
+
+.theater-blank {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  color: #8b8b85;
+}
+
+.theater-blank p {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+/* 窄屏：两簇各占一行，右簇靠右。 */
+@media (max-width: 599px) {
+  .media-room .collection-toolbar.media-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .media-room .media-actions {
+    margin-left: 0;
+  }
+
+  .media-room .media-actions .media-pick {
+    flex: 1;
+    justify-content: center;
+    width: auto;
+  }
+
+  .media-room .media-actions {
+    display: flex;
+    gap: 8px;
+  }
+}
+
+/* 断链保底：原文件被挪走或删掉时，<img> 加载失败会塌成 0 高，
+   播放台就剩一条黑线。给台面一个下限，塌的时候还是个台子。 */
+@media (max-height: 700px) {
+  .media-room .media-theater .theater-screen {
+    min-height: 140px;
+  }
+}
+
+/* 台面本身要有高度。模板是 position:absolute 铺满的，它撑不开父元素，
+   所以父元素必须自己定高——用 aspect-ratio 定比例，再用 max-height 按视口收，
+   否则在 900 高的窗口里播放台会把下面全挤出屏幕。
+
+   注意只写 aspect-ratio 不写 width 时，宽度是 auto，浏览器会反过来用 max-height
+   倒推宽度（实测被压到 543px，右边露一块黑底）。所以 width 必须显式 100%。
+
+   这条要压过前面 [data-kind] 那两条，所以选择器带 .media-room 前缀。 */
+/* ---------- 放映：三套版式 ---------- */
+
+/* 台面本身要有高度。模板是 position:absolute 铺满的，它撑不开父元素，
+   所以父元素必须自己定高——用 aspect-ratio 定比例，再用 max-height 按视口收，
+   否则在 900 高的窗口里播放台会把下面全挤出屏幕。
+
+   注意只写 aspect-ratio 不写 width 时，宽度是 auto，浏览器会反过来用 max-height
+   倒推宽度（实测被压到 543px，右边露一块黑底）。所以 width 必须显式 100%。 */
+.media-room .media-theater .theater-screen {
+  position: relative;
+  /* 锁死 16:9。版式的比例是画的一部分——窗口一变高变矮整块排版就散了，
+     所以宁可让下面滚动，也不让台面自己改比例。
+     宽度吃满、高度由宽度推出来，任何窗口比例下版式都长一样。 */
+  width: 100%;
+  background: transparent;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  /* 只有视口特别矮时才收一档，否则 16:9 的台面会高到把控制条顶出屏幕。
+     这一档按「宽度优先」算：min 里取小的那个，收的是极端情况。 */
+  max-height: min(70vh, calc(100vw * 9 / 16));
+  overflow: hidden;
+}
+
+/* 版式套在播放台里面，铺满 .theater-screen。
+   三套共用同一个外框，只在里面长不同的东西，所以切换时不会跳布局。 */
+.media-theater .theater-screen > .template {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--tpl-base, #101010);
+}
+
+/* 拼贴里每一块都是一张「裁好的照片」，不是「完整展示的图」。
+   所以一律 cover——选 contain 会在块里留下黑边，那套版式的语法就散了。
+   选择器带 .template 前缀，压过前面那条给普通图片留的 contain。 */
+/* 选择器必须比 .media-theater[data-kind='image'] .theater-screen img（0,3,1）更长，
+   否则 width:100% / height:auto 那套会盖过来，图按原比例缩在块中间、两侧留黑边。 */
+.media-theater .template .tpl-block-media img,
+.media-theater .template .tpl-block-media video,
+.media-theater .template .tpl-frame-media img,
+.media-theater .template .tpl-frame-media video,
+.media-theater .template .tpl-photo-media img,
+.media-theater .template .tpl-photo-media video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+  object-position: center;
+}
+
+
+
+/* 三块内容各自钉死在自己的格子里。缝本身不画东西，露出底下的画布色。 */
+.template-collage .tpl-block {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tpl-block-media {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+
+
+/* 信息条只有 105px 高（305 的 27.4%），三组内容必须压得很紧才放得下。
+   实测按默认间距排，「PLAYLIST」那行会被控制条压住。 */
+
+
+.tpl-block-bar .tpl-fields { gap: 0; }
+.tpl-block-bar .tpl-fields > div { gap: 0; }
+.tpl-block-bar .tpl-fields span { font-size: 11px; line-height: 1.2; }
+.tpl-block-bar .tpl-list { padding-right: 0; gap: 0; }
+.tpl-block-bar .tpl-list span { font-size: 8.5px; line-height: 1.3; }
+
+/* 右列：一整条竖面板，从顶到底，跨越上下两行。 */
+
+
+
+
+.tpl-dot-tl { top: 10px; left: 10px; }
+.tpl-dot-tr { top: 10px; right: 10px; }
+.tpl-dot-bl { bottom: 10px; left: 10px; }
+.tpl-dot-br { bottom: 10px; right: 10px; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* with + 三个平台 + 三个小图标 */
+.tpl-with {
+  margin: 16px 0 0;
+  display: grid;
+  gap: 1px;
+  font-size: 8.5px;
+  line-height: 1.45;
+  opacity: 0.72;
+}
+
+/* 窗口态下这块只有 220px 宽，8.5px 已经到可读下限；
+   再小就只剩灰点，看不出是字。 */
+
+.tpl-with i { font-style: normal; }
+.tpl-with em {
+  display: block;
+  font-style: normal;
+  letter-spacing: 0.26em;
+  margin-top: 4px;
+  opacity: 0.8;
+}
+
+/* pick by vanilla soda：左对齐小字，靠底部但不贴边——右下角要留给彩胶。 */
+/* 圆压在面板下半截，pick by 只能缩在它左侧那一窄条里。
+   原版就是这么处理的——字很轻，压在画面边上，不抢圆。 */
+/* 圆从面板 48% 高度起、往左下伸出 -10%，所以左下这块只有很窄一条安全区。
+   pick by 缩在那一窄条里，字很小、很轻，压在画面边上，不抢圆。 */
+/* 紧跟在 with 下面，不是被推到面板底部——原版就是一路排下来的，
+   底部那大片空白是留给彩胶的。 */
+.tpl-pick {
+  margin: 26px 0 0;
+  width: auto;
+  font-size: 7px;
+  line-height: 1.55;
+  opacity: 0.72;
+  position: relative;
+  z-index: 6;
+}
+
+
+
+
+
+
+
+
+
+.tpl-star-a { top: 42px; right: 6px; }
+.tpl-star-b { top: 200px; left: 6px; }
+.tpl-star-c { bottom: 8px; right: 10px; }
+
+
+
+.tpl-fields > div {
+  display: grid;
+  gap: 2px;
+}
+
+.tpl-fields b,
+.tpl-list b {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.62;
+}
+
+.tpl-fields span {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.tpl-list span {
+  font-size: 9px;
+  line-height: 1.4;
+  opacity: 0.7;
+}
+
+
+
+
+
+
+
+/* 内圈：正在放的那张封面。拿不到封面就只留盘面，不画空洞。 */
+.tpl-disc-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 38%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background-color: var(--disc-groove);
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px #ffffff40;
+}
+
+/* 中心孔 */
+.tpl-disc-hole {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4.5%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--tpl-panel);
+  box-shadow: 0 0 0 1px #ffffff33;
+}
+
+
+
+@keyframes tpl-disc-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  
+}
+
+/* ---------- 照片：整张铺满 ---------- */
+
+.template-photo {
+  background: #0d0d0d;
+}
+
+.tpl-photo-media {
+  position: absolute;
+  inset: 0;
+}
+
+/* 压一层由下往上的暗角，保证白字在任何画面上都读得出来。
+   不做全局压暗——那会把照片压脏。 */
+.tpl-photo-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, #000000a8 0%, #00000000 42%),
+              linear-gradient(to bottom, #0000006b 0%, #00000000 30%);
+  pointer-events: none;
+}
+
+.tpl-photo-brand {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  margin: 0;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: #ffffff;
+  font-family: "Segoe Script", "Bradley Hand", "Ink Free", cursive;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.tpl-photo-brand i {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* 手写体大标题压在左上。原版就是这么摆的——像在照片背面写的字。 */
+.tpl-photo-title {
+  position: absolute;
+  top: 24px;
+  left: 28px;
+  margin: 0;
+  z-index: 2;
+  max-width: 56%;
+  color: #f4f1ea;
+  font-family: "Segoe Script", "Bradley Hand", "Ink Free", cursive;
+  font-size: clamp(20px, 3vw, 42px);
+  font-weight: 700;
+  line-height: 1.12;
+  text-shadow: 0 2px 18px #00000080;
+  text-wrap: balance;
+}
+
+/* 曲目列：原版是右侧一列「歌名 - 歌手」，右对齐，压在半透明上。 */
+.tpl-photo-list {
+  position: absolute;
+  right: 24px;
+  bottom: 22px;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  text-align: right;
+  color: #ffffff;
+}
+
+.tpl-photo-list li {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+.tpl-photo-list span {
+  opacity: 0.6;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.tpl-photo-list b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 画框：缩成一枚卡片 ---------- */
+
+.template-frame {
+  display: grid;
+  place-items: center;
+  padding: 5%;
+  box-sizing: border-box;
+}
+
+.tpl-frame-card {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.tpl-frame-media {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 18px;
+  box-shadow: 0 20px 50px #0000002e;
+}
+
+.tpl-frame-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--tpl-ink);
+  padding: 0 2px;
+  flex: none;
+}
+
+.tpl-frame-foot b {
+  font-size: 11px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tpl-frame-foot span {
+  flex: none;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--tpl-ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- 窄屏：拼贴改上下排 ---------- */
+
+/* 窄屏第一处：拼贴压成单列——已删除。
+   拼贴版是固定比例排版，窗口小的时候整体等比缩，不改结构；
+   压成单列会让右列两轨变成 0px，面板和唱片直接不渲染。 */
+@media (max-width: 760px) {
+  .tpl-photo-title {
+    font-size: clamp(16px, 4.6vw, 28px);
+    max-width: 72%;
+  }
+
+  .tpl-block-media {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .tpl-block-circle,
+  .tpl-ring,
+  
+
+  .tpl-photo-title {
+    font-size: clamp(16px, 4.6vw, 28px);
+    max-width: 72%;
+  }
+}
+
+
+
+
+
+
+
+.media-room.is-expanded .tpl-note { font-size: 15px; margin-top: 26px; }
+.media-room.is-expanded .tpl-with { font-size: 15px; margin-top: 30px; }
+.media-room.is-expanded .tpl-with em { font-size: 14px; margin-top: 8px; }
+
+
+.media-room.is-expanded .tpl-pick { font-size: 13px; width: 22%; }
+.media-room.is-expanded .tpl-fields b,
+.media-room.is-expanded .tpl-list b { font-size: 13px; }
+.media-room.is-expanded .tpl-fields span { font-size: 17px; max-width: 30ch; }
+.media-room.is-expanded .tpl-list span { font-size: 15px; }
+.media-room.is-expanded .tpl-fields { gap: 0; }
+.media-room.is-expanded .tpl-block-bar { padding: 4% 14% 4% 3%; }
+.media-room.is-expanded .tpl-block-panel { padding: 34px 30px 38px; }
+.media-room.is-expanded .tpl-photo-title { font-size: clamp(38px, 4.4vw, 76px); left: 56px; top: 46px; }
+.media-room.is-expanded .tpl-photo-brand { font-size: 30px; top: 34px; right: 46px; }
+.media-room.is-expanded .tpl-photo-list { right: 52px; bottom: 44px; gap: 8px; }
+.media-room.is-expanded .tpl-photo-list li { font-size: 17px; }
+.media-room.is-expanded .tpl-photo-list span { font-size: 13px; }
+.media-room.is-expanded .tpl-frame-foot b { font-size: 20px; }
+.media-room.is-expanded .tpl-frame-foot span { font-size: 15px; }
+.media-room.is-expanded .tpl-frame-card { gap: 16px; }
+.media-room.is-expanded .tpl-frame-media { border-radius: 28px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .template * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- 放映：叠加元素 ---------- */
+
+/* 铺满整个画面的一块透明层，里面的每块元素按自己的百分比坐标定位。
+   坐标存的是 0–1 的比例，换个窗口大小位置才不会跑。 */
+.overlay-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.overlay {
+  position: absolute;
+  left: var(--ox, 50%);
+  top: var(--oy, 50%);
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  /* 底下可能是任何颜色的画面，所以文字统一靠阴影立住，不靠底色块 */
+  text-shadow: 0 2px 18px #00000073, 0 1px 3px #00000059;
+  transition: opacity 160ms ease;
+}
+
+.overlay.is-dragging {
+  cursor: grabbing;
+  opacity: 0.86;
+}
+
+/* 悬停时给一圈虚线，告诉用户「这块能拖」。平时不显示，免得压画面。 */
+.overlay::after {
+  content: '';
+  position: absolute;
+  inset: -10px -14px;
+  border: 1px dashed #ffffff00;
+  border-radius: 10px;
+  transition: border-color 160ms ease;
+}
+
+.overlay:hover::after {
+  border-color: #ffffff5c;
+}
+
+.overlay.is-dragging::after {
+  border-color: #ffffffa6;
+}
+
+.overlay-clock .ov-clock {
+  display: block;
+  font-family: "Segoe UI", Inter, system-ui, sans-serif;
+  font-size: clamp(38px, 5.2vw, 76px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.overlay-title .ov-title {
+  display: block;
+  max-width: 62vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Segoe Script", "Bradley Hand", "Ink Free", cursive;
+  font-size: clamp(18px, 2.2vw, 34px);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #ffffff;
+}
+
+.overlay-date .ov-date {
+  display: block;
+  font-size: clamp(10px, 0.95vw, 13px);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ffffffd9;
+}
+
+/* 番茄钟：左边一颗小圆点，读数和专注页一致 */
+.overlay-timer .ov-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px 7px 10px;
+  border-radius: 999px;
+  background: #101010a8;
+  backdrop-filter: blur(10px);
+  font-size: clamp(11px, 1.05vw, 15px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+  text-shadow: none;
+}
+
+.overlay-timer .ov-timer i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bold-mint, #a8e6c1);
+}
+
+/* 全屏时整体放大一档：那一屏才是真拿来看的 */
+.overlay-layer[data-big='true'] .ov-clock {
+  font-size: clamp(64px, 8vw, 148px);
+}
+
+.overlay-layer[data-big='true'] .ov-title {
+  font-size: clamp(26px, 3vw, 56px);
+  max-width: 54vw;
+}
+
+.overlay-layer[data-big='true'] .ov-date {
+  font-size: clamp(12px, 1.2vw, 19px);
+}
+
+.overlay-layer[data-big='true'] .ov-timer {
+  font-size: clamp(14px, 1.5vw, 24px);
+  padding: 10px 18px 10px 13px;
+}
+
+.overlay-layer[data-big='true'] .ov-timer i {
+  width: 8px;
+  height: 8px;
+}
+
+/* ---------- 放映：叠加元素开关 ---------- */
+
+.theater-overlays {
+  position: relative;
+  display: inline-flex;
+}
+
+.theater-overlay-toggle.on {
+  background: #ffffff;
+  color: #101010;
+}
+
+.theater-overlay-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.theater-overlay-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 71;
+  width: 232px;
+  display: grid;
+  gap: 1px;
+  padding: 6px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid var(--bold-line);
+  box-shadow: 0 18px 44px #10101033;
+}
+
+.theater-overlay-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--bold-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.theater-overlay-menu > button:hover {
+  background: #f4f2ee;
+}
+
+.theater-overlay-menu > button > span:last-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.theater-overlay-menu b {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.theater-overlay-menu small {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--bold-faint);
+}
+
+/* 开关点：关着是空心圈，开着是实心黑 */
+.overlay-dot {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1.5px solid #b6b5ae;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.overlay-dot.on {
+  background: #101010;
+  border-color: #101010;
+}
+
+.theater-overlay-tip {
+  margin: 6px 4px 2px;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--bold-faint);
+}
+
+@media (max-width: 599px) {
+  .theater-overlay-menu {
+    width: min(232px, calc(100vw - 48px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .overlay::after,
+  .overlay-dot {
+    transition: none;
+  }
+}
+
+/* ---------- 放映：全屏时把窗口态的高度上限清掉 ---------- */
+
+/* 这里必须写这么长的选择器。
+   窗口态那条是 .media-room .media-theater .theater-screen（0,4,0），
+   而原来的全屏规则只有 .media-room.is-expanded .theater-screen（0,3,0）——
+   特异性输了，max-height: none 根本没生效，全屏后版式只占上半屏，下半屏全黑。
+   实测：3840×2160 的截图里画面只铺到 y≈770。 */
+.media-room.is-expanded .media-theater .theater-screen {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+
+/* 图片那条上限同理，也要一起清掉，否则图还是按窗口态封顶。 */
+.media-room.is-expanded .media-theater[data-kind='image'] .theater-screen img {
+  max-height: none;
+}
+
+@media (max-height: 700px) {
+  .media-room.is-expanded .media-theater .theater-screen {
+    max-height: none;
+    min-height: 0;
+  }
+}
+
+/* ---------- 放映：全屏时藏掉工具条（特异性补丁） ---------- */
+
+/* 上面那条「藏掉除播放台以外的一切」写的是 .media-room.is-expanded .collection-toolbar（0,3,0），
+   而工具条重排那条是 .media-room .collection-toolbar.media-toolbar（0,3,0）——
+   特异性一样、但后者写在后面，display: flex 把 display: none 盖了回来。
+   实测全屏后左上角还残留「图片 / 视频」两个按钮。
+   这条是 0,4,0，稳赢。 */
+.media-room.is-expanded .collection-toolbar.media-toolbar {
+  display: none;
+}
+
+/* 全屏时控制条贴底不留缝。窗口态底下有页面 padding，全屏后那块 padding 还在，
+   黑带就浮在离底边 20px 的位置，看着像没贴住。 */
+.media-room.is-expanded .theater-bar {
+  bottom: 0;
+  border-radius: 0;
+}
+
+/* ---------- 放映：空库时的占位台面 ---------- */
+
+/* 库空着时台面也要能看。占位画面是一块渐变，不是真图片——
+   目的是让人一眼看出「这里以后会放东西」，同时不干扰版式本身的判断。 */
+.tpl-blank {
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(120% 90% at 22% 18%, #6b7f8c 0%, #3f4d57 46%, #262f36 100%),
+    #262f36;
+}
+
+/* 渐变上再压一层很淡的斜纹，避免大片纯色看着像加载失败 */
+.tpl-blank::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(135deg, #ffffff08 0 2px, #ffffff00 2px 9px);
+}
+
+
+
+
+/* ---------- 放映：雨 ---------- */
+
+/* 两层水叠在画面上。都是 pointer-events: none——雨不该挡住拖动叠加元素。 */
+/* 雨丝的置换图载体：尺寸为 0，但必须留在文档流里（display:none 会让 filter 引用失效）。 */
+.rain-defs {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rain-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  overflow: hidden;
+  opacity: var(--rain-opacity, 0.7);
+  pointer-events: none;
+}
+
+/* 雨丝：两条重复的斜向渐变，靠平移制造「一直在下」。
+   不用元素画是因为雨丝要密到看不出个体，用元素反而更贵。 */
+
+
+@keyframes rain-sweep {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: -26px 92px, -14px 74px; }
+}
+
+/* 水珠：每颗自己滑，靠 animation-delay 错开出发时间。
+   关键帧不是匀速的——真实水珠一段一段挪，中途会挂住。 */
+.rain-drops {
+  position: absolute;
+  inset: 0;
+}
+
+.rain-drops > i {
+  position: absolute;
+  display: block;
+  border-radius: 50% 50% 47% 47%;
+  /* 凸透镜的观感靠三样叠出来，缺一样就像贴纸：
+     ① backdrop-filter 把背后的画面放大提亮——这是「透过水珠看」；
+     ② 一层极淡的白色渐变给中心高光；
+     ③ 内外两道阴影压出厚度（上沿亮、下沿暗），让它不是平的。 */
+  backdrop-filter: blur(0.4px) brightness(1.12) saturate(1.15) contrast(1.05);
+  -webkit-backdrop-filter: blur(0.4px) brightness(1.12) saturate(1.15) contrast(1.05);
+  background:
+    radial-gradient(58% 52% at 36% 26%, #ffffffc4 0%, #ffffff3d 38%, #ffffff00 72%),
+    radial-gradient(120% 120% at 50% 50%, #ffffff00 62%, #ffffff1f 100%);
+  box-shadow:
+    inset 0 -0.12vh 0.18vh #ffffff4d,
+    inset 0 0.10vh 0.14vh #ffffff59,
+    0 0.10vh 0.22vh #00000033;
+  opacity: 0;
+  animation-name: drop-fall;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+  /* AE 里那颗珠子会拖出一条竖直的变形痕。用竖向压扁的投影近似。 */
+  filter: drop-shadow(0 0.25vh 0.2vh #0000001f);
+}
+
+@keyframes drop-fall {
+  0% { transform: translateY(0) scale(0.9); opacity: 0; }
+  6% { opacity: 0.95; }
+  /* 挂住的那一下：只走一点点，然后突然放开 */
+  42% { transform: translateY(14vh) scale(1); opacity: 0.95; }
+  46% { transform: translateY(15vh) scale(1.02); opacity: 0.95; }
+  88% { transform: translateY(78vh) scale(0.92); opacity: 0.7; }
+  100% { transform: translateY(96vh) scale(0.8); opacity: 0; }
+}
+
+/* 控制条上的雨按钮与菜单 */
+.theater-rain {
+  position: relative;
+  display: inline-flex;
+}
+
+.theater-rain-toggle.on {
+  background: #ffffff;
+  color: #101010;
+  border-color: #ffffff;
+}
+
+.theater-rain-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 71;
+  width: 232px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid var(--bold-line);
+  box-shadow: 0 18px 44px #10101026, 0 1px 2px #1010100f;
+  animation: add-menu-in 160ms cubic-bezier(.2,.7,.3,1) both;
+}
+
+.rain-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bold-ink);
+}
+
+.rain-modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 3px;
+  border-radius: 11px;
+  background: #f4f2ee;
+}
+
+.rain-modes > button {
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--bold-muted);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.rain-modes > button.on {
+  background: #101010;
+  color: #ffffff;
+}
+
+.rain-slider {
+  display: grid;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--bold-muted);
+}
+
+.rain-slider input[type='range'] {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  accent-color: #101010;
+}
+
+/* 全屏时菜单跟着放大一点，别在 4K 上像颗纽扣 */
+.media-room.is-expanded .theater-rain-menu {
+  width: 280px;
+  padding: 16px;
+  border-radius: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rain-streak,
+  .rain-drops > i {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* ---------- 放映：版式与控制条的四处修正 ---------- */
+
+/* 1. 控制条挤成一条：版式胶囊是 block 显示（宽 114 却按行内排版），
+   而且控制条本身没有 flex 约束，右侧几个按钮全被压到一起。
+   实测版式按钮的 y 是 691、控制条 y 是 674（高 52）——按钮跑出了控制条的可视区。 */
+.media-theater .theater-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+.media-theater .theater-bar .theater-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.media-theater .theater-bar .theater-copy b,
+.media-theater .theater-bar .theater-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 版式胶囊：内联 flex，别再按 block 排 */
+.media-theater .theater-templates {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  margin: 0 6px 0 0;
+  padding: 3px;
+  border-radius: 999px;
+  background: #ffffff14;
+}
+
+.media-theater .theater-templates > button {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #ffffffb8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.media-theater .theater-templates > button:hover {
+  color: #ffffff;
+}
+
+.media-theater .theater-templates > button.on {
+  background: #ffffff;
+  color: #101010;
+}
+
+/* 右侧三个图标键（叠加 / 雨 / 全屏）排成一簇，别互相挤 */
+.media-theater .theater-bar .theater-overlays,
+.media-theater .theater-bar .theater-rain {
+  display: inline-flex;
+  flex: none;
+}
+
+.media-theater .theater-bar .theater-controls {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+}
+
+.media-theater .theater-bar .theater-expand {
+  flex: none;
+}
+
+/* 2. 空库提示条压在信息条上。挪到台面顶部——底部永远有控制条，
+   提示放上面不会和任何东西打架。 */
+
+
+
+/* 3. 乌鸦压住 pick by 那三行字。乌鸦再往右下挪、缩小，
+   并且给它一个深色底托，别在浅色面板上糊成一团。 */
+
+
+/* 4. pick by 在面板左下角，和圆形/乌鸦都不碰 */
+.tpl-pick {
+  max-width: 40%;
+  font-size: 7.5px;
+}
+
+@media (max-width: 900px) {
+  .media-theater .theater-templates > button {
+    padding: 0 7px;
+    font-size: 9px;
+  }
+}
+
+/* ---------- 放映：拼贴版三处位置修正 ---------- */
+
+
+/* 雨丝在深色画面上几乎看不见：原来两条渐变最亮只到 #ffffff52，
+   再乘 rain-layer 的 opacity 就没了。提亮，并把间距收紧一点让它更密。 */
+
+
+/* 空库提示条压在画面正中偏上，盖住了画面本身。
+   挪到画面底部——那里只有渐变，且离开控制条还有一段距离。 */
+
+
+
+/* ---------- 放映：拼贴版与雨层的第二轮修正 ---------- */
+
+
+/* 空库提示条还是压在信息条上（它相对 .theater-screen 定位，而信息条也在底部）。
+   挪到画面正上方——那里是纯画面，没有版式元素。 */
+
+
+
+/* 雨丝：改成「一个超高元素 + translateY」。
+   原来用 background-position 动画，位移距离和图案周期对不齐，视觉上是在闪而不是在落。
+   现在位移正好等于图案周期（20px），循环无缝，而且方向就是往下。 */
+
+
+@keyframes rain-fall {
+  from { transform: translateY(0); }
+  to { transform: translateY(20px); }
+}
+
+/* ---------- 放映：乌鸦 / 雨丝 / 空库提示（定稿） ---------- */
+
+.media-room.is-expanded /* 雨丝。
+   上一版用 background-position 动画，位移距离和图案周期对不齐，
+   看起来是在闪而不是在落。改成「一个超高元素 + translateY(一个周期)」，
+   循环无缝，方向也确实朝下。
+   亮度：原来最亮 #ffffff52 再乘 opacity 就没了，提到 #ffffffa6。 */
+.rain-streak {
+  /* 折射：feTurbulence 当置换图把斜纹推成不规则的雨脚（见 RainLayer 里的 filter）。
+     注意：filter 引用的是同文档里的 SVG 元素，RainLayer 把它挂在 .rain-layer 内。 */
+  filter: url(#rain-streak-warp);
+  -webkit-filter: url(#rain-streak-warp);
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  top: -60%;
+  height: 220%;
+  background-image:
+    repeating-linear-gradient(
+      15deg,
+      #ffffff00 0,
+      #ffffff00 6px,
+      #ffffffb0 6px,
+      #ffffffb0 7px,
+      #ffffff00 7px,
+      #ffffff00 19px
+    ),
+    repeating-linear-gradient(
+      15deg,
+      #ffffff00 0,
+      #ffffff00 2.5px,
+      #ffffff70 2.5px,
+      #ffffff70 3.2px,
+      #ffffff00 3.2px,
+      #ffffff00 10px
+    );
+  animation: rain-fall 0.46s linear infinite, rain-fall 0.83s linear infinite;
+  opacity: calc(0.6 + var(--rain-strength, 0.55) * 0.4);
+}
+
+@keyframes rain-fall {
+  from { transform: translateY(0); }
+  to { transform: translateY(19px); }
+}
+
+/* 空库提示。相对 .theater-screen 定位，而信息条也在底部——
+   放底部一定打架。挪到画面正上方。 */
+.theater-blank-hint {
+  top: 14px;
+  bottom: auto;
+}
+
+.media-room.is-expanded .theater-blank-hint {
+  top: 26px;
+  bottom: auto;
+}
+
+/* 空库提示要压在雨层之上。雨层 z-index 是 7，提示原来是 9，
+   但它是 .theater-screen 的直接子元素，而雨层也是——两者同级时
+   后写的赢。显式抬到 12。 */
+.theater-blank-hint {
+  z-index: 12;
+}
+
+
+
+.media-room.is-expanded .tpl-star-a { top: 7%; right: 12px; }
+.media-room.is-expanded .tpl-star-b { top: 34%; left: 12px; }
+.media-room.is-expanded .tpl-star-c { bottom: 5%; right: 16px; }
+
+
+.media-room.is-expanded .tpl-with { font-size: 14px; margin-top: 26px; }
+.media-room.is-expanded .tpl-pick { font-size: 13px; max-width: 42%; }
+
+/* 信息条：全屏下两行字段之间的空隙拉大，别挤成一小坨。 */
+.media-room.is-expanded .tpl-fields { gap: 0; }
+.media-room.is-expanded .tpl-list { padding-right: 0; }
+
+
+
+/* 窄屏：拼贴改成上下排，右列面板和彩胶都不画——屏幕太窄，
+   硬塞进去只会把画面挤没。 */
+/* 窄屏第二处：拼贴压成单列——已删除。
+   拼贴版是固定比例排版，窗口小的时候整体等比缩，不改结构；
+   压成单列会让右列两轨变成 0px，面板和唱片直接不渲染。 */
+@media (max-width: 760px) {
+  .tpl-photo-title {
+    font-size: clamp(16px, 4.6vw, 28px);
+    max-width: 72%;
+  }
+}
+
+
+
+
+.template-collage > .tpl-block {
+  border-radius: 0;
+}
+
+
+
+
+
+
+
+/* 文字。参考图里通篇是衬线体（Georgia/Times 那一路），
+   小标题是大写 + 宽字距，值是斜体。 */
+.template-collage .tpl-block-bar,
+.template-collage .tpl-block-panel {
+  font-family: "Noto Serif SC", "Source Han Serif SC", "Source Han Serif", "Songti SC", "SimSun", "Noto Serif SC", "Source Han Serif SC", "Source Han Serif", "Songti SC", "SimSun", Georgia, serif;
+}
+
+/* 信息条：TITLE 在左 1/3，PHOTOGRAPHY 从 1/3 处开始，PLAYLIST 独占下面一行。 */
+.template-collage .tpl-fields {
+  grid-template-columns: 1fr 2fr;
+  gap: 0;
+  align-items: baseline;
+}
+
+.template-collage .tpl-fields > div > b {
+  font-size: clamp(6px, 1.15vw, 8.5px);
+  letter-spacing: 0.16em;
+  font-weight: 400;
+  opacity: 0.72;
+}
+
+.template-collage .tpl-fields > div > span {
+  font-size: clamp(7px, 1.4vw, 10.5px);
+  font-style: italic;
+  letter-spacing: 0.01em;
+  opacity: 0.92;
+}
+
+.template-collage .tpl-list > b {
+  font-size: clamp(6px, 1.15vw, 8.5px);
+  letter-spacing: 0.16em;
+  font-weight: 400;
+  opacity: 0.72;
+}
+
+/* 曲目是一整段连续文字（顿号连起来），不是列表——所以压成一段、行高收紧。 */
+.template-collage .tpl-list > span {
+  margin-top: 0.15em;
+  font-size: clamp(6px, 1.15vw, 8.5px);
+  font-style: italic;
+  line-height: 1.5;
+  opacity: 0.66;
+  display: block;
+  max-height: 3.2em;
+  overflow: hidden;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.template-collage .tpl-star-a { left: 14%; top: 12%; }
+.template-collage .tpl-star-b { right: 16%; top: 30%; }
+.template-collage .tpl-star-c { left: 22%; bottom: 28%; }
+.template-collage .tpl-star-d { right: 20%; bottom: 10%; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.media-room.is-expanded .template-collage .tpl-fields > div > b { font-size: 19px; letter-spacing: 0.2em; }
+.media-room.is-expanded .template-collage .tpl-fields > div > span { font-size: 27px; }
+.media-room.is-expanded .template-collage .tpl-list > b { font-size: 19px; letter-spacing: 0.2em; }
+.media-room.is-expanded .template-collage .tpl-list > span { font-size: 21px; max-height: 4.6em; line-height: 1.6; }
+.media-room.is-expanded .template-collage .tpl-block-bar { gap: 1.1em; }
+
+
+
+
+@media (max-width: 760px) {
+  
+  
+}
+
+@media (prefers-reduced-motion: reduce) {
+  
+}
+
+
+/* ---------- 放映：拼贴的尺寸全部按容器走 ---------- */
+
+/* 之前窗口态和全屏态排版不一样，根因是字号跟着视口走（clamp(..., vw, ...)），
+   而面板宽度在两种状态下差三倍多——同一套 px 值在 220px 宽和 700px 宽的
+   面板里占的比例完全不同，于是「标题在中间」这种关系就散了。
+
+   改成容器查询：.template 声明 container-type: size，内部所有尺寸都用 cqw
+   （容器宽度的百分之一）。这样版式内部的比例恒定，台面多大都是同一张排版。 */
+
+/* 每个块各自是容器：面板里的字号相对面板宽、信息条里的相对信息条宽。
+   用整块画布当容器的话，右栏 220px 里塞的是按 680px 算出来的字号，必爆。 */
+.template-collage,
+.template-collage > .tpl-block {
+  container-type: size;
+}
+
+/* 圆角不在这里设：每个块画自己的对角圆角，
+   统一写 0 会把它们全抹掉（这条是 0,2,0，比单类名那条优先级高）。 */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* 信息条：标签、值、曲目段一律按容器宽缩放。 */
+.template-collage .tpl-fields > div > b,
+.template-collage .tpl-list > b {
+  font-size: 1.75cqw;
+  letter-spacing: 0.18em;
+}
+
+.template-collage .tpl-fields > div > span {
+  margin-top: 0.4cqw;
+  font-size: 2.2cqw;
+}
+
+.template-collage .tpl-list > span {
+  margin-top: 0.25cqw;
+  font-size: 1.8cqw;
+  line-height: 1.55;
+  max-height: 5.4cqw;
+}
+
+.template-collage .tpl-block-bar {
+  gap: 1.4cqw;
+  padding: 3.2% 15% 2.6% 3.4%;
+}
+
+.template-collage .tpl-block-panel {
+  padding: 6% 7% 5%;
+}
+
+/* 全屏时不要再单独设字号——容器查询已经把「台面变宽」这件事算进去了。
+   这条只保留一句说明，避免后来者又加一套 px。 */
+
+/* ---------- 放映：配色面板 ---------- */
+
+/* 和「叠加元素」「雨」同一套：黑底控制条上一个圆形图标键，点开浮一块白面板。
+   面板往上弹、右对齐，因为它就在控制条右侧，往下弹会被窗口底边裁掉。 */
+.theater-tone {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.theater-tone-toggle.on {
+  background: #ffffff;
+  color: #101010;
+  border-color: #ffffff;
+}
+
+/* 点面板外面收起。铺满整屏的透明按钮，压在菜单下面一层。 */
+.theater-tone-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.theater-tone-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 61;
+  width: 244px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid var(--bold-line, #eceae5);
+  box-shadow: 0 18px 44px #10102626, 0 1px 2px #1010100f;
+  color: #101010;
+  font-family: "Inter", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  animation: tone-menu-in 160ms cubic-bezier(.2, .7, .3, 1) both;
+}
+
+@keyframes tone-menu-in {
+  from { opacity: 0; transform: translateY(6px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.tone-modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: #f2f0eb;
+}
+
+.tone-modes button {
+  height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #6f6f68;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .16s, color .16s;
+}
+
+.tone-modes button:hover {
+  color: #101010;
+}
+
+.tone-modes button.on {
+  background: #101010;
+  color: #ffffff;
+}
+
+/* 「挑一个」：画面取出来的几个主色，圆点里留白勾。 */
+.tone-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 11px;
+}
+
+.tone-swatches button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px #00000016;
+  transition: transform .14s cubic-bezier(.2, .7, .3, 1), box-shadow .14s;
+}
+
+.tone-swatches button:hover {
+  transform: scale(1.08);
+}
+
+.tone-swatches button.on {
+  box-shadow: inset 0 0 0 1px #00000016, 0 0 0 2px #ffffff, 0 0 0 3.5px #101010;
+}
+
+.tone-swatches small {
+  flex-basis: 100%;
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #8b8b85;
+}
+
+/* 「自己填」：三行「名字 + 色块 + 色值」。 */
+.tone-fields {
+  display: grid;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.tone-field {
+  display: grid;
+  grid-template-columns: 44px 26px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.tone-field > span {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #6f6f68;
+}
+
+.tone-field input[type="color"] {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--bold-line, #eceae5);
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.tone-field input[type="color"]::-webkit-color-swatch-wrapper { padding: 3px; }
+.tone-field input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 5px; }
+
+.tone-hex {
+  height: 26px;
+  min-width: 0;
+  padding: 0 9px;
+  border: 1px solid var(--bold-line, #eceae5);
+  border-radius: 8px;
+  background: #faf9f6;
+  color: #101010;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .02em;
+}
+
+.tone-hex::placeholder { color: #b6b5ae; }
+.tone-hex:focus { outline: 2px solid #101010; outline-offset: -1px; }
+
+.tone-reset {
+  justify-self: start;
+  margin-top: 2px;
+  padding: 5px 10px;
+  border: 1px solid var(--bold-line, #eceae5);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #6f6f68;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tone-reset:hover { color: #101010; border-color: #d5d2c9; }
+
+.tone-hint {
+  margin: 10px 0 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #b6b5ae;
+}
+
+/* 全屏时控制条会淡出，但配色面板开着就不该跟着消失——
+   用户正在调颜色，画面得能看见效果。 */
+.media-room.is-expanded[data-chrome="hidden"] .theater-tone-menu ~ * { pointer-events: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .theater-tone-menu { animation: none; }
+  .tone-swatches button { transition: none; }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.template-collage .tpl-star-a { left: -12%; top: 12%; }
+.template-collage .tpl-star-b { right: -10%; top: 44%; }
+.template-collage .tpl-star-c { left: 4%; bottom: 14%; }
+
+
+
+
+
+.template-collage .tpl-disc-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  /* 参考图里内圈大约占直径 40%，中间还有一个更浅的 center label */
+  width: 40%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background-color: var(--disc-groove);
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px #00000024;
+}
+
+.template-collage .tpl-disc-hole {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3.2%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--tpl-panel);
+  box-shadow: inset 0 0 0 1px #00000030;
+}
+
+
+
+
+
+
+
+.template-collage .tpl-dot-tl { top: 3%; left: 3%; }
+.template-collage .tpl-dot-tr { top: 3%; right: 3%; }
+.template-collage .tpl-dot-bl { bottom: 3%; left: 3%; }
+.template-collage .tpl-dot-br { bottom: 3%; right: 3%; }
+
+
+
+.template-collage .tpl-fields {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 2cqw;
+  align-items: start;
+}
+
+.template-collage .tpl-fields > div > b,
+.template-collage .tpl-list > b {
+  display: block;
+  font-size: 1.8cqw;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  opacity: 0.72;
+  margin-bottom: 0.5cqw;
+}
+
+.template-collage .tpl-fields > div > span,
+.template-collage .tpl-list > span {
+  font-size: 2.2cqw;
+  line-height: 1.35;
+  font-style: italic;
+}
+
+.template-collage .tpl-note-icon {
+  font-style: normal;
+  opacity: 0.8;
+}
+
+
+
+
+
+
+
+
+
+
+
+.template-collage .tpl-intro {
+  /* 顶部那四行介绍，占左半边，右半边让给竖排凹槽。 */
+  position: absolute;
+  left: 7%;
+  top: 4.5%;
+  width: 52%;
+  margin: 0;
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 2.9cqw;
+  line-height: 1.36;
+  letter-spacing: 0.01em;
+  font-style: italic;
+  opacity: 0.8;
+  z-index: 4;
+}
+
+
+
+.template-collage .tpl-intro-mirror {
+  /* 单独一行，不和上面那段挤在同一个网格行里 */
+  grid-column: 1 / -1;
+  font-size: 0.78em;
+  line-height: 1.28;
+  margin: 0;
+  transform: scaleY(-1);
+  text-align: right;
+  overflow: hidden;
+  opacity: 0.5;
+}
+
+/* 这里原本有 `.tpl-brand`（`DumbRaven bilibili` 那行署名）的定位与字体。
+   这块已经从 JSX 里删掉：AE 源文件里没有 brand 图层，参考图里也没有它，
+   是早期自行加的，而且正好压在倒影上。品牌在右下的 Produced By 里已有一次。 */
+
+
+
+/* 标题组只占左边 56%，右边让给竖排胶囊。 */
+.template-collage .tpl-words {
+  /* 标题区：署名下面。参考图里它夹在署名和唱片之间。 */
+  position: absolute;
+  left: 7%;
+  top: 47%;
+  width: 56%;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2em;
+  min-width: 0;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-transform: capitalize;
+  z-index: 5;
+}
+
+
+
+.template-collage .tpl-title-text {
+  margin: 0;
+  font-size: 7.4cqw;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.template-collage .tpl-sub {
+  font-size: 3.3cqw;
+  letter-spacing: 0.02em;
+  opacity: 0.66;
+  font-style: italic;
+}
+
+/* 标题倒影已删：JSX 里不再渲染 .tpl-title-mirror，AE 里标题图层也没有镜像
+   （只有 For more information 那层是 scale(-100,-100)）。规则一并删掉，
+   不留 display:none 的空壳——没有元素需要用规则去藏。 */
+
+/* 竖排字这块是「面板上挖出来的一个圆角矩形凹槽」：
+   外沿一圈亮线（凹陷处的反光）、内侧一圈暗影（陷进去的深度），
+   中间嵌一层大理石纹理。字母浮在纹理上面。
+   之前做成了半透明胶囊垫在字后面，方向反了。 */
+.template-collage .tpl-tag {
+  position: absolute;
+  right: 6%;
+  /* 凹槽高约 88px ≈ 40cqw；放在 12cqw 起，下沿 52cqw，唱片从 64cqw 起，中间留 12cqw */
+  top: 12cqw;
+  width: 26%;
+  padding: 2cqw 0.8cqw 2.4cqw;
+  border-radius: 5.2cqw;
+  /* 大理石纹是 AE 里的「分型杂色」（脏污 / 柔和线性 / 对比度 100 / 亮度 -10 /
+     缩放 20 / 偏移(960,540) / 复杂度 10 / 演化 +41°，混合模式柔光）。
+     CSS 没有等价物，重复线性渐变只能拼出规则的条纹，看着像布纹不像石头。
+     改用 SVG feTurbulence：baseFrequency ≈ 1/缩放、numOctaves ≈ 复杂度、
+     seed ≈ 演化，再叠一层柔光让明暗过渡像石面。
+     滤镜定义在 TemplateStage 里挂到 body 上（id="tpl-marble"）。 */
+  background-image:
+    linear-gradient(152deg, #ffffff26 0%, #ffffff0d 38%, #00000012 100%),
+    linear-gradient(180deg, #ffffff1a, #ffffff07);
+  background-size: 100% 100%, 100% 100%;
+  isolation: isolate;
+  box-shadow:
+    inset 0 0.22cqw 0.6cqw #0000002e,
+    inset 0 0 0 1px #ffffff26,
+    0 1px 0 #ffffff1f;
+  display: grid;
+  justify-items: center;
+  z-index: 5;
+}
+
+/* 石纹本体：一层 feTurbulence 生成的噪声，用柔光压到凹槽上。
+   单独做成 ::before，是因为 background-image 不能直接吃掉 SVG filter 的输出。 */
+.template-collage .tpl-tag::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #ffffff;
+  filter: url(#tpl-marble);
+  mix-blend-mode: soft-light;
+  opacity: 0.85;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.template-collage .tpl-badge {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  font-size: 8.2cqw;
+  font-weight: 900;
+  line-height: 0.96;
+  letter-spacing: -0.04em;
+}
+
+.template-collage .tpl-star {
+  position: absolute;
+  font-size: 2.1cqw;
+  opacity: 0.62;
+  color: var(--tpl-on-panel);
+  pointer-events: none;
+}
+
+.template-collage .tpl-star-a { left: -12%; top: 12%; }
+.template-collage .tpl-star-b { right: -10%; top: 44%; }
+.template-collage .tpl-star-c { left: 4%; bottom: 14%; }
+
+
+
+.template-collage .tpl-disc {
+  /* 盘面本身：中心到边缘略暗，让它是一个「圆盘」而不是一块黑 */
+  background:
+    radial-gradient(circle at 42% 38%, #ffffff1f 0%, #ffffff00 46%),
+    var(--disc-base, #1d1d1d);
+}
+
+.template-collage .tpl-disc::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  /* 沟槽 + 一圈环向高光。深色底上这两样决定它「像不像一张唱片」。 */
+  background:
+    conic-gradient(from var(--disc-angle, 30deg),
+      #ffffff00, #ffffff4d 10%, #ffffff00 20%, #0000002e 40%,
+      #ffffff38 58%, #ffffff00 72%, #00000024 88%, #ffffff00),
+    repeating-radial-gradient(circle at center,
+      #ffffff00 0 1.2px, #ffffff12 1.2px 2px, #00000000 2px 3.4px);
+  mix-blend-mode: screen;
+}
+
+.template-collage .tpl-disc-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 40%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background-color: var(--disc-groove);
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px #00000024;
+}
+
+.template-collage .tpl-disc-hole {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3.2%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--tpl-panel);
+  box-shadow: inset 0 0 0 1px #00000030;
+}
+
+
+
+/* 第二行 `DumbRaven`：参考图里它和第一行**同字号**，只是更粗。
+   注意不要再给它 display:block —— 源码里第一行后面已经有 <br />，
+   两者同时存在会多出一个空行盒，实测把两行行距从 1.84cqw 撑到 2.7cqw。 */
+.template-collage .tpl-produced b {
+  font-weight: 700;
+}
+
+
+.template-collage .tpl-dot {
+  position: absolute;
+  width: 0.9cqw;
+  height: 0.9cqw;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+  z-index: 4;
+}
+
+.template-collage .tpl-dot-tl { top: 3%; left: 3%; }
+.template-collage .tpl-dot-tr { top: 3%; right: 3%; }
+.template-collage .tpl-dot-bl { bottom: 3%; left: 3%; }
+.template-collage .tpl-dot-br { bottom: 3%; right: 3%; }
+
+
+
+.template-collage .tpl-fields {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 2cqw;
+  align-items: start;
+}
+
+.template-collage .tpl-fields > div > b,
+.template-collage .tpl-list > b {
+  display: block;
+  margin: 0 0 0.5cqw;
+  font-size: 1.8cqw;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  opacity: 0.72;
+}
+
+.template-collage .tpl-fields > div > span,
+.template-collage .tpl-list > span {
+  font-size: 2.2cqw;
+  line-height: 1.35;
+  font-style: italic;
+}
+
+.template-collage .tpl-note-icon {
+  font-style: normal;
+  opacity: 0.8;
+}
+
+/* 乌鸦：矢量描出的剪影，颜色跟信息条的字走。 */
+.template-collage .tpl-raven {
+  position: absolute;
+  right: 3.4%;
+  bottom: 8%;
+  width: 6.4cqw;
+  height: auto;
+  color: var(--tpl-on-bar);
+  opacity: 0.92;
+  z-index: 3;
+}
+
+/* mask 挖洞方案已废弃：这版 Chromium 上 mask-composite: exclude
+   会把整块面板连同文字一起抹掉（实测面板只剩色块、一个字都不显示）。
+   改用 .tpl-hole 画一圈页面底色，视觉效果等同挖洞且不牵连同层内容。 */
+/* ---------- 拼贴：唱片坐在底色上，面板挖洞让出来 ---------- */
+
+/* 用户要的形状：「唱片单独放在底色上面，上面（面板）是一个长方形切掉下面半圆」。
+   所以不是唱片盖住面板，而是反的——面板自己在唱片的位置挖掉一个圆，
+   唱片在面板下面，从这个洞里露出来，缝里看到的是页面底色。 */
+
+/* 唱片层：铺满整个画布。下面所有 cqw / 百分比都相对画布算，
+   和 AE 导出的坐标一致（AE 里这些数值就是相对 1920×1080 的）。 */
+.tpl-disc-layer {
+  /* 铺满整个画布：下面所有 cqw / 百分比都相对画布算，
+     和 AE 导出的坐标一致（AE 里这些数值就是相对 1920×1080 的）。
+     压在面板之上（面板 z-index 2）——面板自己被 clip-path 挖掉了半圆，
+     那个缺口露出画布底色；唱片再盖在缺口上，就成了一张完整的碟。 */
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+
+/* 让位圈：唱片外面那圈页面底色。
+   它坐在面板之上、唱片之下，把面板在唱片周围「切」出一圈缝。
+   为什么不用 mask：这版 Chromium 上 mask-composite: exclude 会把整块面板
+   连同文字一起抹掉（文字元素在、位置也对，但一个像素都不显示）。
+   用一圈实色环盖上去，视觉效果和真的挖洞一样，且不牵连同层内容。 */
+
+
+
+
+
+/* ══════════════════════════════════════════════════════════════
+   放映：拼贴版式
+   数值全部来自 AE 导出的 raven-layout.json（主合成 1920×1080），
+   不是从截图估的。换算成百分比，换任何窗口尺寸都等比缩放。
+   ══════════════════════════════════════════════════════════════ */
+
+/* 画布本身是容器：里面所有 cqw 都等于「画布宽度的百分之一」。 */
+.media-theater .template-collage {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: var(--tpl-base);
+  overflow: hidden;
+  container-type: size;
+}
+
+/* 画面块：34,34 → 1244,742。只有左上角是圆的（半径 162px = 8.44% 画布宽）。 */
+.template-collage > .tpl-block-media {
+  position: absolute;
+  left: 1.77%;
+  top: 3.15%;
+  width: 63.02%;
+  height: 65.56%;
+  overflow: hidden;
+  border-radius: 8.44% 0 0 0;
+}
+
+/* 信息条：34,768 → 1244,1042。只有右下角是圆的（半径 131px）。 */
+.template-collage > .tpl-block-bar {
+  position: absolute;
+  left: 1.77%;
+  top: 71.11%;
+  width: 63.02%;
+  height: 25.37%;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  align-content: start;
+  gap: 0.45em;
+  padding: 2.4% 16% 2.2% 2.4%;
+  box-sizing: border-box;
+  /* 信息条也是不规则图形：右下角被斜切掉一块，让给唱片。
+     AE 顶点（+960,+540 后）：(1244,768) (34,768) (34,1042) (1106,1042) (1244,895) (1244,772)。
+     换算到自身外接框就是下面这 6 个百分比——斜边从 (88.6%,100%) 到 (100%,46.4%)。 */
+  clip-path: polygon(100.000% 0.000%, 0.041% 0.182%, 0.000% 100.000%, 88.595% 100.000%, 100.000% 46.350%, 100.000% 1.460%);
+  overflow: hidden;
+  background: var(--tpl-bar);
+  color: var(--tpl-on-bar);
+  z-index: 8;
+}
+
+/* 面板：1271,34 → 1886,636。
+   底边被唱片的圆切掉一块——这就是「长方形切掉下面半圆」：
+   面板是一整块矩形，clip-path 把圆占的那部分从底边挖掉。 */
+.template-collage > .tpl-block-panel {
+  position: absolute;
+  left: 66.20%;
+  top: 3.15%;
+  width: 32.03%;
+  height: 55.74%;
+  overflow: hidden;
+  background: var(--tpl-panel);
+  color: var(--tpl-on-panel);
+  /* 面板本身就是一个不规则图形——不是「矩形挖半圆」，是 AE 里画的一个五边形：
+       左上(1271,34) → 右上(1886,34) → 右边下来到(1886,630)
+       → 沿一段弧收到(1582,414) → 左边(1271,636) → 闭合。
+     那段弧的圆心就是唱片圆心(1582,740)，半径 326（唱片半径 309.6 再加 16px 的缝）。
+     三个底边支点到圆心的距离实测 327.9 / 326.0 / 323.3，所以确实是一段等距圆弧。
+     顶点与弧的点序都来自 AE 的 raven-shapes.json，不是猜的。 */
+  clip-path: polygon(0.00% 0.00%, 100.00% 0.00%, 100.00% 98.85%, 98.76% 94.72%, 96.78% 90.75%, 94.49% 86.95%, 91.90% 83.36%, 89.02% 80.00%, 85.89% 76.90%, 82.52% 74.06%, 78.93% 71.52%, 75.15% 69.30%, 71.20% 67.39%, 67.11% 65.83%, 62.91% 64.61%, 58.62% 63.75%, 54.28% 63.26%, 49.92% 63.13%, 45.56% 63.37%, 41.23% 63.97%, 36.97% 64.93%, 32.80% 66.26%, 28.75% 67.92%, 24.85% 69.92%, 21.12% 72.25%, 17.60% 74.88%, 14.29% 77.79%, 11.23% 80.98%, 8.44% 84.41%, 5.94% 88.06%, 3.74% 91.91%, 1.85% 95.93%, 0.30% 100.10%, 0.00% 100.10%);
+  z-index: 2;
+}
+
+
+/* 唱片：圆心 (1582,740) = 82.40% / 68.52%，直径 619.2px = 32.25%。
+   它坐在页面底色上，从面板让出的洞里露出来。 */
+.template-collage .tpl-disc {
+  position: absolute;
+  left: 82.40%;
+  top: 68.52%;
+  width: 32.25%;
+  aspect-ratio: 1;
+  height: auto;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  /* 面板是 clip-path 挖洞的，只裁自己、透不出下层。
+     唱片必须压在面板之上（面板 z-index:2），否则看到的还是面板自己的底色。 */
+  z-index: 6;
+  /* 两道阴影：外圈细亮边把碟从面板上"剥"出来，外圈大阴影给厚度。 */
+  box-shadow: 0 0 0 0.35cqw #ffffff1f, 0 2.2cqw 5cqw #00000052;
+}
+
+
+/* Produced By：字号 29 / 1920 ≈ 1.51cqw。
+   这里只给字体、行距、字色这些「长相」；left/top 由后面那条
+   「.tpl-produced { left: 87.43%; ... }」定，别在这里写位置。
+   参考图实测（画布 1917×1072）：单行墨迹高 23px = 1.20% 画布宽，
+   两行行顶间距 35px = 3.27% 画布高。1.55cqw ≈ 29.7px，行高 35.1px → 1.18。 */
+.template-collage .tpl-produced {
+  position: absolute;
+  right: auto;
+  bottom: auto;
+  margin: 0;
+  font-family: "Playfair Display", Georgia, serif;
+  font-size: 1.55cqw;
+  /* 参考图用的是 Playfair Display（高对比粗衬线），项目里没这个字体、也不许联网加载，
+     实际回落 Georgia。Georgia 常规体笔画细，同一字号下「实心金」的像素少一半，
+     看上去就发灰，所以压到 700 补回来。 */
+  font-weight: 700;
+  /* 参考图两行行顶间距 3.27% 画布高（1440 下 = 47.1px），字号 39.68px，
+     所以行高是 47.1 / 39.68 ≈ 1.19。 */
+  line-height: 1.19;
+  /* AE 里 track=126 即 0.126em，但那是 Playfair 的量法；回落 Georgia 后同字距会宽出 3%
+     （实测右端到 99.79%，参考图只到 99.43%），所以收到 0.10em 把宽度补回来。 */
+  letter-spacing: 0.10em;
+  white-space: nowrap;
+  z-index: 3;
+}
+
+
+
+/* 2026 / 1020 角标：锚点 (53,43)，字号 12 × 88% = 10.56 → 0.55cqw。 */
+.template-collage .tpl-corner-date {
+  position: absolute;
+  left: 2.7%;
+  top: 1.15%;
+  margin: 0;
+  font-family: "Montserrat", "Segoe UI", sans-serif;
+  font-size: 0.62cqw;
+  line-height: 1.35;
+  letter-spacing: 0.081em;
+  color: #C5AF83;
+  white-space: nowrap;
+  text-align: left;
+  z-index: 12;
+}
+
+
+
+/* 面板四角小点。 */
+.template-collage .tpl-dot {
+  position: absolute;
+  width: 0.42cqw;
+  height: 0.42cqw;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+  z-index: 2;
+}
+.template-collage .tpl-dot-tl { left: 4.4%; top: 4.2%; }
+.template-collage .tpl-dot-tr { right: 4.4%; top: 4.2%; }
+.template-collage .tpl-dot-bl { left: 4.4%; bottom: 4.2%; }
+.template-collage .tpl-dot-br { right: 4.4%; bottom: 4.2%; }
+
+/* ---------- 放映：让 .tpl-disc 也能吃到彩胶花色 ---------- */
+
+/* 彩胶的 .pressing-* 规则只写在 .vinyl 上（唱片柜那张碟），放映台的碟类名是 .tpl-disc，
+   所以之前一直只有底色、看不到晕染/云石/泼溅。这里把同一套背景搬过来，
+   变量名换成 --disc-*（TemplateStage 里注入的那一组）。 */
+
+.template-collage .tpl-disc.pressing-swirl {
+  background-color: var(--disc-base);
+  background-image:
+    radial-gradient(ellipse 66% 46% at 28% 22%, var(--disc-accent) 0%, #00000000 64%),
+    radial-gradient(ellipse 54% 64% at 76% 66%, var(--disc-accent-2) 0%, #00000000 62%),
+    radial-gradient(ellipse 88% 38% at 52% 94%, var(--disc-accent) 0%, #00000000 58%),
+    radial-gradient(ellipse 40% 60% at 12% 72%, var(--disc-accent-2) 0%, #00000000 66%),
+    radial-gradient(circle at 50% 50%, var(--disc-sheen) 16%, var(--disc-base) 76%);
+}
+
+.template-collage .tpl-disc.pressing-marble {
+  background-color: var(--disc-base);
+  background-image:
+    repeating-conic-gradient(from var(--disc-angle, 168deg) at 50% 50%, #00000000 0 6deg, #ffffff24 6deg 7deg, #0000000e 7deg 13deg),
+    radial-gradient(circle at 36% 30%, var(--disc-accent) 0%, #00000000 52%),
+    radial-gradient(circle at 70% 74%, var(--disc-accent-2) 0%, #00000000 48%),
+    radial-gradient(circle at 50% 50%, var(--disc-base) 32%, var(--disc-sheen) 100%);
+}
+
+.template-collage .tpl-disc.pressing-splatter {
+  background-color: var(--disc-base);
+  background-image:
+    radial-gradient(circle at 24% 18%, var(--disc-accent) 0 2.4%, #00000000 2.9%),
+    radial-gradient(circle at 63% 12%, var(--disc-accent-2) 0 1.7%, #00000000 2.1%),
+    radial-gradient(circle at 82% 34%, var(--disc-accent) 0 2.8%, #00000000 3.3%),
+    radial-gradient(circle at 16% 52%, var(--disc-accent-2) 0 2.1%, #00000000 2.6%),
+    radial-gradient(circle at 44% 40%, var(--disc-accent) 0 1.4%, #00000000 1.8%),
+    radial-gradient(circle at 74% 62%, var(--disc-accent-2) 0 2.6%, #00000000 3.1%),
+    radial-gradient(circle at 32% 78%, var(--disc-accent) 0 2.2%, #00000000 2.7%),
+    radial-gradient(circle at 58% 88%, var(--disc-accent-2) 0 1.6%, #00000000 2%),
+    radial-gradient(circle at 90% 82%, var(--disc-accent) 0 2%, #00000000 2.5%),
+    radial-gradient(circle at 8% 88%, var(--disc-accent-2) 0 1.9%, #00000000 2.4%),
+    radial-gradient(circle at 50% 50%, var(--disc-base) 26%, var(--disc-sheen) 100%);
+}
+
+.template-collage .tpl-disc.pressing-glow {
+  background-color: var(--disc-base);
+  background-image:
+    radial-gradient(circle at 50% 50%, var(--disc-base) 24%, var(--disc-accent) 56%, var(--disc-base) 76%, var(--disc-sheen) 100%);
+}
+
+.template-collage .tpl-disc.pressing-halo {
+  background-color: var(--disc-base);
+  background-image:
+    radial-gradient(circle at 50% 50%, var(--disc-base) 26%, var(--disc-accent) 48%, var(--disc-base) 74%, var(--disc-sheen) 100%);
+}
+
+/* 没在放音乐时 .has-disc 不在，碟只做「这里有台唱机」的暗示。
+   给了花色之后别再压那么淡，否则白给。 */
+.template-collage .tpl-disc:not(.has-disc) {
+  /* 没在放音乐时只是「这里有台唱机」的暗示，但压太狠会变成一块灰饼。
+     保留花色，只降一点亮度。 */
+  opacity: 0.72;
+  filter: saturate(0.92) brightness(0.9);
+}
+
+/* ===== 文字位置的唯一来源：AE 的 raven-shapes.json =====
+   每条都是 layer 的 pos（锚点）+ fontSize，除以画布 1920×1080 换算成百分比。
+   改动版式时只改这一段，别在别处再写 position。 */
+
+/* 正介绍：pos(1410.18,131.25)，字号 18 → 1.67cqw。相对面板：左 21.9%、上 16.2%。 */
+.template-collage .tpl-intro { left: 21.90%; top: 16.15%; width: 60%; }
+.template-collage .tpl-intro p { font-size: 1.67cqw; line-height: 1.30; }
+
+/* 镜像介绍：pos(1467.46,269)，scale(-100,-100) 就是整块上下左右都翻。 */
+.template-collage .tpl-intro-mirror { font-size: 1.85cqw; }
+
+/* 竖排 DUMBRAVEN：pos(1748.61,230.56)，字号 52 → 4.81cqw。
+   相对面板：左 77.7%、上 32.7%。 */
+.template-collage .tpl-tag { right: 12.5%; top: 32.65%; width: 26%; }
+.template-collage .tpl-badge { font-size: 4.81cqw; }
+
+/* 标题：pos(1380.54,370.25)，字号 18。相对面板：左 17.8%、上 55.8%。 */
+.template-collage .tpl-words { left: 17.80%; top: 55.85%; width: 62%; }
+.template-collage .tpl-title-text { font-size: 2.30cqw; }
+.template-collage .tpl-sub { font-size: 1.30cqw; }
+
+/* 信息条：全部按 AE 锚点。外接框 34..1244 / 768..1042（1210×274）。 */
+/* TITLE  pos(89.76,805)  → 相对信息条 4.6% / 13.5% */
+/* 标题值 pos(115.55,826.75) */
+/* PLAYLIST pos(92.71,869) → 4.8% / 36.9% */
+/* 曲目串 pos(496.83,945) → 38.3% / 64.6% */
+/* photography pos(698.06,801.75) → 54.9% / 12.3% */
+/* Read The   pos(692.58,837.07) → 54.5% / 25.2% */
+.template-collage .tpl-block-bar .tpl-fields { padding-top: 12.9%; }
+.template-collage .tpl-block-bar .tpl-fields > div > b { font-size: 1.48cqw; }
+.template-collage .tpl-block-bar .tpl-fields span { font-size: 1.67cqw; }
+.template-collage .tpl-block-bar .tpl-list > b { font-size: 1.48cqw; }
+.template-collage .tpl-block-bar .tpl-list span { font-size: 1.57cqw; }
+
+/* 乌鸦：pos(1118.6,948)，相对信息条 89.7% / 65.7%，高约信息条的 60%。 */
+.template-collage .tpl-raven { left: 87.2%; top: 60%; width: 9.5%; height: auto; }
+
+/* Produced By：字号 29 → 2.69cqw，色 #C5AF83。
+   AE 的 pos(2228.71,943.79) 在 1920 画布右边界之外（x=116.08%），照抄等于一个字都看不见。
+   参考图（AE 最终渲染 PNG）里它落在右下角 88.78%..99.43%，右端被画布裁掉一截——
+   也就是 AE 那台「安全框外」的图层，最终输出时确实有一部分进来了。
+   所以位置取参考图实测值，不取 AE 的 pos。 */
+.template-collage .tpl-produced {
+  left: 87.43%;
+  /* 胶囊顶边 82.46%。参考图文字带从 84.51% 起，差 2.05% 画布高 = 1.15cqw，
+     但行高会在字上留 0.3cqw 的 leading，所以 padding-top 取 0.85cqw 才落得准。 */
+  top: 82.46%;
+  right: auto;
+  bottom: auto;
+  font-size: 1.55cqw;
+  /* 胶囊宽 11.94%（参考图 x=1676..1905），右端正好停在画布边缘。
+     文字从左边距起步、左对齐——之前是 text-align:right + 无宽度，
+     内容被推到右侧、大半越出画布，只剩右端几个字母露在外面。 */
+  width: 11.94%;
+  /* 参考图里这行字压在一条半透明白胶囊上，胶囊右端贴到画布边缘被裁掉，
+     所以右端不圆、左端是半圆（圆角 = 半个高）。
+     上内边距 0.85cqw：参考图首行文字带顶距胶囊顶 2.05% 画布高，
+     行高自身还会留一点 leading，所以不能直接写 1.15cqw。 */
+  padding: 0.85cqw 0 1.04cqw 1.36cqw;
+  margin: 0;
+  text-align: left;
+  border-radius: 2.6cqw 0 0 2.6cqw;
+  background: #ffffff42;
+  /* 参考图金字核心色实测 rgb(212,160,64)。原来的 #C5AF83 又淡又发灰，
+     在浅色胶囊上几乎读不出来。 */
+  color: #d4a040;
+  /* 唱片在本层里是 z-index:6，署名只有 3。唱片的深色外阴影
+     「0 2.2cqw 5cqw #00000052」半径 5cqw，正好铺到署名上半行，
+     把金字压成灰褐色（放大图里 Produced By 明显比 DumbRaven 灰）。
+     参考图里署名压在唱片的阴影之上，所以这里抬到唱片上面。 */
+  z-index: 7;
+}
+/* 两行字号一样大：参考图里第二行只比第一行高 23px vs 28px，
+   差的那 5px 是第一行 “Produced By” 里 y 的下降部，不是字号差异。 */
+.template-collage .tpl-produced b { font-size: inherit; }
+
+/* 角标：pos(52.91,42.91) scale 88%，字号 12×0.88 → 0.98cqw。 */
+.template-collage .tpl-corner-date { left: 2.76%; top: 3.97%; font-size: 0.98cqw; line-height: 1.15; }
+
+/* ===== 文字按 AE 锚点绝对定位（覆盖掉上面的流式网格排布） =====
+   面板：615×602；信息条：1210×274。百分比 = (锚点 - 块左上) / 块尺寸。
+   这里全部 position:absolute，不参与父级网格流，才和 AE 一一对应。 */
+.template-collage .tpl-block-panel { display: block; padding: 0; }
+
+/* 正介绍 pos(1410.18,131.25) 字号 18 */
+.template-collage .tpl-intro {
+  position: absolute; left: 22.63%; top: 16.15%; width: 56%;
+  margin: 0; font-size: 2.93cqw; line-height: 1.24;
+}
+/* 镜像介绍 pos(1467.46,269) 字号 20，AE 里 scale(-100,-100) 整块翻转 */
+.template-collage .tpl-intro-mirror {
+  position: absolute; right: 6.5%; top: 34.5%; width: 56%;
+  margin: 0; font-size: 3.25cqw; line-height: 1.24;
+  text-align: right; transform: scaleY(-1); opacity: 0.5;
+}
+/* 竖排 DUMBRAVEN pos(1748.61,230.56) 字号 52 */
+.template-collage .tpl-tag { right: 11.5%; top: 26.4%; width: 21%; }
+/* 标题 pos(1380.54,370.25) 字号 18 */
+.template-collage .tpl-words {
+  position: absolute; left: 17.81%; top: 55.86%; width: 60%;
+  transform: none; margin: 0; padding: 0;
+}
+.template-collage .tpl-title-text { font-size: 2.93cqw; line-height: 1.16; }
+.template-collage .tpl-sub { font-size: 1.63cqw; }
+
+/* 信息条：display:grid 会重置绝对定位的子项，所以也改块级 */
+.template-collage .tpl-block-bar { display: block; padding: 0; }
+/* TITLE pos(89.76,805) 字号 16 → 相对信息条 (4.61%,13.50%) */
+.template-collage .tpl-block-bar .tpl-fields {
+  position: absolute; inset: 0; padding: 0;
+  display: block;
+}
+.template-collage .tpl-block-bar .tpl-fields > div:first-child {
+  position: absolute; left: 4.61%; top: 13.50%; margin: 0;
+}
+.template-collage .tpl-block-bar .tpl-fields > div:first-child > b { font-size: 1.32cqw; }
+.template-collage .tpl-block-bar .tpl-fields > div:first-child span {
+  display: block; position: absolute; left: 2.15cqw; top: 1.06cqw;
+  font-size: 1.49cqw; white-space: nowrap;
+}
+/* PHOTOGRAPHY pos(698.06,801.75) 字号 16 → (54.88%,12.32%) */
+.template-collage .tpl-block-bar .tpl-fields > div:last-child {
+  position: absolute; left: 54.88%; top: 12.32%; margin: 0;
+}
+.template-collage .tpl-block-bar .tpl-fields > div:last-child > b { font-size: 1.32cqw; }
+.template-collage .tpl-block-bar .tpl-fields > div:last-child span {
+  display: block; position: absolute; left: -0.37cqw; top: 1.06cqw;
+  font-size: 1.49cqw; white-space: nowrap;
+}
+/* PLAYLIST pos(92.71,869) 字号 16 → (4.85%,36.86%) */
+.template-collage .tpl-block-bar .tpl-list {
+  position: absolute; left: 4.85%; top: 36.86%; right: 6%; margin: 0; padding: 0;
+}
+.template-collage .tpl-block-bar .tpl-list > b { font-size: 1.32cqw; }
+/* 曲目串 pos(496.83,945) → (38.25%,64.60%)，是一整段连续文字 */
+.template-collage .tpl-block-bar .tpl-list span {
+  display: block; margin-top: 2.6cqw;
+  font-size: 1.40cqw; line-height: 1.55; opacity: 0.82;
+}
+
+/* 乌鸦：位置取自参考图实测（AE 的 pos 少了父级变换，算出来是错的）。
+   参考图里它是近纯黑的剪影，站在信息条右下角，画布 55.87%..64.11% × 83.68%..95.99%。
+   换算成相对信息条：left 85.85% top 49.55% width 13.08%。
+   颜色用页底色 #1c2433 而不是纯黑——参考图实测 #040405，但信息条是灰的，
+   纯黑会显得像贴上去的一块，参考图那点微弱的暖调来自环境光。 */
+.template-collage .tpl-raven {
+  position: absolute;
+  left: 85.85%;
+  top: 49.55%;
+  width: 13.08%;
+  height: auto;
+  margin: 0;
+  color: #08080a;
+  opacity: 1;
+}
+
+/* ===== 三块的外形：全部用 SVG mask（曲线 + 等比缩放） =====
+   clip-path:path() 的坐标是像素、不随容器缩放，所以曲线只能靠 mask-image。
+   preserveAspectRatio="none" 让 path 跟着块的宽高等比拉伸。 */
+
+/* 画面块：左上角是一段大弧，AE 里半径约 162px（块宽 1210 的 13.4%）。 */
+.template-collage > .tpl-block-media {
+  border-radius: 0;
+  -webkit-mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 708' preserveAspectRatio='none'><path d='M162,0 L1210,0 L1210,708 L0,708 L0,162 Q0,0 162,0 Z' fill='white'/></svg>");
+  mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 708' preserveAspectRatio='none'><path d='M162,0 L1210,0 L1210,708 L0,708 L0,162 Q0,0 162,0 Z' fill='white'/></svg>");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+/* 信息条：右下角顺着唱片的圆内凹，弧从 (1072,274) 拱到 (1210,127)。 */
+.template-collage > .tpl-block-bar {
+  clip-path: none;
+  -webkit-mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 274' preserveAspectRatio='none'><path d='M1210,4 L1210,0 L0,0 L0,274 L1072,274 Q1120,232 1210,127 L1210,4 Z' fill='white'/></svg>");
+  mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 274' preserveAspectRatio='none'><path d='M1210,4 L1210,0 L0,0 L0,274 L1072,274 Q1120,232 1210,127 L1210,4 Z' fill='white'/></svg>");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  padding-right: 24%;
+}
+
+/* ===== 凹槽里的竖排 DUMBRAVEN：5 行、每行 2 个字母、左右交错 =====
+   AE 里那一层是「    R D     A U     V M     E B     N」——每行两个字母，
+   第二列比第一列低一截，整体像一个斜着排的柱子。 */
+.template-collage .tpl-tag {
+  right: 11.5%;
+  top: 26.4%;
+  width: 21%;
+  padding: 2.2cqw 0 2.6cqw;
+  border-radius: 5.2cqw;
+}
+
+.template-collage .tpl-badge {
+  display: grid;
+  grid-auto-flow: row;
+  justify-items: center;
+  align-items: center;
+  gap: 0.15cqw 0.6cqw;
+  grid-template-columns: auto auto auto;
+  font-size: 5.6cqw;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #e8b84b;
+  text-shadow: 0 0 1.2cqw #e8b84b3d;
+}
+
+/* 每行两个字母：第二个往下沉半格，做出「交错」的错位感。 */
+.template-collage .tpl-badge > span {
+  display: block;
+  text-align: center;
+}
+.template-collage .tpl-badge > span:nth-child(even) {
+  transform: translateY(0.5cqw);
+  opacity: 0.88;
+}
+
+/* 星点：围着柱子在两侧散开。 */
+.template-collage .tpl-star {
+  font-size: 1.7cqw;
+  opacity: 0.75;
+  color: #e8b84b;
+}
+.template-collage .tpl-star-a { left: -14%; top: 14%; }
+.template-collage .tpl-star-b { right: -14%; top: 40%; }
+.template-collage .tpl-star-c { left: -8%; bottom: 16%; }
+.template-collage .tpl-star-d { right: -4%; bottom: 34%; }
+
+/* ===== 面板右上那枚竖排 DUMBRAVEN 胶囊（覆盖上面所有写法） =====
+   位置全部取自参考图（AE 最终渲染 PNG）的实测像素，不取 AE 的 pos——
+   AE 导出 JSON 里这些图层还套着父级/空对象变换，算出来的绝对值是错的
+   （同一个 JSON 里「小图标」算 51.6%，实测 67.79%）。
+   画布实测：胶囊 x=[1701,1841] y=[91,400] → left 88.73% top 8.49% w 7.30% h 28.82%。
+   这里换成相对面板的百分比：left 70.34% top 9.58% width 22.79%。 */
+.template-collage .tpl-tag {
+  right: auto;
+  top: 9.58%;
+  left: 70.34%;
+  width: 22.79%;
+  min-height: 0;
+  /* 高 = 胶囊实测 28.82% 画布高 ÷ 面板高 55.74% */
+  height: 51.70%;
+  padding: 0;
+  /* 圆角是半个宽：参考图里那是一条正胶囊，两端是正半圆，不是圆角矩形。 */
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 胶囊底是半透明白叠在面板上：参考图实测 #7a8494，面板 #4a5363，
+     即约 26% 的白。之前那块白噪点就是丢了这层透明度、又叠了死白的纹理。 */
+  background-image: none;
+  background-color: #ffffff3d;
+  box-shadow: none;
+  isolation: isolate;
+}
+
+/* 大理石絮纹：参考图里胶囊内是**很淡**的灰白絮状团块，主视觉是那块偏亮的底，
+   纹理只是隐约一层。之前 0.9 的 soft-light 白把它铺成了一片白云，
+   把面板里的介绍文字整个糊掉了。 */
+.template-collage .tpl-tag::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* 带 filter 的元素会脱离父级 border-radius 的裁剪，方形的滤镜输出会整块露在
+     胶囊圆角外面（截图上就是胶囊四角那圈直角浅色块）。父级不能加 overflow:hidden，
+     因为四颗 ✦ 星是故意探到胶囊外的。所以在这一层自己再裁一次，形状跟 border-radius 一致。 */
+  clip-path: inset(0 round 999px);
+  background: #ffffff;
+  filter: url(#tpl-marble);
+  mix-blend-mode: soft-light;
+  opacity: 0.28;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* 两列字母：左列 DUMB、右列 RAVEN，不是按行铺的十个字母。 */
+.template-collage .tpl-badge {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  /* 参考图两列字母的中心距 2.63% 画布宽，实测 2.4cqw 时是 3.35%，宽了 27%。
+     Georgia 斜体比参考图的 Playfair 宽，所以间隙压到 0.6cqw 才能让整块回到
+     接近参考图的窄长比例——再大就变成两列分家的宽块了。 */
+  column-gap: 0.6cqw;
+  row-gap: 0;
+  /* 参考图单字母 cap 高约 43px、行距 55px（画布 1917 宽时）。
+     面板宽 614px → 1cqw = 614px（换算到 1917 宽画布是 1cqw = 6.14px）。
+     cap 高 43px = 7.0cqw，衬线字体 cap 约占 0.70em → font-size ≈ 10cqw；
+     行距 55px = 8.96cqw → line-height = 8.96 / 10 = 0.90。
+     这两条是绑在一起的：只放大字号不收行距，5 个字母就会顶出胶囊。 */
+  font-size: 10.6cqw;
+  /* 参考图是金色高对比衬线（Playfair 类）。项目里没有这个字体文件、
+     也不许联网加载，所以只能落到系统衬线 Georgia——字形宽度不同，
+     但粗细对比和整体气质能留住。 */
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  /* 参考图是粗笔画高对比衬线。600 在 Georgia 下笔画太细，实测金色像素
+     覆盖率只有参考的一半，整块看着发灰。 */
+  font-weight: 700;
+  /* 斜体衬线。参考图 4 倍放大（%TEMP/badge7-cmp.png 左）里 D/R/U/M/B 的竖笔
+     全部右倾，V/E/N 也有斜切——不是直立正体。
+     AE JSON 里这层登记的是 Montserrat-Bold（无衬线），跟参考图对不上，
+     说明那份导出和出图不是同一版本；以参考图像素为准。 */
+  font-style: italic;
+  line-height: 0.90;
+  letter-spacing: 0;
+  /* 参考图字母核心色中位 rgb(196,143,70) = #c48f46（直方图 7794 个金色像素）。
+     原来写 #c8a56a 偏黄偏淡，压在灰白大理石底上读不出金色感。 */
+  color: #c48f46;
+  /* Georgia 斜体只有一个 400 字重，font-weight 调不动笔画粗细。
+     参考图的金色像素覆盖率是 0.379% 画布，纯色填充只有 0.301%——
+     用同色描边把笔画加粗一圈补回来（0.025em 实测对上；0.06em 会超出 38%）。 */
+  -webkit-text-stroke: 0.025em #c48f46;
+  paint-order: stroke fill;
+  /* 胶囊 309px 高、字母区 284px，上留 16px 下留 9px——基本是垂直居中，
+     别再额外加 margin 往下推（加过一次，右列 N 直接顶穿胶囊底）。 */
+  margin-top: 0;
+}
+
+.template-collage .tpl-badge-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 左列（4 个字母 D-U-M-B）比右列低半行——实测左列顶距胶囊顶 85px、
+   右列顶 48px，差 37px。1cqw = 6.14px，所以 37px ≈ 6.0cqw。
+   别反过来写：右列多一个字母，让它上移会直接顶穿胶囊顶。 */
+.template-collage .tpl-badge-col-left {
+  transform: translateY(6.0cqw);
+}
+
+/* 每个字母单独一行；不再有 translateY 抖动和「最后一个跨两列」，
+   那是旧的按行铺法留下的规则，对新结构没有意义。 */
+.template-collage .tpl-badge .tpl-badge-col > span {
+  display: block;
+  text-align: center;
+  opacity: 0.94;
+  transform: none;
+}
+
+/* 四颗星：参考图里它们探到胶囊外面（金色像素顶端比胶囊顶还高 41px），
+   分布在右上 / 左中 / 右下 / 左下，不在胶囊内部。 */
+.template-collage .tpl-star {
+  /* 参考图星是 22..24px（画布 1917 宽），即 1.20% 画布宽；
+     ✦ 字形宽约 0.92em，所以字号 = 1.30% 画布宽 ÷ 0.3203%（1cqw）= 4.07cqw。
+     原来写 1.5cqw，实测只有参考的 4 成，四颗星小得像灰点。
+     补一层：✦ 的字面 ink 只占约 0.53em（4.0cqw = 24.6px 时实测 14×13px），
+     要 22px 的 ink 就得 24 ÷ 0.53 = 45px = 7.0cqw。 */
+  font-size: 6.2cqw;
+  opacity: 1;
+  color: #c48f46;
+  line-height: 1;
+}
+/* 四颗星相对胶囊的左上角，按参考图金色连通块实测换算（胶囊 140×309）：
+     右上 [1809,90]-[1831,113]  → left 77%    top -0.3%
+     左中 [1696,201]-[1717,222] → left -3.6%  top 35.6%
+     右下 [1832,322]-[1854,344] → left 93.6%  top 74.8%
+     左下 [1712,378]-[1733,400] → left 7.9%   top 92.9%
+   全部用 left/top 写，别再用 right/bottom ——两套混写时哪个生效取决于
+   声明顺序，之前就是这样把四颗星全摆错的。 */
+.template-collage .tpl-star-a { left: 77%; top: -0.3%; right: auto; bottom: auto; }
+.template-collage .tpl-star-b { left: -3.6%; top: 35.6%; right: auto; bottom: auto; }
+.template-collage .tpl-star-c { left: 93.6%; top: 74.8%; right: auto; bottom: auto; }
+.template-collage .tpl-star-d { left: 7.9%; top: 92.9%; right: auto; bottom: auto; }
+
+/* ===== 信息条文字（覆盖上面的绝对定位） =====
+   信息条 1210×274。AE 锚点：
+     TITLE      (89.76,805)   → 相对 (4.61%, 13.50%)
+     标题值     (115.55,826.75)
+     PLAYLIST   (92.71,869)   → (4.85%, 36.86%)
+     曲目串     (496.83,945)  → (38.25%, 64.60%)
+     photography(698.06,801.75)→ (54.88%, 12.32%)
+     Read The   (692.58,837.07)→ (54.43%, 25.21%)
+   信息条现在已经不再是 grid，全部改绝对定位，才和 AE 一一对应。 */
+.template-collage .tpl-block-bar {
+  display: block;
+  padding: 0;
+}
+
+/* TITLE 组：标签在 (4.61%,13.50%)，值在标签右下方 (6.74%,21.44%)。
+   注意这些百分比都是相对信息条（1210×274），不是画布。 */
+.template-collage .tpl-block-bar .tpl-fields {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  display: block;
+}
+
+.template-collage .tpl-block-bar .tpl-fields > div:first-child {
+  position: absolute;
+  left: 4.61%;
+  top: 13.50%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1cqw;
+}
+
+.template-collage .tpl-block-bar .tpl-fields > div:first-child > b {
+  font-size: 1.32cqw;
+  letter-spacing: 0.14em;
+  opacity: 0.72;
+  font-weight: 600;
+}
+
+.template-collage .tpl-block-bar .tpl-fields > div:first-child span {
+  position: static;
+  font-size: 1.49cqw;
+  white-space: nowrap;
+}
+
+/* PHOTOGRAPHY 组：在 2/3 处，和 TITLE 同一行起。 */
+.template-collage .tpl-block-bar .tpl-fields > div:last-child {
+  position: absolute;
+  left: 54.88%;
+  top: 12.32%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1cqw;
+}
+
+.template-collage .tpl-block-bar .tpl-fields > div:last-child > b {
+  font-size: 1.32cqw;
+  letter-spacing: 0.14em;
+  opacity: 0.72;
+  font-weight: 600;
+}
+
+.template-collage .tpl-block-bar .tpl-fields > div:last-child span {
+  position: static;
+  font-size: 1.49cqw;
+  white-space: nowrap;
+}
+
+/* PLAYLIST：另起一行，铺到信息条右侧（右边留给斜切）。 */
+.template-collage .tpl-block-bar .tpl-list {
+  position: absolute;
+  left: 4.85%;
+  top: 40.5%;
+  right: 14%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4cqw;
+}
+
+.template-collage .tpl-block-bar .tpl-list > b {
+  font-size: 1.32cqw;
+  letter-spacing: 0.14em;
+  opacity: 0.72;
+  font-weight: 600;
+}
+
+/* 曲目串：一整段连续文字，允许换行，行距按 AE 的 leading。 */
+.template-collage .tpl-block-bar .tpl-list span {
+  position: static;
+  margin: 0;
+  font-size: 1.40cqw;
+  line-height: 1.6;
+  opacity: 0.86;
+  white-space: normal;
+}
+
+/* 乌鸦：信息条右端 (89.64%,65.69%)，宽 275px = 22.73%。 */
+/* 乌鸦（位置见上方 6074 那条，那里有实测依据）。这里只留一句占位说明，
+   不要再写一套 left/top，否则会盖掉实测值——之前就是这样把乌鸦顶到画布外的。 */
+
+/* ===== 面板里的标题（第三次对齐，按 AE 的叠放顺序） =====
+   AE 面板内的次序：正介绍 → 镜像介绍 → 标题 → 唱片。
+   （AE 里没有署名，见文件末尾关于 tpl-brand 的说明。） */
+
+/* 标题块：往下挪一点，和署名前后的空档对上。 */
+.template-collage .tpl-words { top: 51.5%; }
+.template-collage .tpl-title-text { font-size: 3.1cqw; }
+.template-collage .tpl-sub { margin-top: 1.1cqw; }
+
+/* ===== 面板内部最终叠放（第四次） =====
+   从上到下：正介绍 → 标题 → 镜像介绍（贴着唱片上沿）→ 唱片。
+   锚点仍取自 AE，只是把互相压住的几块拉开一点。 */
+/* 镜像介绍挪到面板中下部，不再和正文抢位置。 */
+.template-collage .tpl-intro-mirror {
+  right: 8.5%;
+  top: 60.5%;
+  width: 58%;
+  font-size: 2.9cqw;
+  opacity: 0.34;
+}
+
+/* 标题块：唱片上沿之上。 */
+.template-collage .tpl-words {
+  left: 17.81%;
+  top: 47.5%;
+  width: 62%;
+}
+.template-collage .tpl-title-text { font-size: 3.0cqw; }
+
+/* 标题的倒影：AE 里就压在标题正下方，只留一点点。 */
+/* （标题倒影规则已删，见上方说明） */
+
+/* ===== 面板文字（旧值，已被文件末尾按参考图实测的那一套覆盖） ===== */
+.template-collage .tpl-intro {
+  left: 22.63%;
+  top: 15.5%;
+  width: 54%;
+  font-size: 2.75cqw;
+  line-height: 1.32;
+  opacity: 0.78;
+}
+.template-collage .tpl-intro p { margin: 0; }
+
+/* 标题块在署名下方，底部留出唱片上沿的空档。 */
+.template-collage .tpl-words {
+  left: 17.81%;
+  top: 50.0%;
+  width: 60%;
+}
+.template-collage .tpl-title-text { font-size: 2.95cqw; }
+.template-collage .tpl-sub { font-size: 1.5cqw; margin-top: 1.0cqw; }
+
+/* 镜像介绍压到面板最下方（唱片上沿之上），只作纹理，不抢注意力。 */
+.template-collage .tpl-intro-mirror {
+  right: 7%;
+  top: 62.0%;
+  width: 56%;
+  font-size: 2.6cqw;
+  line-height: 1.3;
+  opacity: 0.28;
+}
+
+/* ===== 面板内五块，各就各位（照 AE 的绝对坐标） =====
+   面板 615×602，1cqw = 6.15px。
+   AE 里从上到下的次序：正介绍 → 署名 → 标题 → 镜像 → 凹槽在右、唱片在下。 */
+.template-collage .tpl-block-panel { overflow: hidden; }
+
+/* 正介绍：AE (1410.18,131.25)，左上角对齐 → (22.63%, 15.5%) */
+.template-collage .tpl-intro { left: 22.63%; top: 15.5%; width: 54%; }
+.template-collage .tpl-intro p { font-size: 2.75cqw; line-height: 1.34; margin: 0; opacity: 0.82; }
+
+/* 镜像：AE (1467.46,269) 且 scale(-100,-100) → 贴在介绍右下方，压得很淡 */
+/* 正介绍：参考图实测文字带 98..177px（相对面板 11.50%..24.12%），
+   左边缘 1324px → 面板左 8.46%。四行、行距 26px → line-height 1.44。 */
+.template-collage .tpl-intro { left: 8.46%; top: 11.50%; width: 56%; }
+.template-collage .tpl-intro p { font-size: 2.93cqw; line-height: 1.44; margin: 0; opacity: 0.82; }
+
+/* 镜像倒影：实测文字带 199..287px（相对面板 27.64%..41.69%），
+   右边缘 1556px → 面板 46.18%，所以 right 用 53.82%。
+   它是整块上下翻转的，文字右对齐，最宽那行反而在最后。 */
+.template-collage .tpl-intro-mirror {
+  position: absolute;
+  right: 53.82%;
+  top: 27.64%;
+  width: 42%;
+  margin: 0;
+  font-size: 2.93cqw;
+  line-height: 1.44;
+  opacity: 0.30;
+  text-align: right;
+}
+
+/* 品牌署名已删（JSX 里也移除了）：AE 源文件没有 brand 图层，参考图里也没有它。
+   这里不留 display:none 之类的空壳——没有元素需要用规则去藏。 */
+
+/* 标题：实测文字带 340..400px（相对面板 50.16%..59.74%），左边缘 1320px → 7.97%。
+   三行是 AE 里同一个文本图层（fs=18、PlayfairDisplayRoman-Bold），所以字号
+   和字体都必须一样。实测墨高：参考 1.31% / 1.40% / 1.68% 画布高
+   （第三行含 J 的 descender），早先 .tpl-sub 写 1.5cqw 只有第一行的一半。
+   text-transform: capitalize 会继承下来、把 "Just for U" 变成 "Just For U"，
+   参考图里是小写 for，所以这里显式关掉。 */
+.template-collage .tpl-words {
+  left: 7.97%; top: 50.16%; width: 60%;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  text-transform: none;
+}
+.template-collage .tpl-title-text { font-size: 3.0cqw; }
+.template-collage .tpl-sub { font-size: 3.0cqw; margin-top: 0; }
+
+
+/* 信息条只有 274px 高，曲目串最多三行——再多就顶到底边外面去了。
+   用 -webkit-line-clamp 比 max-height 稳，截断处还能加省略号。 */
+.template-collage .tpl-block-bar .tpl-list { right: 16%; }
+.template-collage .tpl-block-bar .tpl-list span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  max-height: 4.7cqw;
+  font-size: 1.36cqw;
+  line-height: 1.55;
+}
