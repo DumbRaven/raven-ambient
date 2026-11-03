@@ -16,7 +16,7 @@ const { verify } = require('./verify-zip.cjs');
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'release', 'win-unpacked');
 const OUT = path.join(ROOT, 'release', 'dist');
-const STAGE = path.join(OUT, 'Raven Ambient Bold');
+const STAGE = path.join(OUT, 'Raven Ambient');
 
 if (!fs.existsSync(SRC)) throw new Error('还没有 win-unpacked，先跑 package:win');
 if (!fs.existsSync(path.join(ROOT, '.cable'))) {
@@ -71,9 +71,9 @@ if (cableIncluded) {
 
 // 4. 先看这里
 fs.writeFileSync(path.join(STAGE, '先看这里.txt'), [
-  `Raven Ambient Bold ${tag} · 免安装版`,
+  `Raven Ambient ${tag} · 免安装版`,
   '',
-  '解压后双击「Raven Ambient Bold.exe」开始，不用安装。',
+  '解压后双击「Raven Ambient.exe」开始，不用安装。',
   '',
   '第一次打开时 Windows 可能提示「已保护你的电脑」，',
   '点「更多信息」→「仍要运行」即可（这个版本没有签名证书）。',

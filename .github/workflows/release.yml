@@ -48,7 +48,7 @@ jobs:
       - name: 打包产物自检
         shell: bash
         run: |
-          exe="release/win-unpacked/Raven Ambient Bold.exe"
+          exe="release/win-unpacked/Raven Ambient.exe"
           asar="release/win-unpacked/resources/app.asar"
           unpacked="release/win-unpacked/resources/app.asar.unpacked/electron/nowplaying/NowPlaying.exe"
           test -f "$exe" || { echo "缺少 $exe"; exit 1; }
@@ -105,7 +105,7 @@ jobs:
           $parts += ''
           $parts += '## 怎么用'
           $parts += ''
-          $parts += '下载 `Raven-Ambient-*-win-x64.zip`，解压后双击里面的 `Raven Ambient Bold.exe`。免安装。'
+          $parts += '下载 `Raven-Ambient-*-win-x64.zip`，解压后双击里面的 `Raven Ambient.exe`。免安装。'
           $parts += ''
           $parts += '## 必要组件'
           $parts += ''

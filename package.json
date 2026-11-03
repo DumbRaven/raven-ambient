@@ -34,7 +34,7 @@
   },
   "build": {
     "appId": "studio.dumbraven.ambient.bold",
-    "productName": "Raven Ambient Bold",
+    "productName": "Raven Ambient",
     "electronDist": "node_modules/electron/dist",
     "directories": {
       "output": "release"

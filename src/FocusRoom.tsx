@@ -28,7 +28,7 @@ import { useMiniDisc, type DiscSource } from './use-mini-disc';
 
 const SETTINGS_KEY = 'raven-focus-settings-v1';
 const HISTORY_KEY = 'raven-focus-history-v1';
-const BASE_TITLE = 'Raven Ambient Bold · 唱片柜';
+const BASE_TITLE = 'Raven Ambient · 唱片柜';
 
 function readStore<T>(key: string, fallback: T): T {
   try {
