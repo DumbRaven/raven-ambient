@@ -10,6 +10,29 @@ export type RecordItem = {
   /** 音乐响起时压低的量，分贝。0 表示这张不避让。 */
   duckDepth: number;
 };
+/**
+ * 媒体库里的东西：图片和视频。
+ * 和唱片不同，它们不进 IndexedDB，库里只记路径——一个 1080p 的视频几百 MB，
+ * 存进 IndexedDB 每次播放都得先整个读出来才能播。
+ */
+export type MediaKind = 'image' | 'video';
+export const mediaKinds: MediaKind[] = ['image', 'video'];
+/** 文件还在不在，由页面侧判断（主进程只在扫描时才知道）。 */
+export function isMediaKind(value: unknown): value is MediaKind {
+  return typeof value === 'string' && (mediaKinds as string[]).includes(value);
+}
+export type MediaItem = {
+  /** 绝对路径。同一个文件反复扫描不会变成两条。 */
+  id: string;
+  kind: MediaKind;
+  path: string;
+  name: string;
+  size: number;
+  /** 来自壁纸库的条目记作品目录，普通文件为空。用来区分来源与去重。 */
+  source?: string;
+  /** 不能直接播时的说明（比如场景壁纸只显示预览图）。 */
+  note?: string;
+};
 /** 音乐的播放顺序：列表循环、单曲循环、随机播放。 */
 export type PlayOrder = 'sequence' | 'repeat-one' | 'shuffle';
 export const playOrders: PlayOrder[] = ['sequence', 'repeat-one', 'shuffle'];
@@ -41,8 +64,12 @@ export type Cabinet = {
   /** 被单独按了暂停的环境音（记录 id）。不在这里面的照常流动。 */
   muted: string[];
   theme: string; imageName: string;
+  /** 媒体库里的图片和视频，只存路径。 */
+  media: MediaItem[];
+  /** 用户加进来的媒体目录。下次启动靠它重新扫，不把绝对路径当配置写死。 */
+  mediaDirs: string[];
 };
-export const emptyCabinet: Cabinet = { version: 2, records: [], queue: [], ambience: [], master: 60, musicVolume: 70, ducking: true, order: 'sequence', transition: 'crossfade', lineMode: false, lineVolume: 100, muted: [], theme: '#9a8b78', imageName: '' };
+export const emptyCabinet: Cabinet = { version: 2, records: [], queue: [], ambience: [], master: 60, musicVolume: 70, ducking: true, order: 'sequence', transition: 'crossfade', lineMode: false, lineVolume: 100, muted: [], theme: '#9a8b78', imageName: '', media: [], mediaDirs: [] };
 export const recordColors = ['#879a91', '#aaa2b4', '#bd9b80', '#8c9caa', '#aaa481', '#b28e92'];
 
 /** 默认避让 9 dB，约等于旧版 65% 的手感。 */
@@ -92,7 +119,26 @@ export function sanitizeCabinet(value: unknown): Cabinet {
     lineVolume: clamp(v.lineVolume ?? 100),
     muted: Array.isArray(v.muted) ? v.muted.filter((id): id is string => typeof id === 'string').slice(0, 8) : [],
     theme: /^#[0-9a-f]{6}$/i.test(v.theme ?? '') ? v.theme! : emptyCabinet.theme,
-    imageName: typeof v.imageName === 'string' ? v.imageName : '' };
+    imageName: typeof v.imageName === 'string' ? v.imageName : '',
+    // 媒体只做最轻的校验：路径得像路径、类型得认识，剩下的交给主进程的白名单。
+    // 这里不能把不认识的丢掉就报错——旧版本存下来的库里根本没有这两个字段。
+    media: (Array.isArray(v.media) ? v.media : [])
+      .filter((m): m is MediaItem => !!m && typeof m === 'object'
+        && typeof (m as MediaItem).id === 'string' && (m as MediaItem).id.length > 0
+        && typeof (m as MediaItem).path === 'string' && (m as MediaItem).path.length > 0
+        && isMediaKind((m as MediaItem).kind)
+        // 旧版本存过场景壁纸的预览图（带 note）。放映只放图片和视频，这类条目不再保留。
+        && !(m as MediaItem).note)
+      .map(m => ({
+        id: m.id, kind: m.kind, path: m.path,
+        name: typeof m.name === 'string' ? m.name.slice(0, 200) : '',
+        size: clamp(m.size, 0, 1e12),
+        source: typeof m.source === 'string' ? m.source.slice(0, 500) : undefined,
+        note: typeof m.note === 'string' ? m.note.slice(0, 200) : undefined,
+      })),
+    mediaDirs: (Array.isArray(v.mediaDirs) ? v.mediaDirs : [])
+      .filter((d): d is string => typeof d === 'string' && d.length > 0)
+      .slice(0, 20) };
 }
 export function toggleRecord(cabinet: Cabinet, id: string): Cabinet {
   const record = cabinet.records.find(r => r.id === id);

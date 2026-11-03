@@ -21,6 +21,8 @@ import RollNumber from './roll-number';
 import { LineIn, lineInError } from './line-in';
 import { appLabel, emptyNowPlaying, hasTrack, parseNowPlaying, playbackHint, type NowPlaying } from './now-playing';
 import { askNowPlaying, commandNowPlaying, listenNowPlaying } from './now-playing-bridge';
+import { askMedia, dropWallpapers, listenMedia, looseMedia, mergeMedia, pickMediaFiles, pickMediaFolder, replaceMediaDir, replaceWallpapers, rescanMediaFolder, restoreMediaDirs, scanWallpapers, toMediaItem, toWallpaperItem, type MediaMessage } from './media';
+import MediaRoom from './MediaRoom';
 import { useDialogMotion, useFilterMotion, usePageMotion } from './use-motion';
 import { useViewLayout } from './use-view-layout';
 import MotionNotice from './MotionNotice';
@@ -184,8 +186,13 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [status, setStatus] = useState<RoomStatus>(emptyStatus);
   const player = useRef<RoomPlayer | null>(null);
-  const [view, setView] = useState<'cabinet' | 'listening' | 'focus'>('cabinet');
+  const [view, setView] = useState<'cabinet' | 'listening' | 'focus' | 'media'>('cabinet');
   const [filter, setFilter] = useState<CabinetFilter>('selected');
+  // 媒体库：主进程扫出来的文件直接进 cabinet.media，这里只留「这次启动扫到过哪些目录」。
+  // 不放进 cabinet 是因为它是运行时状态，不该触发一次存储写入。
+  const [mediaDirs, setMediaDirs] = useState<string[]>([]);
+  // 主进程确认白名单已经登记好。在这之前不能渲染媒体元素，否则一次 403 就永久空着。
+  const [mediaReady, setMediaReady] = useState(false);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const [focusId, setFocusId] = useState<string>();
@@ -239,6 +246,57 @@ export default function App() {
     askNowPlaying('ping');
     return () => { stop(); askNowPlaying('stop'); };
   }, [cabinet.lineMode]);
+  // 媒体库：主进程扫完推过来，合并进 cabinet.media。
+  // 扫到的目录记在 mediaDirs 里（运行时状态），媒体条目本身进 cabinet 才能跨启动留住。
+  useEffect(() => {
+    const stop = listenMedia((message: MediaMessage) => {
+      // 收到 ready 说明主进程已经把白名单登记好了（用户目录 + 壁纸库根目录）。
+      // 在这之前渲染 <img>/<video> 会拿到 403，而且是永久失败——浏览器不会因为
+      // 后来白名单变了就重试同一个地址，格子会一直空着。所以等这一拍。
+      if (message.type === 'ready') { setMediaDirs(message.dirs); setMediaReady(true); return; }
+      if (message.type === 'wallpapers') {
+        // 壁纸库是「一次全量读」，所以整体替换：在 Wallpaper Engine 里取消订阅的作品
+        // 这里也该跟着消失。只动 source 非空的条目，用户自己加的文件夹不受影响。
+        const incoming = message.items.map(toWallpaperItem);
+        const next = replaceWallpapers(cabinetRef.current.media, incoming);
+        if (next.length === cabinetRef.current.media.length && next.every((item, index) => item.id === cabinetRef.current.media[index]?.id)) return;
+        change({ media: next });
+        return;
+      }
+      if (message.type === 'files') {
+        // 单独挑的文件只往库里加，不进 mediaDirs——它不属于任何目录。
+        // 按 id 去重合并：同一张图挑两次不该变成两格。
+        const incoming = message.url.map(toMediaItem);
+        const next = mergeMedia(cabinetRef.current.media, incoming);
+        if (next.length === cabinetRef.current.media.length && next.every((item, index) => item.id === cabinetRef.current.media[index]?.id)) return;
+        change({ media: next });
+        return;
+      }
+      setMediaDirs(dirs => (dirs.includes(message.dir) ? dirs : [...dirs, message.dir]));
+      const incoming = message.url.map(toMediaItem);
+      // 用扫描结果替换这个目录下的条目，不是合并：用户删掉的文件必须跟着消失，
+      // 否则库里会留着点开就 404 的缩略图。目录外的条目原样保留。
+      const next = replaceMediaDir(cabinetRef.current.media, message.dir, incoming);
+      // 内容没变就别写盘：启动时每次都会重扫一遍，白写一次存储没必要。
+      if (next.length === cabinetRef.current.media.length && next.every((item, index) => item.id === cabinetRef.current.media[index]?.id)) return;
+      const dirs = cabinetRef.current.mediaDirs.includes(message.dir) ? cabinetRef.current.mediaDirs : [...cabinetRef.current.mediaDirs, message.dir];
+      change({ media: next, mediaDirs: dirs });
+    });
+    askMedia();
+    return stop;
+  }, []);
+  // 主进程的白名单只在内存里，重启就没了。把上次记下的目录补回去，
+  // 否则卡片还在、点开是 403。等 cabinet 读出来再补，别抢在存储加载之前。
+  //
+  // 这里不能写成「mediaDirs 非空才补」：壁纸库的条目路径在 Steam 目录下，
+  // 从来不进 mediaDirs，于是重启后一次 restore 都不会发生，一百多张壁纸全是 403。
+  // 无条件调，主进程那边没有目录也只是一次空转。
+  useEffect(() => {
+    if (!ready) return;
+    const dirs = cabinetRef.current.mediaDirs;
+    // 单独导入的文件不在任何目录里，要单独补：否则重启后那几张图全是 403。
+    restoreMediaDirs(dirs, looseMedia(cabinetRef.current.media, dirs));
+  }, [ready]);
   // 波形电平：60ms 读一次引擎。不走 status 的 200ms 节流，否则波形一卡一卡的。
   useEffect(() => {
     if (!cardOpen) return;
@@ -266,7 +324,7 @@ export default function App() {
     );
     return { x, y, r };
   }
-  function selectView(next: 'cabinet' | 'listening' | 'focus', trigger?: HTMLElement) {
+  function selectView(next: 'cabinet' | 'listening' | 'focus' | 'media', trigger?: HTMLElement) {
     if (next === view) return;
     const stage = viewLayout.stageRef.current;
     if (stage && trigger) setWipe(circleFrom(trigger, stage));
@@ -573,6 +631,23 @@ export default function App() {
     } catch (error) { notify(message(error)); } finally { busyRef.current = false; setBusy(''); }
   }
   function openImport(type?: RecordType) { setReport([]); if (type) setImportType(type); setModal('import'); }
+  // 媒体库：把选中的目录移出。条目一起清掉，不然界面会留着一堆打不开的缩略图。
+  function forgetMediaDir(dir: string) {
+    const keep = cabinetRef.current.media.filter(item => !item.path.toLowerCase().startsWith(dir.replace(/[\\/]+$/, '').toLowerCase() + '\\')
+      && !item.path.toLowerCase().startsWith(dir.replace(/[\\/]+$/, '').toLowerCase() + '/'));
+    setMediaDirs(dirs => dirs.filter(item => item !== dir));
+    change({ media: keep, mediaDirs: cabinetRef.current.mediaDirs.filter(item => item !== dir) });
+  }
+  // 移出壁纸库：只清壁纸读进来的那批（带 source 的）。
+  // 自己加的文件夹、单独导入的文件都不属于壁纸库，一件都不能动。
+  //
+  // 不清完就重扫：下次点「读取壁纸库」会重新读一遍，用户想找回来随时可以。
+  // 但主进程那边的壁纸根目录白名单留着——重扫要读同一个位置。
+  function forgetWallpapers() {
+    const keep = dropWallpapers(cabinetRef.current.media);
+    if (keep.length === cabinetRef.current.media.length) return;
+    change({ media: keep });
+  }
   function openEdit(record = focused) { if (!record) return; setFocusId(record.id); setDraft({ name: record.name, artist: record.artist, description: record.description }); setDraftError(''); setModal('edit'); }
   function chooseCover(cover: AmbientCover) { if (!focused) return; editRecord(focused.id, { coverId: undefined, coverPreset: cover.id, color: cover.color }); }
   function autoCover() {
@@ -656,8 +731,8 @@ export default function App() {
     <div className="background-wash" /><div className="paper-grain" />
     <div className="portrait-shell">
       <header className="masthead"><a href="#" className="brand" onClick={e => { e.preventDefault(); setView('cabinet'); }}><Bird size={18} strokeWidth={1.3} /><span>RAVEN <i>ambient</i></span></a><div className="header-actions"><span className="local-status"><i />LOCAL ONLY</span><button className="icon-button" aria-label="使用说明" onClick={() => setModal('guide')}><Info size={16} /></button><button className="icon-button" aria-label="空间设置" onClick={() => setModal('settings')}><Settings2 size={17} /></button></div></header>
-      <section className="today-head"><div className="today-row"><h1 key={view} className="today-title">{view === 'cabinet' ? 'Cabinet' : view === 'listening' ? 'Listening' : 'Focus'}</h1><div className="today-stamp"><span>{todayStamp}</span><i /><span className="today-count"><RollNumber value={view === 'cabinet' ? cabinet.records.length : view === 'listening' ? selectedCount : Math.round(status.running ? 1 : 0)} minDigits={2} /></span></div></div></section>
-      <nav ref={viewLayout.navigationRef} className="view-tabs" aria-label="空间导航"><span className="nav-marker" aria-hidden="true" /><button className={view === 'cabinet' ? 'active' : ''} onClick={event => selectView('cabinet', event.currentTarget)} aria-label="唱片柜"><Disc3 size={15} /><span className="tab-label">唱片柜</span><small>{String(cabinet.records.length).padStart(2, '0')}</small></button><button className={view === 'listening' ? 'active' : ''} onClick={event => selectView('listening', event.currentTarget)} aria-label="正在听"><Headphones size={15} /><span className="tab-label">正在听</span>{selectedCount > 0 && <span className="tab-dot" />}</button><button className={view === 'focus' ? 'active' : ''} onClick={event => selectView('focus', event.currentTarget)} aria-label="专注"><Timer size={15} /><span className="tab-label">专注</span></button><span className="dock-disc-slot"><button className={`dock-disc ${playingNow ? 'playing' : ''}`} aria-label={playingNow ? '打开播放器（正在播放）' : '打开播放器'} aria-expanded={cardOpen} onClick={openCard} style={discCover ? { backgroundImage: `url("${discCover}")` } as CSSProperties : undefined}>{!discCover && <Disc3 size={17} strokeWidth={1.4} />}{sleepUntil > 0 && <i className="dock-disc-sleep" title={`${formatTime(remaining)} 后休息`} />}</button></span></nav>
+      <section className="today-head"><div className="today-row"><h1 key={view} className="today-title">{view === 'cabinet' ? 'Cabinet' : view === 'listening' ? 'Listening' : view === 'media' ? 'Screening' : 'Focus'}</h1><div className="today-stamp"><span>{todayStamp}</span><i /><span className="today-count"><RollNumber value={view === 'cabinet' ? cabinet.records.length : view === 'listening' ? selectedCount : view === 'media' ? cabinet.media.length : Math.round(status.running ? 1 : 0)} minDigits={2} /></span></div></div></section>
+      <nav ref={viewLayout.navigationRef} className="view-tabs" aria-label="空间导航"><span className="nav-marker" aria-hidden="true" /><button className={view === 'cabinet' ? 'active' : ''} onClick={event => selectView('cabinet', event.currentTarget)} aria-label="唱片柜"><Disc3 size={15} /><span className="tab-label">唱片柜</span><small>{String(cabinet.records.length).padStart(2, '0')}</small></button><button className={view === 'listening' ? 'active' : ''} onClick={event => selectView('listening', event.currentTarget)} aria-label="正在听"><Headphones size={15} /><span className="tab-label">正在听</span>{selectedCount > 0 && <span className="tab-dot" />}</button><button className={view === 'focus' ? 'active' : ''} onClick={event => selectView('focus', event.currentTarget)} aria-label="专注"><Timer size={15} /><span className="tab-label">专注</span></button><button className={view === 'media' ? 'active' : ''} onClick={event => selectView('media', event.currentTarget)} aria-label="放映"><ImagePlus size={15} /><span className="tab-label">放映</span>{cabinet.media.length > 0 && <small>{String(cabinet.media.length).padStart(2, '0')}</small>}</button><span className="dock-disc-slot"><button className={`dock-disc ${playingNow ? 'playing' : ''}`} aria-label={playingNow ? '打开播放器（正在播放）' : '打开播放器'} aria-expanded={cardOpen} onClick={openCard} style={discCover ? { backgroundImage: `url("${discCover}")` } as CSSProperties : undefined}>{!discCover && <Disc3 size={17} strokeWidth={1.4} />}{sleepUntil > 0 && <i className="dock-disc-sleep" title={`${formatTime(remaining)} 后休息`} />}</button></span></nav>
       <div ref={viewLayout.stageRef} className="view-stage" data-motion={pageMotion.phase} data-view={pageMotion.value} inert={pageMotion.phase === 'exit'} style={{ '--page-direction': pageMotion.direction, '--wipe-x': `${wipe.x}px`, '--wipe-y': `${wipe.y}px`, '--wipe-r': `${wipe.r}px` } as CSSProperties}>
       <div ref={viewLayout.contentRef} className="view-content">
       {pageMotion.value === 'cabinet' ? <>
@@ -684,6 +759,7 @@ export default function App() {
         </div>
       </> : pageMotion.value === 'listening' ? <section className="listening-room"><div className={`turntable ${status.running ? 'is-playing' : ''}`}><div className="platter">{externalDisc ? <div className="platter-disc disc-swap" key={`ext:${externalDisc.info.app}:${externalDisc.info.title}`}><RecordPlayer disc={externalDisc} spinning={status.running && nowPlaying.playing} /></div> : shownOutgoing ? <div className="platter-disc disc-leaving" key={`out:${shownOutgoing.id}`}><RecordPlayer disc={{ kind: 'local', record: shownOutgoing }} cover={coverFor(shownOutgoing)} spinning={status.running && status.musicPlaying} leaving /></div> : (current ?? focused) ? <div className="platter-disc disc-swap" key={`in:${(current ?? focused)!.id}`}><RecordPlayer disc={{ kind: 'local', record: (current ?? focused)! }} cover={coverFor((current ?? focused)!)} spinning={status.running && status.musicPlaying} /></div> : <div className="platter-disc disc-swap" key="empty" />}</div><div className="tonearm"><span /><i /></div><span className={`power-light ${status.running ? 'on' : ''}`} /><span className="rpm">33 ⅓<br /><small>STEREO</small></span></div><div className="playing-title" key={externalDisc ? `ext:${externalDisc.info.app}:${externalDisc.info.title}` : titleRecord?.id ?? 'empty'}><span>{externalDisc ? `${appLabel(externalDisc.info.app)}${playbackHint(externalDisc.info) ? ' · ' + playbackHint(externalDisc.info) : ''}` : status.running ? '正在播放' : '待机'}</span><h2>{externalDisc ? externalDisc.info.title : titleRecord?.name ?? (cabinet.ambience.length ? '环境音的合奏' : '等待一张喜欢的唱片')}</h2></div>{cabinet.lineMode ? <><div className="queue-heading"><h3>正在流动的环境音</h3><span>{cabinet.ambience.length} / 8 · 一起循环</span></div><MusicQueue variant="ambient" queue={cabinet.ambience} records={cabinet.records} muted={cabinet.muted} onToggle={toggleAmbience} onPlay={() => undefined} onRemove={choose} onReorder={ambience => change({ ambience })} />{!cabinet.ambience.length && <p className="queue-empty">外部音乐已经在响了，再选几张环境音，让它有地方落脚。</p>}<p className="line-mode-hint">音乐来自外部播放器，{status.ducked ? '正在为你让路。' : '这里只负责环境音。'}</p></> : <><div className="queue-heading"><h3>接下来听什么</h3><span>{cabinet.queue.length} 张音乐 · {orderNames[cabinet.order]}</span></div><MusicQueue queue={cabinet.queue} records={cabinet.records} currentId={status.currentId} onPlay={id => player.current?.playRecord(id)} onRemove={choose} onReorder={queue => change({ queue })} />{!cabinet.queue.length && <p className="queue-empty">还没有音乐唱片，纯粹的环境音也很好听。</p>}<div className="queue-heading"><h3>一起流动的环境音</h3><span>{cabinet.ambience.length} / 8</span></div><div className="ambient-chips">{cabinet.ambience.map(id => { const record = cabinet.records.find(r => r.id === id)!; return <button key={id} onClick={() => choose(record)}><AmbientMark record={record} />{record.name}<X size={12} /></button>; })}{!cabinet.ambience.length && <p className="queue-empty">从唱片柜选几张环境音，给音乐添一点风景。</p>}</div></>}<button className="text-button back-cabinet" onClick={() => setView('cabinet')}><ArrowLeft size={13} />回唱片柜，再挑一张</button></section> : null}
       <div hidden={pageMotion.value !== 'focus'}><FocusRoom active={view === 'focus' && pageMotion.value === 'focus' && pageMotion.phase !== 'exit'} playing={status.running} hasSelection={selectedCount > 0} onPlaySelection={() => player.current?.start()} onNotice={notify} disc={miniDiscSource} onPrev={previousTrack} onNext={nextTrack} canSkip={canSkipDisc} /></div>
+      <div hidden={pageMotion.value !== 'media'}><MediaRoom items={mediaReady ? cabinet.media : []} dirs={mediaDirs} active={view === 'media' && pageMotion.value === 'media'} onPick={pickMediaFolder} onRescan={rescanMediaFolder} onForgetDir={forgetMediaDir} onScanWallpapers={scanWallpapers} onPickFiles={pickMediaFiles} onForgetWallpapers={forgetWallpapers} disc={miniDiscSource} /></div>
       </div>
       </div>
     </div>
@@ -715,7 +791,7 @@ export default function App() {
         editRecord(focused.id, { ...draft, name });
         setModal(null);
       }} noValidate><label className="text-field" data-invalid={draftError ? 'true' : undefined}>唱片名称<input ref={nameInputRef} value={draft.name} maxLength={100} required aria-invalid={draftError ? true : undefined} aria-describedby={draftError ? 'record-name-error' : undefined} onChange={e => { setDraft(d => ({ ...d, name: e.target.value })); if (draftError) setDraftError(''); }} />{draftError && <span className="field-error" id="record-name-error" role="alert">{draftError}</span>}</label><label className="text-field">作者<input value={draft.artist} maxLength={100} onChange={e => setDraft(d => ({ ...d, artist: e.target.value }))} /></label><label className="text-field">一段介绍<textarea placeholder="它让你想起了什么？" value={draft.description} maxLength={500} rows={4} onChange={e => setDraft(d => ({ ...d, description: e.target.value }))} /></label>{focused.category === 'ambient' && <section className="cover-library" aria-label="环境音封面库"><div className="cover-library-heading"><h3>本地封面库</h3><span>{ambientCovers.length} 款声音小景</span></div><p>点选即可换上封面，也可以上传自己的图片。</p><div className="cover-options">{ambientCovers.map(cover => <button type="button" key={cover.id} className={focused.coverPreset === cover.id ? 'chosen' : ''} aria-label={"使用" + cover.name + "封面"} aria-pressed={focused.coverPreset === cover.id} disabled={!!busy} onClick={() => chooseCover(cover)}><img src={ambientCoverUrl(cover.id)} alt="" loading="lazy" /><span>{cover.name}</span>{focused.coverPreset === cover.id && <Check size={12} />}</button>)}</div><button type="button" className="text-button" disabled={!!busy} onClick={autoCover}><Sparkles size={12} />按唱片名称重新匹配</button></section>}<button type="button" className="secondary-button full-width" disabled={!!busy} onClick={() => coverInput.current?.click()}><ImagePlus size={15} />{busy || '上传自己的封面'}</button><button type="submit" className="primary-button full-width" disabled={!!busy}><CheckCheck size={15} />保存介绍</button></form><button className="text-button remove-record" onClick={() => takeOffShelf(focused)}><Trash2 size={12} />从唱片柜移除</button></>}
-      {shownModal === 'settings' && <><h2>设置</h2><div className="settings-group"><h3>空间的颜色</h3><button className="secondary-button full-width" disabled={!!busy} onClick={() => imageInput.current?.click()}><ImagePlus size={15} />{busy || '选择背景照片'}</button>{background && <button className="text-button" onClick={() => void clearBackground()}><RotateCcw size={12} />恢复默认背景</button>}</div><div className="settings-group"><h3>声音的分寸</h3><Slider label="音乐总音量" value={cabinet.musicVolume} onChange={musicVolume => change({ musicVolume })} /></div><div className="settings-group"><h3>外部音乐</h3><p>把播放器的输出切到 CABLE Input，再打开下面的开关。<span>外部音乐会在响起时压低环境音。</span></p><label className="line-mode-toggle"><input type="checkbox" checked={cabinet.lineMode} onChange={e => void toggleLineMode(e.target.checked)} /><span className="line-mode-switch" aria-hidden="true" /><span className="line-mode-copy"><b>外部音乐模式</b><small>{cabinet.lineMode ? '音乐来自外部播放器，这里只留环境音' : '关着的时候播放本地唱片'}</small></span></label>{cabinet.lineMode && <div className="line-in-meter" aria-label="外部音乐电平"><span style={{ '--level': `${Math.round(status.lineInput * 100)}%` } as CSSProperties} /><small>{status.lineInput > 0.02 ? (status.ducked ? '收到外部音乐 · 环境音正在退让' : '收到外部音乐 · 环境音没有退让') : '已接上虚拟声卡，等待声音'}</small></div>}{cabinet.lineMode && <label className="line-volume"><span>外部音乐音量</span><input type="range" min={0} max={100} value={cabinet.lineVolume} aria-label="外部音乐音量" onChange={e => change({ lineVolume: Number(e.target.value) })} style={{ '--fill': `${cabinet.lineVolume}%` } as CSSProperties} /><small>{cabinet.lineVolume}%</small></label>}{lineError && <p className="line-in-error" role="alert">{lineError}</p>}</div><div className="settings-group"><h3>换唱片的方式</h3><div className="transition-options" role="radiogroup" aria-label="换唱片的方式">{trackTransitions.map(value => <button key={value} type="button" role="radio" aria-checked={cabinet.transition === value} className={cabinet.transition === value ? 'selected' : ''} onClick={() => change({ transition: value })}><strong>{transitionNames[value]}</strong><small>{transitionHints[value]}</small></button>)}</div></div><div className="settings-group"><h3>存储</h3><p>换过封面之后，旧的那张还留在本地。<span>清理只删这些不再被引用的封面图，音频和唱片一张都不会动。</span></p><button className="secondary-button full-width" disabled={!!busy} onClick={() => void clearCoverCache()}>{busy ? <LoaderCircle size={15} className="loading-spin" /> : <RotateCcw size={15} />}{busy || '清理封面缓存'}</button></div><div className="settings-group"><h3>定时休息</h3><label className="sleep-select">在这之后停止全部声音<select aria-label="定时休息" value={sleepUntil ? 'active' : '0'} onChange={e => setSleepUntil(Number(e.target.value) ? Date.now() + Number(e.target.value) * 60000 : 0)}>{sleepUntil > 0 && <option value="active">剩余 {formatTime(remaining)}</option>}<option value="0">不设定时</option><option value="15">15 分钟</option><option value="30">30 分钟</option><option value="60">60 分钟</option><option value="90">90 分钟</option></select></label></div><p className="import-help">你的音频、封面和介绍仅保存在这台设备。<br />Raven Ambient Bold · 0.3.3</p></>}
+      {shownModal === 'settings' && <><h2>设置</h2><div className="settings-group"><h3>空间的颜色</h3><button className="secondary-button full-width" disabled={!!busy} onClick={() => imageInput.current?.click()}><ImagePlus size={15} />{busy || '选择背景照片'}</button>{background && <button className="text-button" onClick={() => void clearBackground()}><RotateCcw size={12} />恢复默认背景</button>}</div><div className="settings-group"><h3>声音的分寸</h3><Slider label="音乐总音量" value={cabinet.musicVolume} onChange={musicVolume => change({ musicVolume })} /></div><div className="settings-group"><h3>外部音乐</h3><p>把播放器的输出切到 CABLE Input，再打开下面的开关。<span>外部音乐会在响起时压低环境音。</span></p><label className="line-mode-toggle"><input type="checkbox" checked={cabinet.lineMode} onChange={e => void toggleLineMode(e.target.checked)} /><span className="line-mode-switch" aria-hidden="true" /><span className="line-mode-copy"><b>外部音乐模式</b><small>{cabinet.lineMode ? '音乐来自外部播放器，这里只留环境音' : '关着的时候播放本地唱片'}</small></span></label>{cabinet.lineMode && <div className="line-in-meter" aria-label="外部音乐电平"><span style={{ '--level': `${Math.round(status.lineInput * 100)}%` } as CSSProperties} /><small>{status.lineInput > 0.02 ? (status.ducked ? '收到外部音乐 · 环境音正在退让' : '收到外部音乐 · 环境音没有退让') : '已接上虚拟声卡，等待声音'}</small></div>}{cabinet.lineMode && <label className="line-volume"><span>外部音乐音量</span><input type="range" min={0} max={100} value={cabinet.lineVolume} aria-label="外部音乐音量" onChange={e => change({ lineVolume: Number(e.target.value) })} style={{ '--fill': `${cabinet.lineVolume}%` } as CSSProperties} /><small>{cabinet.lineVolume}%</small></label>}{lineError && <p className="line-in-error" role="alert">{lineError}</p>}</div><div className="settings-group"><h3>换唱片的方式</h3><div className="transition-options" role="radiogroup" aria-label="换唱片的方式">{trackTransitions.map(value => <button key={value} type="button" role="radio" aria-checked={cabinet.transition === value} className={cabinet.transition === value ? 'selected' : ''} onClick={() => change({ transition: value })}><strong>{transitionNames[value]}</strong><small>{transitionHints[value]}</small></button>)}</div></div><div className="settings-group"><h3>存储</h3><p>换过封面之后，旧的那张还留在本地。<span>清理只删这些不再被引用的封面图，音频和唱片一张都不会动。</span></p><button className="secondary-button full-width" disabled={!!busy} onClick={() => void clearCoverCache()}>{busy ? <LoaderCircle size={15} className="loading-spin" /> : <RotateCcw size={15} />}{busy || '清理封面缓存'}</button></div><div className="settings-group"><h3>定时休息</h3><label className="sleep-select">在这之后停止全部声音<select aria-label="定时休息" value={sleepUntil ? 'active' : '0'} onChange={e => setSleepUntil(Number(e.target.value) ? Date.now() + Number(e.target.value) * 60000 : 0)}>{sleepUntil > 0 && <option value="active">剩余 {formatTime(remaining)}</option>}<option value="0">不设定时</option><option value="15">15 分钟</option><option value="30">30 分钟</option><option value="60">60 分钟</option><option value="90">90 分钟</option></select></label></div><p className="import-help">你的音频、封面和介绍仅保存在这台设备。<br />Raven Ambient · 0.3.3</p></>}
       {shownModal === 'guide' && <><h2>使用说明</h2><div className="guide-steps"><p><span>01</span><strong>收藏</strong>音频文件或整个文件夹，音乐与环境音分开收。</p><p><span>02</span><strong>打开唱片盒</strong>鼠标停留或点一下，看介绍。</p><p><span>03</span><strong>加入此刻</strong>点 ＋ 选择。数字是播放顺序，环境音同时循环。</p><p><span>04</span><strong>微调</strong>「正在听」里改顺序，环境音的「声音微调」调避让幅度。</p></div><button className="primary-button full-width" onClick={() => setModal(null)}>知道了<ArrowRight size={14} /></button></>}
     </div></dialog>
     <MotionNotice message={notice} onClose={() => setNotice('')} />

@@ -64,6 +64,15 @@ export function publishFocus(snapshot: FocusSnapshot) {
 }
 
 /**
+ * 读当前的计时快照。放映页的番茄钟叠加元素用它——
+ * 那个元素只是「把专注页正在算的数字再显示一遍」，不自己起计时器，
+ * 否则两处各算各的，暂停一次就对不上了。
+ */
+export function readFocus(): FocusSnapshot | null {
+  return raven.__ravenFocusSnapshot ?? null;
+}
+
+/**
  * 请求把桌面小窗重新显示出来。
  * 用户点过小窗上的收起之后，就靠这个把它找回来。
  * 主进程读取后会把标记清掉（见 electron/focus-mini.cjs）。

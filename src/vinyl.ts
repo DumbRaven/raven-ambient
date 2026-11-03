@@ -174,6 +174,12 @@ export function coverPalette(src: string): Promise<string[]> {
     if (typeof document === 'undefined') { resolve([]); return; }
     const image = new Image();
     image.decoding = 'async';
+    // media:// 是另一个源（虽然是我们自己的协议）。不声明 crossOrigin 的话，
+    // 画进 canvas 会把画布标记为「被污染」，getImageData 直接抛 SecurityError，
+    // 异常被下面的 catch 吞掉、返回空数组——上层就只能用兜底色，
+    // 整套版式染成棕色，看着像取色算错了。协议注册时开了 corsEnabled，
+    // 所以声明 crossOrigin 之后能正常读像素。
+    if (!src.startsWith('data:') && !src.startsWith('blob:')) image.crossOrigin = 'anonymous';
     image.onload = () => {
       try {
         const size = 36;

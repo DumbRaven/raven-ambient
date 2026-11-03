@@ -2,8 +2,13 @@ const { app, BrowserWindow, screen, session } = require('electron');
 const path = require('node:path');
 const { attachNowPlaying } = require('./now-playing.cjs');
 const { attachFocusMini } = require('./focus-mini.cjs');
+const { registerMediaScheme, attachMedia } = require('./media.cjs');
 
 if (process.env.RAVEN_DATA_DIR) app.setPath('userData', path.resolve(process.env.RAVEN_DATA_DIR));
+
+// 必须在 app.ready 之前登记：之后再登记，media:// 就不被当成标准协议，
+// <img>/<video> 会把它当普通自定义协议处理，Range 请求和流式读取都失效。
+registerMediaScheme();
 
 /** 主窗口。小组件是独立窗口，所有「找窗口」的地方都得认准这个。 */
 let mainWindow = null;
@@ -26,7 +31,7 @@ function createWindow() {
     // 关掉 Windows 11 的 Mica：窗口在画出第一帧之前会先把桌面壁纸的色调透出来
     // （本机壁纸偏青，看上去就是一块青蓝色的空壳）。我们自己的界面是纯白的，不需要这种材质。
     backgroundMaterial: 'none',
-    title: 'Raven Ambient Bold · 唱片柜',
+    title: 'Raven Ambient · 唱片柜',
     icon: appIcon(),
     autoHideMenuBar: true,
     // 先不显示：窗口一出现就露出底色，蓝色的空壳比白屏还难看。
@@ -64,8 +69,9 @@ app.on('second-instance', () => {
 });
 app.whenReady().then(() => {
   attachNowPlaying();
-  // 默认一律拒绝，只放行音频输入——外部音乐就是从这里进来的（虚拟声卡输出）。
-  // 摄像头、麦克风以外的权限、通知、地理位置等仍然全部拒绝。
+  attachMedia();
+  // 默认一律拒绝，只放行音频输入（外部音乐的虚拟声卡）。
+  // 摄像头、屏幕采集、通知、地理位置等仍然全部拒绝。
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
     if (permission !== 'media') { callback(false); return; }
     const types = details?.mediaTypes ?? [];

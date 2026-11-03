@@ -22,7 +22,7 @@ export function useMotion<T>(target: T, timing: MotionTiming, order?: readonly T
   return state;
 }
 
-const views = ['cabinet', 'listening', 'focus'] as const;
+const views = ['cabinet', 'listening', 'focus', 'media'] as const;
 export function usePageMotion(view: typeof views[number]) { return useMotion(view, pageTiming, views); }
 
 /** 唱片柜内部的筛选（已选择 / 音乐 / 环境音）：换内容时同样走一遍扩散。 */

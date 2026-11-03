@@ -1,0 +1,223 @@
+// 媒体库：页面侧的数据模型与主进程约定。
+//
+// 和 now-playing-bridge 同一套思路——页面 sandbox: true、没有 preload，
+// 所以页面把请求压进 outbox，主进程轮询取走，处理完再调 window.__ravenMedia 推回来。
+// 页面永远是被动的一方。
+import type { MediaItem, MediaKind } from './records.ts';
+
+type RavenWindow = Window & {
+  __ravenMedia?: (raw: unknown) => void;
+  __ravenMediaOutbox?: unknown[];
+};
+
+/**
+ * 拿页面上的桥接对象。
+ *
+ * 写成函数而不是模块级的 `const raven = window as ...`：上面那些纯函数
+ * （toMediaItem / mergeMedia / mediaSrc）要在 Node 的测试里跑，那里没有 window，
+ * 模块一加载就炸。只有真正要跟主进程说话的函数才碰它。
+ */
+function raven(): RavenWindow {
+  return window as RavenWindow;
+}
+
+/** 主进程扫出来的一个文件，比 MediaItem 多了绝对路径和可以直接用的 src。 */
+export type ScannedFile = {
+  path: string;
+  name: string;
+  kind: MediaKind;
+  size: number;
+  src: string;
+};
+
+export type MediaMessage =
+  | { type: 'ready'; dirs: string[] }
+  | { type: 'scan'; dir: string; files: Omit<ScannedFile, 'src'>[]; url: ScannedFile[] }
+  | { type: 'files'; files: Omit<ScannedFile, 'src'>[]; url: ScannedFile[] }
+  | { type: 'wallpapers'; roots: { dir: string; count: number }[]; items: WallpaperFile[] }
+
+/** 壁纸库里的一件。key 是作品目录，比标题和文件名都稳。 */
+export type WallpaperFile = ScannedFile & { key: string; note: string };
+
+/** 注册接收器。返回取消函数，组件卸载时调。 */
+export function listenMedia(onMessage: (message: MediaMessage) => void): () => void {
+  const bridge = raven();
+  const receiver = (raw: unknown) => {
+    if (!raw || typeof raw !== 'object') return;
+    const message = raw as MediaMessage;
+    if (message.type !== 'ready' && message.type !== 'scan' && message.type !== 'files' && message.type !== 'wallpapers') return;
+    onMessage(message);
+  };
+  bridge.__ravenMedia = receiver;
+  return () => {
+    if (bridge.__ravenMedia === receiver) delete bridge.__ravenMedia;
+  };
+}
+
+function push(action: unknown) {
+  const bridge = raven();
+  bridge.__ravenMediaOutbox = [...(bridge.__ravenMediaOutbox ?? []), action];
+}
+
+/** 问主进程要一份「当前放行了哪些目录」。页面刚挂载时调一次。 */
+export function askMedia() {
+  push({ type: 'ping' });
+}
+
+/** 弹出文件夹选择框，选完主进程会推回一条 scan。 */
+export function pickMediaFolder() {
+  push({ type: 'pick' });
+}
+
+/**
+ * 挑单个文件，可以多选。
+ *
+ * 和 pickMediaFolder 分开：那个会把整棵树扫进来（挑一个素材盘就是几千个文件），
+ * 这个只收点中的那几件，来源列表里也不会多出一个目录。
+ */
+export function pickMediaFiles() {
+  push({ type: 'pick-files' });
+}
+
+/** 重新扫一遍某个已经放行的目录。 */
+export function rescanMediaFolder(dir: string) {
+  push({ type: 'rescan', dir });
+}
+
+/** 让窗口进/出真全屏。页面铺满只能盖住内容区，任务栏和窗口边框要主进程来收。 */
+export function setWindowFullscreen(on: boolean) {
+  push({ type: 'fullscreen', on });
+}
+
+/**
+ * 读 Wallpaper Engine 的创意工坊库。
+ *
+ * 不弹对话框：它的位置是固定的，主进程自己去几个常见路径找。
+ * 一件都没找到就回空列表，页面据此提示「没装」。
+ */
+export function scanWallpapers() {
+  push({ type: 'wallpapers' });
+}
+
+/**
+ * 启动时把上次记下的目录重新登记进主进程的白名单。
+ *
+ * 主进程的白名单只活在内存里，关掉软件就没了；但收藏里的路径还在。
+ * 不补这一步，重启后卡片显示得出来、点开却是 403 —— 用户看到的是「一堆打不开的缩略图」。
+ */
+export function restoreMediaDirs(dirs: string[], files: string[] = []) {
+  // 目录可以是空的：主进程那边还要补登记壁纸库的根目录，
+  // 而壁纸条目从来不进 mediaDirs。所以不能因为 dirs 为空就跳过这次调用。
+  push({ type: 'restore', dirs, files });
+}
+
+/** 主进程是否已经取走队列。只用于测试断言。 */
+export function pendingMediaActions(): number {
+  return raven().__ravenMediaOutbox?.length ?? 0;
+}
+
+/**
+ * 问主进程：Wallpaper Engine 现在放的是哪个文件。
+ *
+ * 不做屏幕采集——抓整屏会把你正在玩的游戏、开着的浏览器一起抓进来，
+ * 而用户要的只是壁纸本身。所以直接读 WE 的配置拿到当前壁纸的文件路径，
+ * 按普通媒体播放：原生画质、能循环、能拖进度。
+ */
+export function askCurrentWallpaper() {
+  push({ type: 'live' });
+}
+
+/**
+ * 把扫出来的文件变成媒体库条目。
+ * 用绝对路径做稳定 id：同一个文件反复扫描不会变成两条，
+ * 用户把文件夹挪走再挪回来也能认出来（只是路径变了，那是另一条）。
+ */
+export function toMediaItem(file: ScannedFile): MediaItem {
+  return {
+    id: file.path,
+    kind: file.kind,
+    path: file.path,
+    name: file.name,
+    size: file.size,
+  };
+}
+
+/**
+ * 壁纸库里的一件 → 媒体库条目。
+ *
+ * id 用作品目录而不是文件路径：视频文件名和标题都可能被作者改，
+ * 目录 id 是创意工坊的编号，作者改了也还在。
+ */
+export function toWallpaperItem(file: WallpaperFile): MediaItem {
+  return {
+    id: file.key,
+    kind: file.kind,
+    path: file.path,
+    name: file.name,
+    size: file.size,
+    source: file.key,
+    note: file.note || undefined,
+  };
+}
+
+/**
+ * 壁纸库结果整体替换进媒体库。
+ *
+ * 壁纸是「一次全量读」而不是「一个目录一个目录扫」，所以和 replaceMediaDir 一样
+ * 走替换而不是合并：用户在 Wallpaper Engine 里取消订阅了，这里也该跟着消失。
+ * 只动 source 非空的条目，用户自己加的文件夹不受影响。
+ */
+export function replaceWallpapers(current: MediaItem[], incoming: MediaItem[]): MediaItem[] {
+  return [...current.filter(item => !item.source), ...incoming];
+}
+
+/**
+ * 从库里拿掉壁纸库读进来的那批。
+ *
+ * 用户点了「移出壁纸库」时用。只删 source 非空的，自己加的文件夹和单独导入的
+ * 文件一件都不动——那条路径和壁纸库没有关系。
+ */
+export function dropWallpapers(current: MediaItem[]): MediaItem[] {
+  return current.filter(item => !item.source);
+}
+
+/** 一个条目该用什么地址显示。路径原样进编码，中文和空格由主进程那侧负责还原。 */
+export function mediaSrc(item: MediaItem): string {
+  return `media://local/${encodeURIComponent(item.path)}`;
+}
+
+/** 按 id 去重合并：新扫到的覆盖旧的（文件可能被改过大小），旧条目保持顺序。 */
+export function mergeMedia(current: MediaItem[], incoming: MediaItem[]): MediaItem[] {
+  const seen = new Map(current.map(item => [item.id, item]));
+  for (const item of incoming) seen.set(item.id, item);
+  return [...seen.values()];
+}
+
+/**
+ * 用一次扫描的结果替换某个目录下的条目。
+ *
+ * 不能用 mergeMedia：那个只增不减，用户在资源管理器里删掉的文件会一直留在库里，
+ * 点开就是 404。重扫的语义是「这个目录现在长这样」，所以先清空再填。
+ */
+export function replaceMediaDir(current: MediaItem[], dir: string, incoming: MediaItem[]): MediaItem[] {
+  const rest = current.filter(item => !isInside(item.path, dir));
+  const seen = new Set(rest.map(item => item.id));
+  return [...rest, ...incoming.filter(item => !seen.has(item.id))];
+}
+
+/** 路径在不在这个目录里。前后缀相似的目录（素材 / 素材二）不能误判。 */
+export function isInside(file: string, dir: string): boolean {
+  const root = dir.replace(/[\\/]+$/, '').toLowerCase();
+  const lower = file.toLowerCase();
+  return lower.startsWith(root + '\\') || lower.startsWith(root + '/');
+}
+
+/**
+ * 哪些条目是单独导入的文件（不在任何目录里）。
+ *
+ * 重启后主进程的白名单要补回来，目录走 dirs、单文件走 files，
+ * 混在一起传会让主进程对着文件调 statSync().isDirectory()，白跑一遍。
+ */
+export function looseMedia(items: MediaItem[], dirs: string[]): string[] {
+  return items.filter(item => !dirs.some(dir => isInside(item.path, dir))).map(item => item.path);
+}
