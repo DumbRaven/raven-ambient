@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Droplets, FilePlus2, FolderOpen, ImageIcon, Layers, Maximize2, Minimize2, Pause, Play, RefreshCw, Sparkles, X, Palette
 } from 'lucide-react';
 import { mediaSrc, setWindowFullscreen } from './media';
-import TemplateStage, { type StageDisc } from './TemplateStage';
+import TemplateStage, { type StageDisc, type StageFocus } from './TemplateStage';
 import { normaliseHex, readTone, toneHint, toneKey, writeTone, type ToneSetting } from './tone-setting';
 import OverlayLayer from './OverlayLayer';
 import RainLayer from './RainLayer';
@@ -135,11 +135,26 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   useEffect(() => { writeRain(rain); }, [rain]);
   // 番茄钟读数：跟着专注页走，自己不另起计时器（两处各算各的，暂停一次就对不上）。
   // 800ms 一刷就够——叠加上只显示到分:秒。
+  // 除了剩余毫秒，还留一份完整快照：拼贴版信息条那一格要显示阶段和轮次，
+  // 只拿一个数字不够。两者同一次 tick 里一起更新，不会出现一半新一半旧。
   const [focusLeft, setFocusLeft] = useState<number | null>(null);
+  const [focusStage, setFocusStage] = useState<StageFocus | null>(null);
   useEffect(() => {
     const tick = () => {
       const snapshot = readFocus();
-      setFocusLeft(snapshot && snapshot.visible ? snapshot.remaining : null);
+      const shown = snapshot && snapshot.visible ? snapshot : null;
+      setFocusLeft(shown ? shown.remaining : null);
+      setFocusStage(
+        shown
+          ? {
+              phase: shown.phase,
+              remaining: shown.remaining,
+              left: shown.total > 0 ? Math.min(1, Math.max(0, shown.remaining / shown.total)) : 0,
+              rounds: shown.rounds,
+              roundsBeforeLong: shown.roundsBeforeLong,
+            }
+          : null,
+      );
     };
     tick();
     const timer = window.setInterval(tick, 800);
@@ -334,6 +349,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               index={Math.max(0, usable.findIndex(item => item.id === current.id))}
               total={usable.length}
               disc={disc}
+              focus={focusStage}
               hint={toneHint(tone, palette)}
               onPalette={setPalette}
             />

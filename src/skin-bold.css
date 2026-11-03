@@ -5961,8 +5961,10 @@ body:has(.media-room.is-expanded) {
 /* photography pos(698.06,801.75) → 54.9% / 12.3% */
 /* Read The   pos(692.58,837.07) → 54.5% / 25.2% */
 .template-collage .tpl-block-bar .tpl-fields { padding-top: 12.9%; }
-.template-collage .tpl-block-bar .tpl-fields > div > b { font-size: 1.48cqw; }
-.template-collage .tpl-block-bar .tpl-fields span { font-size: 1.67cqw; }
+/* 这里只管第一格（TITLE）的字号。第二格改成番茄钟之后读数是 2.9cqw、
+   标签 1.32cqw，都不一样，不能再按 `> div > b` 一把抓。 */
+.template-collage .tpl-block-bar .tpl-fields > div:first-child > b { font-size: 1.48cqw; }
+.template-collage .tpl-block-bar .tpl-fields > div:first-child span { font-size: 1.67cqw; }
 .template-collage .tpl-block-bar .tpl-list > b { font-size: 1.48cqw; }
 .template-collage .tpl-block-bar .tpl-list span { font-size: 1.57cqw; }
 
@@ -6048,15 +6050,8 @@ body:has(.media-room.is-expanded) {
   display: block; position: absolute; left: 2.15cqw; top: 1.06cqw;
   font-size: 1.49cqw; white-space: nowrap;
 }
-/* PHOTOGRAPHY pos(698.06,801.75) 字号 16 → (54.88%,12.32%) */
-.template-collage .tpl-block-bar .tpl-fields > div:last-child {
-  position: absolute; left: 54.88%; top: 12.32%; margin: 0;
-}
-.template-collage .tpl-block-bar .tpl-fields > div:last-child > b { font-size: 1.32cqw; }
-.template-collage .tpl-block-bar .tpl-fields > div:last-child span {
-  display: block; position: absolute; left: -0.37cqw; top: 1.06cqw;
-  font-size: 1.49cqw; white-space: nowrap;
-}
+/* 第二格原本是 PHOTOGRAPHY（pos 698.06,801.75 → 54.88%,12.32%），已删。
+   现在那一格是番茄钟，位置和字号全部写在文件末尾那段，别在这里补。 */
 /* PLAYLIST pos(92.71,869) 字号 16 → (4.85%,36.86%) */
 .template-collage .tpl-block-bar .tpl-list {
   position: absolute; left: 4.85%; top: 36.86%; right: 6%; margin: 0; padding: 0;
@@ -6091,8 +6086,21 @@ body:has(.media-room.is-expanded) {
   width: 10.33%;
   height: auto;
   margin: 0;
-  color: #08080a;
+  /* 两色乌鸦：身体用面板色、翅膀用信息条色。
+     原 logo 就是这两块颜色（身体 rgb(33,42,50)、翅膀 rgb(93,108,120)），
+     深浅关系一致——信息条比面板亮，所以翅膀仍然是「亮过身体」的那块。
+     这两个令牌跟着壁纸取色走，换一张图乌鸦跟着换，不会钉死在某个灰上。 */
+  color: var(--tpl-panel);
   opacity: 1;
+}
+
+/* 翅膀单独一条 path，盖在身体上。放在这里而不是用 currentColor，
+   是因为一个元素只能有一个 currentColor。
+   取「信息条色向面板色压 35%」，而不是直接用信息条色：
+   信息条色正是乌鸦脚下的底色，直接填进去翅膀会和背景糊在一起、变成一块洞。
+   压 35% 之后它仍明显亮过身体，两色关系（亮翅膀 / 暗身体）保住了。 */
+.template-collage .tpl-raven .tpl-raven-wing {
+  fill: color-mix(in srgb, var(--tpl-bar) 65%, var(--tpl-panel));
 }
 
 /* ===== 三块的外形：全部用 SVG mask（曲线 + 等比缩放） =====
@@ -6374,27 +6382,83 @@ body:has(.media-room.is-expanded) {
   white-space: nowrap;
 }
 
-/* PHOTOGRAPHY 组：在 2/3 处，和 TITLE 同一行起。 */
-.template-collage .tpl-block-bar .tpl-fields > div:last-child {
+/* 第二格：番茄钟。原先这里是 PHOTOGRAPHY / 「Read the introduction」，
+   那个值对所有条目都一样、不提供信息，已删。
+   位置沿用原第二格的起点（左 54.88%、上 12.32%），但改成和第一格同一套
+   竖排节奏：标签、大号读数、进度线、阶段与轮次。 */
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus {
   position: absolute;
   left: 54.88%;
   top: 12.32%;
+  /* 不给宽度的话，绝对定位 + flex column 会缩到内容宽（实测只有信息条宽的
+     6.3%、76px），底下那条进度线跟着一起缩成一小截。右栏从 54.88% 到
+     PLAYLIST 的右边界 84%，这里留到 78.88%，给乌鸦（85.79% 起）让出位置。 */
+  width: 24%;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 1.1cqw;
+  gap: 0.5cqw;
 }
 
-.template-collage .tpl-block-bar .tpl-fields > div:last-child > b {
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > b {
   font-size: 1.32cqw;
   letter-spacing: 0.14em;
   opacity: 0.72;
   font-weight: 600;
 }
 
-.template-collage .tpl-block-bar .tpl-fields > div:last-child span {
+/* 读数用等宽字体：秒数每秒跳一次，比例字体每个数字宽度不同，整行会左右抖。
+   选择器必须带满 `.tpl-fields > .tpl-focus`：更早那几套 `.tpl-fields > div > span`
+   是 4 类 + 2 元素，比单个类名更具体，不写满会被它按回 1.49cqw。 */
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-clock {
   position: static;
+  display: block;
+  font-family: "SF Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  font-size: 2.9cqw;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  opacity: 0.94;
+  white-space: nowrap;
+}
+
+/* 剩余时间细线。轨道半透明、内层实色——不用父级 opacity，
+   否则整棵子树一起被压暗，内层的实色也会跟着变淡。 */
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-bar {
+  position: static;
+  display: block;
+  width: 100%;
+  height: 0.16cqw;
+  margin-top: 0.3cqw;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  overflow: hidden;
+}
+
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-bar > span {
+  position: static;
+  display: block;
+  height: 100%;
+  background: currentColor;
+  opacity: 0.8;
+  border-radius: inherit;
+  transition: width 800ms linear;
+}
+
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-meta {
+  position: static;
+  display: block;
+  font-size: 0.95cqw;
+  letter-spacing: 0.1em;
+  opacity: 0.55;
+  white-space: nowrap;
+}
+
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-idle {
+  position: static;
+  display: block;
   font-size: 1.49cqw;
+  opacity: 0.5;
   white-space: nowrap;
 }
 

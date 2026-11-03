@@ -19,9 +19,11 @@ import { mediaSrc } from './media';
 import type { MediaItem } from './records';
 import { coverPalette, recordPressing, vinylPalette } from './vinyl';
 import { launchSeed } from './sleeves';
-import { ravenBox, ravenPath } from './raven';
+import { ravenBox, ravenPath, ravenWingPath } from './raven';
 import { videoPalette } from './video-palette';
 import { collageTone, findTemplate, templateTitle, type TemplateId, type ToneHint } from './templates';
+import { timerText } from './overlays';
+import { phaseCaptions, type FocusPhase } from './focus';
 
 /** 右下角那只彩胶。没在放音乐时它是空的，只留一圈盘面。 */
 
@@ -49,6 +51,23 @@ function useMarbleFilter() {
 
 export type StageDisc = { cover?: string; color: string; key: string; spinning: boolean };
 
+/**
+ * 信息条右半边那块番茄钟的读数。
+ *
+ * 拼贴版式里它是版式的一部分，不是可以拖动的叠加元素——用户明确说过
+ * 「拼贴就不允许用户自己添加组件」。所以这里只收数字，不收位置、不收开关。
+ * `null` 表示还没开始过（显示「未开始」），和叠加元素那边的 timer 判断一致。
+ */
+export type StageFocus = {
+  phase: FocusPhase;
+  /** 本阶段剩余毫秒。 */
+  remaining: number;
+  /** 剩余比例 0–1，用来画那条细线。 */
+  left: number;
+  rounds: number;
+  roundsBeforeLong: number;
+};
+
 type Props = {
   item: MediaItem;
   template: TemplateId;
@@ -59,6 +78,8 @@ type Props = {
   total: number;
   /** 「正在听」的那张碟。拼贴版右下角画的就是它。 */
   disc?: StageDisc | null;
+  /** 番茄钟读数。不传或为 null 时信息条第二格显示「未开始」。 */
+  focus?: StageFocus | null;
   /** 用户指定的配色。不传就纯自动。 */
   hint?: ToneHint;
   /** 把取到的原始色板交出去，配色面板要拿它画可选的色块。 */
@@ -79,7 +100,11 @@ const stampDay = `${String(stampDate.getMonth() + 1).padStart(2, '0')}${String(s
  */
 const BADGE = { left: 'DUMB', right: 'RAVEN' } as const;
 
-/** 乌鸦。矢量路径是从 docs/images/00-logo.png 的 alpha 通道描出来的（含腿和翅膀），用 currentColor 上色。 */
+/**
+ * 乌鸦。两色：身体走 currentColor（版式里给 --tpl-panel），
+ * 翅膀单独画一层（给 --tpl-bar）——原 logo 本来就是这两块颜色，
+ * 一条路径填不出两色，所以是两条 path 叠起来的。
+ */
 function Raven({ className }: { className: string }) {
   return (
     <svg
@@ -89,11 +114,12 @@ function Raven({ className }: { className: string }) {
       focusable="false"
     >
       <path d={ravenPath} fill="currentColor" fillRule="evenodd" />
+      <path className="tpl-raven-wing" d={ravenWingPath} />
     </svg>
   );
 }
 
-export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, hint, onPalette }: Props) {
+export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, hint, onPalette }: Props) {
   const preset = findTemplate(template);
   const fromWallpaper = !!item.source;
   const title = useMemo(() => templateTitle(item.name, fromWallpaper), [item.name, fromWallpaper]);
@@ -254,11 +280,30 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
           </div>
 
           <div className="tpl-block tpl-block-bar">
-            {/* 原版是左右两列：TITLE 在左三分之一、PHOTOGRAPHY 在中三分之二处。
-                PHOTOGRAPHY 后面原本缀着一枚 ♪，参考图里没有，去掉。 */}
+            {/* TITLE 和 FOCUS 并排。原先第二格是 PHOTOGRAPHY / 「Read the introduction」，
+                那个值对所有条目都一样、不提供任何信息，删掉了。
+                空出来的位置给当下的番茄钟——这一栏本来就是「此刻」的信息。 */}
             <div className="tpl-fields">
               <div><b>TITLE</b><span>{title || 'Untitled'}</span></div>
-              <div><b>PHOTOGRAPHY</b><span>Read the introduction</span></div>
+              <div className="tpl-focus">
+                <b>FOCUS</b>
+                {focus ? (
+                  <>
+                    <span className="tpl-focus-clock">{timerText(focus.remaining)}</span>
+                    {/* 剩余比例：满格是刚开始，缩到 0 是本阶段结束。 */}
+                    <i className="tpl-focus-bar" aria-hidden="true">
+                      <span style={{ width: `${focus.left * 100}%` }} />
+                    </i>
+                    <span className="tpl-focus-meta">
+                      {focus.phase === 'focus'
+                        ? `ROUND ${focus.rounds + 1}/${focus.roundsBeforeLong}`
+                        : `${phaseCaptions[focus.phase]} · ${focus.rounds + 1}/${focus.roundsBeforeLong}`}
+                    </span>
+                  </>
+                ) : (
+                  <span className="tpl-focus-idle">未开始</span>
+                )}
+              </div>
             </div>
             <div className="tpl-list">
               <b>PLAYLIST</b>
