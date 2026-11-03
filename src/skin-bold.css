@@ -3923,9 +3923,9 @@ body:has(.media-room.is-expanded) {
 
 
 
-.tpl-star-a { top: 42px; right: 6px; }
-.tpl-star-b { top: 200px; left: 6px; }
-.tpl-star-c { bottom: 8px; right: 10px; }
+/* 星的位置统一在文件末尾那套 `.template-collage .tpl-star-*` 里定义。
+   这里原来是 px 写法（`top: 42px; right: 6px`），非 collage 版式用不上，
+   而 collage 版式下它会被末尾那套按实测换来的百分比覆盖，属于死规则。 */
 
 
 
@@ -4885,9 +4885,11 @@ body:has(.media-room.is-expanded) {
 
 
 
-.media-room.is-expanded .tpl-star-a { top: 7%; right: 12px; }
-.media-room.is-expanded .tpl-star-b { top: 34%; left: 12px; }
-.media-room.is-expanded .tpl-star-c { bottom: 5%; right: 16px; }
+/* 这里原本有三条 `top: 7% / 34% / bottom: 5%` 的星位置。
+   选择器带 `.media-room.is-expanded`（4 类），比文件末尾那套
+   `.template-collage .tpl-star-a`（2 类）更具体，于是全屏时它一直赢——
+   文件末尾反复调的百分比从来没生效过，这就是「星星怎么摆都错位」的第二半原因。
+   星的位置现在只在文件末尾定义一处，这里删掉。 */
 
 
 .media-room.is-expanded .tpl-with { font-size: 14px; margin-top: 26px; }
@@ -5008,10 +5010,15 @@ body:has(.media-room.is-expanded) {
 
 
 
-.media-room.is-expanded .template-collage .tpl-fields > div > b { font-size: 19px; letter-spacing: 0.2em; }
-.media-room.is-expanded .template-collage .tpl-fields > div > span { font-size: 27px; }
-.media-room.is-expanded .template-collage .tpl-list > b { font-size: 19px; letter-spacing: 0.2em; }
-.media-room.is-expanded .template-collage .tpl-list > span { font-size: 21px; max-height: 4.6em; line-height: 1.6; }
+/* 信息条的标签与值现在全部走文件末尾那套 cqw —— 容器查询已经把「台面变宽」
+   这件事算进去了，这里再写一套 px 只会打架。
+   踩过的坑：这里原本有三条 `font-size: 19px / 27px / 21px`，选择器多一层
+   `.media-room.is-expanded`（4 类 + 1 元素），比末尾的
+   `.template-collage .tpl-block-bar .tpl-list > b`（3 类 + 1 元素）更具体，
+   于是全屏时 PLAYLIST 是 19px、TITLE 和 PHOTOGRAPHY 却是 11.66px，
+   三个标签肉眼可见不一样大。TITLE 那侧侥幸没露馅，只是因为末尾那条
+   `> div:first-child > b` 多一个伪类、刚好压过它。
+   所以这里只保留 gap。 */
 .media-room.is-expanded .template-collage .tpl-block-bar { gap: 1.1em; }
 
 
@@ -5479,7 +5486,11 @@ body:has(.media-room.is-expanded) {
   font-size: 3.3cqw;
   letter-spacing: 0.02em;
   opacity: 0.66;
-  font-style: italic;
+  /* 曾经是斜体。但 AE 里这三行是**同一个文本图层**
+     （`BEFORE THE LAKE FREEZES\rPicked\rJust for U`，字体
+     PlayfairDisplayRoman-Bold），正体；参考图里也是正体。
+     在这里单独给斜体，等于把同一个图层的三行拆成两种字体，
+     与「三行是同一图层」这条事实矛盾。字号与行距由文件末尾那条统一管。 */
 }
 
 /* 标题倒影已删：JSX 里不再渲染 .tpl-title-mirror，AE 里标题图层也没有镜像
@@ -5968,17 +5979,13 @@ body:has(.media-room.is-expanded) {
   /* 胶囊顶边 82.46%。参考图文字带从 84.51% 起，差 2.05% 画布高 = 1.15cqw，
      但行高会在字上留 0.3cqw 的 leading，所以 padding-top 取 0.85cqw 才落得准。 */
   top: 82.46%;
-  right: auto;
+  /* 右端贴死画布边界：参考图里这块半透明底是**越过画布右边被裁掉**的，
+     所以不能写 width，要写 right: 0 —— 写 width 时右边会留一条缝，
+     看起来像「没铺到头」。left + right 一起写，宽度由它们撑开。 */
+  right: 0;
   bottom: auto;
   font-size: 1.55cqw;
-  /* 胶囊宽 11.94%（参考图 x=1676..1905），右端正好停在画布边缘。
-     文字从左边距起步、左对齐——之前是 text-align:right + 无宽度，
-     内容被推到右侧、大半越出画布，只剩右端几个字母露在外面。 */
-  width: 11.94%;
-  /* 参考图里这行字压在一条半透明白胶囊上，胶囊右端贴到画布边缘被裁掉，
-     所以右端不圆、左端是半圆（圆角 = 半个高）。
-     上内边距 0.85cqw：参考图首行文字带顶距胶囊顶 2.05% 画布高，
-     行高自身还会留一点 leading，所以不能直接写 1.15cqw。 */
+  /* 左边留白，右边不补：字靠左排，胶囊右段本来就伸到画布外，看不见。 */
   padding: 0.85cqw 0 1.04cqw 1.36cqw;
   margin: 0;
   text-align: left;
@@ -6066,11 +6073,22 @@ body:has(.media-room.is-expanded) {
    换算成相对信息条：left 85.85% top 49.55% width 13.08%。
    颜色用页底色 #1c2433 而不是纯黑——参考图实测 #040405，但信息条是灰的，
    纯黑会显得像贴上去的一块，参考图那点微弱的暖调来自环境光。 */
+/* 乌鸦：位置和尺寸都是参考图像素实测（.tools/raven-box.cjs 的阈值扫描，
+   T=30~40 之间包围盒稳定：125×101px，相对信息条 left 85.79% / top 49.27% /
+   宽 10.33% / 高 36.86%）。
+   两个必须知道的偏差：
+   1. 原写 width 13.08%，算出来的底边落在 96.81%——信息条只有 274px 高，
+      超出去的那截正是被 mask 裁掉的尾巴。
+   2. 参考图那只乌鸦的宽高比是 1.238，而我们这份 `ravenPath`（从
+      `docs/images/00-logo.png` 描出来的）是 617/553 = 1.116，**同等宽度下更高**。
+      所以不能只对齐 top：那样底边会比参考图低 4 个百分点、正好顶进圆弧。
+      这里改成**对齐底边**（参考图底 86.13%），高度 40.88% 反推 top = 45.25%，
+      脚踩在同一个高度上，尾巴离圆弧还有余量。 */
 .template-collage .tpl-raven {
   position: absolute;
-  left: 85.85%;
-  top: 49.55%;
-  width: 13.08%;
+  left: 85.79%;
+  top: 45.25%;
+  width: 10.33%;
   height: auto;
   margin: 0;
   color: #08080a;
@@ -6092,11 +6110,24 @@ body:has(.media-room.is-expanded) {
   mask-repeat: no-repeat;
 }
 
-/* 信息条：右下角顺着唱片的圆内凹，弧从 (1072,274) 拱到 (1210,127)。 */
+/* 信息条：右下角顺着唱片的圆内凹。参考图实测那段是**半径 152px 的正圆**
+   （画布宽 7.94%，残差 rms 0.48px），不是斜切——原先写的是
+   `Q1120,232 1210,127` 二次贝塞尔，两个控制点会让弧在接近右下角时变直，
+   远看就像被斜着切掉一个角。
+   这段弧的圆心 (1096.3,883.4) 落在信息条右下角**外侧**（信息条右下角是
+   1244,1042），底切点 x=1096.3（相对信息条宽 87.94%）、右切点 y=883.4
+   （相对信息条高 44.63%）——也就是右下角就是一段半径 152 的圆角，
+   两条直角边分别在 x=1096.3 与 y=883.4 处离开边缘。
+   换算成 mask 的 viewBox（信息条自身 1210×274）：
+     圆心 (1062.3, 121.4)，半径 152
+     底边从 (0,274) 走到 (1062.3,274)，然后弧上到 (1210,121.4)，
+     右边从 (1210,121.4) 上到 (1210,0)。
+   用真正的 A（arc）指令，不用 Q；`preserveAspectRatio='none'` 会让弧在
+   非等比缩放下变成椭圆，但那正是 AE 的行为——它按成片比例渲染。 */
 .template-collage > .tpl-block-bar {
   clip-path: none;
-  -webkit-mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 274' preserveAspectRatio='none'><path d='M1210,4 L1210,0 L0,0 L0,274 L1072,274 Q1120,232 1210,127 L1210,4 Z' fill='white'/></svg>");
-  mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 274' preserveAspectRatio='none'><path d='M1210,4 L1210,0 L0,0 L0,274 L1072,274 Q1120,232 1210,127 L1210,4 Z' fill='white'/></svg>");
+  -webkit-mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 274' preserveAspectRatio='none'><path d='M1210,0 L0,0 L0,274 L1062.3,274 A152,152 0 0 0 1210,121.4 L1210,0 Z' fill='white'/></svg>");
+  mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 274' preserveAspectRatio='none'><path d='M1210,0 L0,0 L0,274 L1062.3,274 A152,152 0 0 0 1210,121.4 L1210,0 Z' fill='white'/></svg>");
   -webkit-mask-size: 100% 100%;
   mask-size: 100% 100%;
   -webkit-mask-repeat: no-repeat;
@@ -6276,18 +6307,26 @@ body:has(.media-room.is-expanded) {
   opacity: 1;
   color: #c48f46;
   line-height: 1;
+  /* 星按**墨迹中心**对齐胶囊边沿（见下面四条位置的注释）。
+     光写 translate(-50%,-50%) 只把 em 盒居中，而 ✦ 的字面 ink 在 em 盒里
+     偏右下（左上留白比右下的多），实测四颗星齐刷刷偏右下 2px / 4px。
+     再补半个 ink 偏移：-0.06em 横向、-0.12em 纵向——用 em 而不是 cqw，
+     因为这是字体度量，字号一变就该跟着变。 */
+  transform: translate(calc(-50% - 0.06em), calc(-50% - 0.12em));
 }
-/* 四颗星相对胶囊的左上角，按参考图金色连通块实测换算（胶囊 140×309）：
-     右上 [1809,90]-[1831,113]  → left 77%    top -0.3%
-     左中 [1696,201]-[1717,222] → left -3.6%  top 35.6%
-     右下 [1832,322]-[1854,344] → left 93.6%  top 74.8%
-     左下 [1712,378]-[1733,400] → left 7.9%   top 92.9%
-   全部用 left/top 写，别再用 right/bottom ——两套混写时哪个生效取决于
-   声明顺序，之前就是这样把四颗星全摆错的。 */
-.template-collage .tpl-star-a { left: 77%; top: -0.3%; right: auto; bottom: auto; }
-.template-collage .tpl-star-b { left: -3.6%; top: 35.6%; right: auto; bottom: auto; }
-.template-collage .tpl-star-c { left: 93.6%; top: 74.8%; right: auto; bottom: auto; }
-.template-collage .tpl-star-d { left: 7.9%; top: 92.9%; right: auto; bottom: auto; }
+/* 四颗星相对胶囊，按参考图金色连通块**中心点**换算（胶囊 x 1701..1841 宽 140、
+   y 91..400 高 309；星是 22..24px 的小方块）：
+     右上 [1809,90]-[1831,113]  中心 (1820, 101.5) → left 85.0%  top  3.4%
+     左中 [1696,201]-[1717,222] 中心 (1706.5,211.5) → left  3.9%  top 39.0%
+     右下 [1832,322]-[1854,344] 中心 (1843, 333)   → left 101.4% top 78.3%
+     左下 [1712,378]-[1733,400] 中心 (1722.5,389)  → left 15.4% top 96.4%
+   注意这些是**中心**，不是左上角：✦ 的墨迹在 em 盒里偏下偏右（字面 ink 只占
+   约 0.53em，而且左边的留白比右边大），按左上角摆会系统性往左上偏——
+   上一版就是这么错的。所以统一加 translate(-50%, -50%) 按中心对齐。 */
+.template-collage .tpl-star-a { left: 85.0%; top: 3.4%; right: auto; bottom: auto; }
+.template-collage .tpl-star-b { left: 3.9%; top: 39.0%; right: auto; bottom: auto; }
+.template-collage .tpl-star-c { left: 101.4%; top: 78.3%; right: auto; bottom: auto; }
+.template-collage .tpl-star-d { left: 15.4%; top: 96.4%; right: auto; bottom: auto; }
 
 /* ===== 信息条文字（覆盖上面的绝对定位） =====
    信息条 1210×274。AE 锚点：

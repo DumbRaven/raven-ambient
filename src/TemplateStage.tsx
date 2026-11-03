@@ -254,22 +254,18 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
           </div>
 
           <div className="tpl-block tpl-block-bar">
-            {/* 原版是左右两列：TITLE 在左三分之一、PHOTOGRAPHY 在中三分之二处。 */}
+            {/* 原版是左右两列：TITLE 在左三分之一、PHOTOGRAPHY 在中三分之二处。
+                PHOTOGRAPHY 后面原本缀着一枚 ♪，参考图里没有，去掉。 */}
             <div className="tpl-fields">
               <div><b>TITLE</b><span>{title || 'Untitled'}</span></div>
-              <div><b>PHOTOGRAPHY<i aria-hidden="true">♪</i></b><span>Read the introduction</span></div>
+              <div><b>PHOTOGRAPHY</b><span>Read the introduction</span></div>
             </div>
             <div className="tpl-list">
               <b>PLAYLIST</b>
-              {/* 原版这里是一长段用顿号连起来的曲目，不是列表——所以直接排成一段。 */}
-              <span>
-                {Array.from({ length: 9 }, (_, at) => {
-                  const order = total > 0 ? (index + at) % total : 0;
-                  const name = order === index ? (title || 'Untitled') : `曲目 ${order + 1}`;
-                  return `${order + 1}. ${name} - ${BRAND}`;
-                }).join(' 、')}
-                　、{fromWallpaper ? 'Wallpaper Engine' : 'Local'} · {item.kind === 'video' ? 'Video' : 'Photo'} · {counter}
-              </span>
+              {/* 只列正在放的那一首。原先是把后面 9 首用顿号串成一段，
+                  但这一条信息栏是「此刻在放什么」，不是播放列表本身——
+                  那一整串同名曲目在放映画面上既不提供信息、又会挤满三行。 */}
+              <span>{index + 1}. {title || 'Untitled'} - {BRAND}</span>
             </div>
             <Raven className="tpl-raven" />
           </div>
