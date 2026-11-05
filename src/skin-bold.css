@@ -5683,7 +5683,14 @@ body:has(.media-room.is-expanded) {
   width: 32.25%;
   aspect-ratio: 1;
   height: auto;
-  transform: translate(-50%, -50%);
+  /* 居中用独立的 `translate` 属性，不写进 `transform`。
+     `rotate` 和 `transform` 是同一个变换链上的两步：浏览器先按
+     `transform-origin`（默认盒子中心）做 translate，**再**绕原点转。
+     也就是说 `transform: translate(-50%,-50%)` + `rotate: 90deg` 会先把碟
+     挪到左上，然后绕着已经画出去的那个位置转——实测圆心从 82.40% 甩到 114.65%。
+     拆成 `translate` + `rotate` 两个独立属性后，两者在同一个坐标系里叠加，
+     旋转才真的是绕唱片自己的中心。 */
+  translate: -50% -50%;
   border-radius: 50%;
   /* 面板是 clip-path 挖洞的，只裁自己、透不出下层。
      唱片必须压在面板之上（面板 z-index:2），否则看到的还是面板自己的底色。 */
@@ -5731,8 +5738,16 @@ body:has(.media-room.is-expanded) {
   top: 3.36%;
   margin: 0;
   font-family: "Montserrat", "Segoe UI", sans-serif;
-  font-size: 0.55cqw;   /* 12 × 0.88 = 10.56px @1920 */
-  line-height: 1.14;    /* 参考图行顶间距 12px @1072 */
+  /* 0.48cqw × 1920 = 9.2px。改成等宽数字后每字比原来宽约 7%，
+     字号不跟着收的话两行总宽会顶到 33px，参考图两行实测是 28 / 29px。 */
+  font-size: 0.48cqw;
+  /* 参考图两行行顶间距 12px @1072；字号缩下来之后要靠行高把它撑回去。 */
+  line-height: 1.30;
+  /* 两行都是四位数字，但比例字形里 `1` 比 `0` 窄得多（实测 2026 = 28.80px、
+     1105 = 24.02px），右侧会参差不齐。等宽数字（tabular-nums）让每个数字占同样的
+     宽度，两行自然对齐——参考图里两行实测 28px / 29px，本来就是等宽的。 */
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
   letter-spacing: 0.081em;
   color: var(--tpl-ink);
   white-space: nowrap;
