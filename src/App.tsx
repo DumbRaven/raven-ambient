@@ -23,6 +23,7 @@ import { appLabel, emptyNowPlaying, hasTrack, parseNowPlaying, playbackHint, typ
 import { askNowPlaying, commandNowPlaying, listenNowPlaying } from './now-playing-bridge';
 import { askMedia, dropWallpapers, listenMedia, looseMedia, mergeMedia, pickMediaFiles, pickMediaFolder, replaceMediaDir, replaceWallpapers, rescanMediaFolder, restoreMediaDirs, scanWallpapers, toMediaItem, toWallpaperItem, type MediaMessage } from './media';
 import MediaRoom from './MediaRoom';
+import type { StageNow } from './TemplateStage';
 import { useDialogMotion, useFilterMotion, usePageMotion } from './use-motion';
 import { useViewLayout } from './use-view-layout';
 import MotionNotice from './MotionNotice';
@@ -451,6 +452,33 @@ export default function App() {
     };
   }, [cabinet.ambience, cabinet.muted, cabinet.records, status.ducked]);
 
+  // 信息条 PLAYLIST 那一行要的是「此刻真正在响的是什么」。
+  // 之前用的是当前画面的文件名，画面和声音本来就没关系——
+  // 画面放着 DROWNED DUSK、耳机里在放别的歌时，信息条会理直气壮地写错。
+  // 两条路：外部音乐看媒体会话，本地看正在放的那张唱片。
+  const stageNow = useMemo<StageNow>(() => {
+    if (cabinet.lineMode) {
+      if (!hasTrack(nowPlaying)) return null;
+      return {
+        kind: 'external',
+        title: nowPlaying.title,
+        artist: nowPlaying.artist,
+        app: appLabel(nowPlaying.app),
+        playing: nowPlaying.playing,
+      };
+    }
+    const record = cabinet.records.find(item => item.id === status.currentId);
+    if (!record) return null;
+    return {
+      kind: 'local',
+      title: record.name,
+      artist: record.artist,
+      // musicPlaying 而不是 running：整间停止时 running 也会下去，
+      // 但那和「这一首被暂停了」是两件事，这里只关心后者。
+      playing: status.musicPlaying,
+    };
+  }, [cabinet.lineMode, cabinet.records, status.currentId, status.musicPlaying, nowPlaying]);
+
   const artFor = (record: RecordItem) => pickSleeve(record.id, launchSeed);
   const selected = (record: RecordItem) => (record.category === 'music' ? cabinet.queue : cabinet.ambience).includes(record.id);
   const isPlaying = (record: RecordItem) => status.running && (record.category === 'music' ? status.musicPlaying && status.currentId === record.id : status.playing && cabinet.ambience.includes(record.id));
@@ -782,7 +810,7 @@ export default function App() {
         </div>
       </> : pageMotion.value === 'listening' ? <section className="listening-room"><div className={`turntable ${status.running ? 'is-playing' : ''}`}><div className="platter">{externalDisc ? <div className="platter-disc disc-swap" key={`ext:${externalDisc.info.app}:${externalDisc.info.title}`}><RecordPlayer disc={externalDisc} spinning={status.running && nowPlaying.playing} /></div> : shownOutgoing ? <div className="platter-disc disc-leaving" key={`out:${shownOutgoing.id}`}><RecordPlayer disc={{ kind: 'local', record: shownOutgoing }} cover={coverFor(shownOutgoing)} spinning={status.running && status.musicPlaying} leaving /></div> : (current ?? focused) ? <div className="platter-disc disc-swap" key={`in:${(current ?? focused)!.id}`}><RecordPlayer disc={{ kind: 'local', record: (current ?? focused)! }} cover={coverFor((current ?? focused)!)} spinning={status.running && status.musicPlaying} /></div> : <div className="platter-disc disc-swap" key="empty" />}</div><div className="tonearm"><span /><i /></div><span className={`power-light ${status.running ? 'on' : ''}`} /><span className="rpm">33 ⅓<br /><small>STEREO</small></span></div><div className="playing-title" key={externalDisc ? `ext:${externalDisc.info.app}:${externalDisc.info.title}` : titleRecord?.id ?? 'empty'}><span>{externalDisc ? `${appLabel(externalDisc.info.app)}${playbackHint(externalDisc.info) ? ' · ' + playbackHint(externalDisc.info) : ''}` : status.running ? '正在播放' : '待机'}</span><h2>{externalDisc ? externalDisc.info.title : titleRecord?.name ?? (cabinet.ambience.length ? '环境音的合奏' : '等待一张喜欢的唱片')}</h2></div>{cabinet.lineMode ? <><div className="queue-heading"><h3>正在流动的环境音</h3><span>{cabinet.ambience.length} / 8 · 一起循环</span></div><MusicQueue variant="ambient" queue={cabinet.ambience} records={cabinet.records} muted={cabinet.muted} onToggle={toggleAmbience} onPlay={() => undefined} onRemove={choose} onReorder={ambience => change({ ambience })} />{!cabinet.ambience.length && <p className="queue-empty">外部音乐已经在响了，再选几张环境音，让它有地方落脚。</p>}<p className="line-mode-hint">音乐来自外部播放器，{status.ducked ? '正在为你让路。' : '这里只负责环境音。'}</p></> : <><div className="queue-heading"><h3>接下来听什么</h3><span>{cabinet.queue.length} 张音乐 · {orderNames[cabinet.order]}</span></div><MusicQueue queue={cabinet.queue} records={cabinet.records} currentId={status.currentId} onPlay={id => player.current?.playRecord(id)} onRemove={choose} onReorder={queue => change({ queue })} />{!cabinet.queue.length && <p className="queue-empty">还没有音乐唱片，纯粹的环境音也很好听。</p>}<div className="queue-heading"><h3>一起流动的环境音</h3><span>{cabinet.ambience.length} / 8</span></div><div className="ambient-chips">{cabinet.ambience.map(id => { const record = cabinet.records.find(r => r.id === id)!; return <button key={id} onClick={() => choose(record)}><AmbientMark record={record} />{record.name}<X size={12} /></button>; })}{!cabinet.ambience.length && <p className="queue-empty">从唱片柜选几张环境音，给音乐添一点风景。</p>}</div></>}<button className="text-button back-cabinet" onClick={() => setView('cabinet')}><ArrowLeft size={13} />回唱片柜，再挑一张</button></section> : null}
       <div hidden={pageMotion.value !== 'focus'}><FocusRoom active={view === 'focus' && pageMotion.value === 'focus' && pageMotion.phase !== 'exit'} playing={status.running} hasSelection={selectedCount > 0} onPlaySelection={() => player.current?.start()} onNotice={notify} disc={miniDiscSource} onPrev={previousTrack} onNext={nextTrack} canSkip={canSkipDisc} /></div>
-      <div hidden={pageMotion.value !== 'media'}><MediaRoom items={mediaReady ? cabinet.media : []} dirs={mediaDirs} active={view === 'media' && pageMotion.value === 'media'} onPick={pickMediaFolder} onRescan={rescanMediaFolder} onForgetDir={forgetMediaDir} onScanWallpapers={scanWallpapers} onPickFiles={pickMediaFiles} onForgetWallpapers={forgetWallpapers} disc={miniDiscSource} ambience={ambienceStage} /></div>
+      <div hidden={pageMotion.value !== 'media'}><MediaRoom items={mediaReady ? cabinet.media : []} dirs={mediaDirs} active={view === 'media' && pageMotion.value === 'media'} onPick={pickMediaFolder} onRescan={rescanMediaFolder} onForgetDir={forgetMediaDir} onScanWallpapers={scanWallpapers} onPickFiles={pickMediaFiles} onForgetWallpapers={forgetWallpapers} disc={miniDiscSource} ambience={ambienceStage} now={stageNow} /></div>
       </div>
       </div>
     </div>

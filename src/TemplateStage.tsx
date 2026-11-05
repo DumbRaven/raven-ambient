@@ -24,6 +24,7 @@ import { videoPalette } from './video-palette';
 import { collageTone, findTemplate, templateTitle, type TemplateId, type ToneHint } from './templates';
 import { timerText } from './overlays';
 import { phaseCaptions, type FocusPhase } from './focus';
+import { nowLine, timeOfDay, type StageNow } from './stage-text';
 
 /** 右下角那只彩胶。没在放音乐时它是空的，只留一圈盘面。 */
 
@@ -50,6 +51,10 @@ function useMarbleFilter() {
 }
 
 export type StageDisc = { cover?: string; color: string; key: string; spinning: boolean };
+
+/* StageNow / timeOfDay / nowLine 住在 stage-text.ts：纯字符串逻辑，不碰 DOM，
+   单独一个文件就能直接测，不用把 React 拖进测试里。 */
+export { nowLine, timeOfDay, type StageNow } from './stage-text';
 
 /**
  * 信息条右半边那块番茄钟的读数。
@@ -101,6 +106,8 @@ type Props = {
   focus?: StageFocus | null;
   /** 此刻的环境音状况。不传或为 null 时面板上半的这块整个不渲染。 */
   ambience?: StageAmbience | null;
+  /** 此刻真正在响的那一首。不传或为 null 时 PLAYLIST 那行留空。 */
+  now?: StageNow;
   /** 用户指定的配色。不传就纯自动。 */
   hint?: ToneHint;
   /** 把取到的原始色板交出去，配色面板要拿它画可选的色块。 */
@@ -113,6 +120,7 @@ const BRAND = 'DumbRaven';
 const stampDate = new Date();
 const stampYear = String(stampDate.getFullYear());
 const stampDay = `${String(stampDate.getMonth() + 1).padStart(2, '0')}${String(stampDate.getDate()).padStart(2, '0')}`;
+
 /**
  * 竖排徽标。AE 源里它不是「DUMBRAVEN 十个字母顺序排」，而是把品牌拆成两个词根
  * 分两列：左列 DUMB（4 个）、右列 RAVEN（5 个），右列整体下沉约半行。
@@ -140,10 +148,14 @@ function Raven({ className }: { className: string }) {
   );
 }
 
-export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, hint, onPalette }: Props) {
+export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, now, hint, onPalette }: Props) {
   const preset = findTemplate(template);
   const fromWallpaper = !!item.source;
   const title = useMemo(() => templateTitle(item.name, fromWallpaper), [item.name, fromWallpaper]);
+  /* 面板主标题用的是时段词，不是画面文件名——见 timeOfDay 上面那段说明。
+     不缓存：MediaRoom 每 800ms 会把番茄钟读数交上来，组件本来就在持续重渲染，
+     时段跨过整点时下一拍就跟上了。 */
+  const heading = timeOfDay();
   const [colors, setColors] = useState<string[]>([]);
   const [discColors, setDiscColors] = useState<string[]>([]);
 
@@ -273,7 +285,7 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
                 `For more information about` 有（它是 scale(-100,-100) 的镜像层）。
                 所以这里不再渲染 `.tpl-title-mirror`。 */}
             <div className="tpl-words">
-              <b className="tpl-title-text">{title || 'Untitled'}</b>
+              <b className="tpl-title-text">{heading}</b>
               <b className="tpl-sub">Picked</b>
               <b className="tpl-sub">Just for U</b>
             </div>
@@ -354,10 +366,12 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
             </div>
             <div className="tpl-list">
               <b>PLAYLIST</b>
-              {/* 只列正在放的那一首。原先是把后面 9 首用顿号串成一段，
-                  但这一条信息栏是「此刻在放什么」，不是播放列表本身——
-                  那一整串同名曲目在放映画面上既不提供信息、又会挤满三行。 */}
-              <span>{index + 1}. {title || 'Untitled'} - {BRAND}</span>
+              {/* 只写此刻在响的那一首。原先有两处不对：
+                  ① 这里取的是当前画面的文件名，画面和数据没关系；
+                  ② 把后面 9 首用顿号串成一大段，那不是「此刻在放什么」。
+                  现在按模式分两条路：本地读唱片名 + 艺人，外部读媒体会话的
+                  歌名 + 歌手 + 播放器名（三样拼起来才够认，外部音乐没有封面可看）。 */}
+              <span>{nowLine(now)}</span>
             </div>
             <Raven className="tpl-raven" />
           </div>
