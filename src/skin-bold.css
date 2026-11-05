@@ -3992,13 +3992,25 @@ body:has(.media-room.is-expanded) {
 
 
 
+/* 唱片跟着音乐转。原版（唱片柜里的 .vinyl）是 10s 一圈、用 animation-play-state
+   控制启停；这里沿用同一节奏。
+
+   有个坑必须写下来：唱片是靠 `transform: translate(-50%, -50%)` 居中的，
+   而 keyframes 里如果写 `transform: rotate(...)`，整个 transform 会被替换掉，
+   唱片会瞬间跳到右下去——这也是之前它一直不转的原因之一（keframes 定义了，
+   但没有一条规则引用它，所以没人发现这层冲突）。
+   所以旋转动画走**独立的 `rotate` 属性**：它和 `transform` 相加，不会互相覆盖。 */
 @keyframes tpl-disc-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from { rotate: 0deg; }
+  to { rotate: 360deg; }
+}
+
+.template-collage .tpl-disc.spinning {
+  animation: tpl-disc-spin 10s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  
+  .template-collage .tpl-disc.spinning { animation: none; }
 }
 
 /* ---------- 照片：整张铺满 ---------- */
@@ -5837,17 +5849,21 @@ body:has(.media-room.is-expanded) {
 
 
 
-/* 2026 / 1020 角标：锚点 (53,43)，字号 12 × 88% = 10.56 → 0.55cqw。 */
+/* 左上的年月角标。AE 里这层叫「2026 1020」：fs=12、track=81、scale=88%，
+   **fill=[1,1,1] 也就是纯白**。
+   早先这里写的是金色 #C5AF83 —— 那是从别的元素串过来的颜色，AE 没这么写。
+   金色压在画面块上几乎读不出来（参考图里它是浅灰白 rgb(236,236,236)）。
+   颜色交给 --tpl-ink：壁纸亮时它翻成深色，两种情况下都读得出来。 */
 .template-collage .tpl-corner-date {
   position: absolute;
-  left: 2.7%;
-  top: 1.15%;
+  left: 2.09%;
+  top: 3.36%;
   margin: 0;
   font-family: "Montserrat", "Segoe UI", sans-serif;
-  font-size: 0.62cqw;
-  line-height: 1.35;
+  font-size: 0.55cqw;   /* 12 × 0.88 = 10.56px @1920 */
+  line-height: 1.14;    /* 参考图行顶间距 12px @1072 */
   letter-spacing: 0.081em;
-  color: #C5AF83;
+  color: var(--tpl-ink);
   white-space: nowrap;
   text-align: left;
   z-index: 12;
@@ -6006,8 +6022,10 @@ body:has(.media-room.is-expanded) {
    差的那 5px 是第一行 “Produced By” 里 y 的下降部，不是字号差异。 */
 .template-collage .tpl-produced b { font-size: inherit; }
 
-/* 角标：pos(52.91,42.91) scale 88%，字号 12×0.88 → 0.98cqw。 */
-.template-collage .tpl-corner-date { left: 2.76%; top: 3.97%; font-size: 0.98cqw; line-height: 1.15; }
+/* 角标的画布坐标（3.36% / 2.09%）由上面那条统一给出，这里不再重复写 left/top。
+   之前这里又写了一套，后出现会赢，把 2.7%/1.15% 钉死在画面上——两个值都来自
+   AE 的锚点，但 AE 这份导出漏了父级变换（同 Produced By 那批），所以位置一律
+   以参考图像素为准：x=2.09%、y=3.36%。 */
 
 /* ===== 文字按 AE 锚点绝对定位（覆盖掉上面的流式网格排布） =====
    面板：615×602；信息条：1210×274。百分比 = (锚点 - 块左上) / 块尺寸。
