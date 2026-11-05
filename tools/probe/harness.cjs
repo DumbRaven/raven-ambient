@@ -106,6 +106,9 @@ async function launch(opts = {}) {
     template = 'collage',
     expand = true,
     settle = 2600,
+    // 想看别的状态（比如「此刻叠着三路环境音」）时传一份 cabinet 补丁进来。
+    // 直接改上面的 CABINET 会让所有探针一起变，几何类探针不该被动到。
+    patch = null,
   } = opts;
 
   ensureMedia();
@@ -130,8 +133,9 @@ async function launch(opts = {}) {
   await wait(2200);
   const run = code => win.webContents.executeJavaScript(code, true);
 
+  const cabinet = patch ? Object.assign({}, CABINET, patch) : CABINET;
   await run(`(() => {
-    localStorage.setItem('raven-cabinet-v2', ${JSON.stringify(JSON.stringify(CABINET))});
+    localStorage.setItem('raven-cabinet-v2', ${JSON.stringify(JSON.stringify(cabinet))});
     localStorage.setItem('raven-stage-template', ${JSON.stringify(template)});
     return 1;
   })()`);
@@ -193,8 +197,8 @@ function measureAll() {
     tag: box('.tpl-tag'),
     raven: box('.tpl-raven'),
     produced: box('.tpl-produced'),
-    intro: box('.tpl-intro'),
-    introMirror: box('.tpl-intro-mirror'),
+    ambient: box('.tpl-ambient'),
+    ambientMirror: box('.tpl-ambient-mirror'),
     words: box('.tpl-words'),
     discLayer: box('.tpl-disc-layer'),
   };
@@ -224,4 +228,4 @@ function guard(fn) {
   });
 }
 
-module.exports = { launch, measureAll, report, guard, wait, CQW_PROBE, ROOT, MEDIA_IMG };
+module.exports = { launch, measureAll, report, guard, wait, CQW_PROBE, ROOT, MEDIA_IMG, MEDIA_DIR, CABINET };

@@ -3827,7 +3827,6 @@ body:has(.media-room.is-expanded) {
 }
 
 
-
 /* 三块内容各自钉死在自己的格子里。缝本身不画东西，露出底下的画布色。 */
 .template-collage .tpl-block {
   position: relative;
@@ -3843,7 +3842,6 @@ body:has(.media-room.is-expanded) {
 }
 
 
-
 /* 信息条只有 105px 高（305 的 27.4%），三组内容必须压得很紧才放得下。
    实测按默认间距排，「PLAYLIST」那行会被控制条压住。 */
 
@@ -3857,23 +3855,10 @@ body:has(.media-room.is-expanded) {
 /* 右列：一整条竖面板，从顶到底，跨越上下两行。 */
 
 
-
-
 .tpl-dot-tl { top: 10px; left: 10px; }
 .tpl-dot-tr { top: 10px; right: 10px; }
 .tpl-dot-bl { bottom: 10px; left: 10px; }
 .tpl-dot-br { bottom: 10px; right: 10px; }
-
-
-
-
-
-
-
-
-
-
-
 
 
 /* with + 三个平台 + 三个小图标 */
@@ -3916,17 +3901,9 @@ body:has(.media-room.is-expanded) {
 }
 
 
-
-
-
-
-
-
-
 /* 星的位置统一在文件末尾那套 `.template-collage .tpl-star-*` 里定义。
    这里原来是 px 写法（`top: 42px; right: 6px`），非 collage 版式用不上，
    而 collage 版式下它会被末尾那套按实测换来的百分比覆盖，属于死规则。 */
-
 
 
 .tpl-fields > div {
@@ -3955,11 +3932,6 @@ body:has(.media-room.is-expanded) {
   line-height: 1.4;
   opacity: 0.7;
 }
-
-
-
-
-
 
 
 /* 内圈：正在放的那张封面。拿不到封面就只留盘面，不画空洞。 */
@@ -3991,7 +3963,6 @@ body:has(.media-room.is-expanded) {
 }
 
 
-
 /* 唱片跟着音乐转。原版（唱片柜里的 .vinyl）是 10s 一圈、用 animation-play-state
    控制启停；这里沿用同一节奏。
 
@@ -4005,12 +3976,71 @@ body:has(.media-room.is-expanded) {
   to { rotate: 360deg; }
 }
 
+/* 启停不写在这里：`.spinning` 只改 animation-play-state，
+   具体挂哪两条动画见下面「换碟」那一段末尾——两处都写 animation 会互相顶掉。 */
+
+/* ---------- 换碟：入场 + 高光扫过 ----------
+   新碟从逆时针 90° 转回来、略小一点、淡入，520ms 落定；
+   落定的同时一道高光从左扫到右，像唱片被放到转盘上时反的那一下光。
+   不位移、不改版式尺寸——右上那块和面板的圆弧咬得很紧，一动就会露缝。
+
+   触发方式：TemplateStage 把 `key` 挂在唱片身份上（唱片 id / 外部曲目名），
+   换碟时 React 重建这个节点，动画自然从头播一次。所以这里不需要状态类，
+   也不需要用 JS 加/删类名——那种做法还得管「什么时候移除」。
+
+   三个属性都用独立的 `rotate` / `scale`：它们和 `transform`（居中用的
+   translate(-50%,-50%)）相加而不是覆盖，所以碟不会跳到右下角去。 */
+@keyframes tpl-disc-enter {
+  /* 只写 from 的 opacity，让 to 取元素自己的值——
+     待机态是 0.72、有碟时是 1，同一条动画两种亮度都对。
+     写死 to { opacity: 1 } 会让待机碟在动画期间亮一下再暗回去。 */
+  from { opacity: 0; rotate: -90deg; scale: 0.94; }
+  to { rotate: 0deg; scale: 1; }
+}
+
+@keyframes tpl-disc-sheen {
+  from { opacity: 0; transform: translateX(-42%); }
+  40% { opacity: 1; }
+  to { opacity: 0; transform: translateX(42%); }
+}
+
+/* 唱片上永远挂两条动画：入场（只播一次）和自转。
+   自转用 animation-play-state 而不是加/删 animation——原版 .vinyl 就是这么做的。
+   这样暂停时碟停在当前角度，续播从那个角度接着转，不会跳回 0°。
+   入场之后自转才起步（delay 520ms），两条动画各自改各自的属性，不打架。 */
+.template-collage .tpl-disc {
+  animation:
+    tpl-disc-enter 520ms cubic-bezier(0.22, 0.61, 0.36, 1) 1,
+    tpl-disc-spin 10s linear infinite 520ms;
+  animation-play-state: running, paused;
+}
+
 .template-collage .tpl-disc.spinning {
-  animation: tpl-disc-spin 10s linear infinite;
+  animation-play-state: running, running;
+}
+
+/* 高光：叠在沟槽层之上的薄薄一条斜光，只在入场那 300ms 出现。 */
+.template-collage .tpl-disc::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(100deg, #ffffff00 36%, #ffffff5c 50%, #ffffff00 64%);
+  opacity: 0;
+  animation: tpl-disc-sheen 300ms ease-out;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .template-collage .tpl-disc.spinning { animation: none; }
+  .template-collage .tpl-disc { animation: none; }
+  .template-collage .tpl-disc::after { animation: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .template-collage .tpl-disc,
+  .template-collage .tpl-disc.spinning,
+  .template-collage .tpl-disc::after { animation: none; }
+  .template-collage .tpl-disc.spinning { rotate: none; }
 }
 
 /* ---------- 照片：整张铺满 ---------- */
@@ -4188,11 +4218,6 @@ body:has(.media-room.is-expanded) {
     max-width: 72%;
   }
 }
-
-
-
-
-
 
 
 .media-room.is-expanded .tpl-note { font-size: 15px; margin-top: 26px; }
@@ -4529,8 +4554,6 @@ body:has(.media-room.is-expanded) {
 }
 
 
-
-
 /* ---------- 放映：雨 ---------- */
 
 /* 两层水叠在画面上。都是 pointer-events: none——雨不该挡住拖动叠加元素。 */
@@ -4783,7 +4806,6 @@ body:has(.media-room.is-expanded) {
    提示放上面不会和任何东西打架。 */
 
 
-
 /* 3. 乌鸦压住 pick by 那三行字。乌鸦再往右下挪、缩小，
    并且给它一个深色底托，别在浅色面板上糊成一团。 */
 
@@ -4812,13 +4834,11 @@ body:has(.media-room.is-expanded) {
    挪到画面底部——那里只有渐变，且离开控制条还有一段距离。 */
 
 
-
 /* ---------- 放映：拼贴版与雨层的第二轮修正 ---------- */
 
 
 /* 空库提示条还是压在信息条上（它相对 .theater-screen 定位，而信息条也在底部）。
    挪到画面正上方——那里是纯画面，没有版式元素。 */
-
 
 
 /* 雨丝：改成「一个超高元素 + translateY」。
@@ -4896,7 +4916,6 @@ body:has(.media-room.is-expanded) {
 }
 
 
-
 /* 这里原本有三条 `top: 7% / 34% / bottom: 5%` 的星位置。
    选择器带 `.media-room.is-expanded`（4 类），比文件末尾那套
    `.template-collage .tpl-star-a`（2 类）更具体，于是全屏时它一直赢——
@@ -4912,7 +4931,6 @@ body:has(.media-room.is-expanded) {
 .media-room.is-expanded .tpl-list { padding-right: 0; }
 
 
-
 /* 窄屏：拼贴改成上下排，右列面板和彩胶都不画——屏幕太窄，
    硬塞进去只会把画面挤没。 */
 /* 窄屏第二处：拼贴压成单列——已删除。
@@ -4926,16 +4944,9 @@ body:has(.media-room.is-expanded) {
 }
 
 
-
-
 .template-collage > .tpl-block {
   border-radius: 0;
 }
-
-
-
-
-
 
 
 /* 文字。参考图里通篇是衬线体（Georgia/Times 那一路），
@@ -4986,40 +4997,10 @@ body:has(.media-room.is-expanded) {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 .template-collage .tpl-star-a { left: 14%; top: 12%; }
 .template-collage .tpl-star-b { right: 16%; top: 30%; }
 .template-collage .tpl-star-c { left: 22%; bottom: 28%; }
 .template-collage .tpl-star-d { right: 20%; bottom: 10%; }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 /* 信息条的标签与值现在全部走文件末尾那套 cqw —— 容器查询已经把「台面变宽」
@@ -5032,8 +5013,6 @@ body:has(.media-room.is-expanded) {
    `> div:first-child > b` 多一个伪类、刚好压过它。
    所以这里只保留 gap。 */
 .media-room.is-expanded .template-collage .tpl-block-bar { gap: 1.1em; }
-
-
 
 
 @media (max-width: 760px) {
@@ -5064,31 +5043,6 @@ body:has(.media-room.is-expanded) {
 
 /* 圆角不在这里设：每个块画自己的对角圆角，
    统一写 0 会把它们全抹掉（这条是 0,2,0，比单类名那条优先级高）。 */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 /* 信息条：标签、值、曲目段一律按容器宽缩放。 */
@@ -5317,35 +5271,9 @@ body:has(.media-room.is-expanded) {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 .template-collage .tpl-star-a { left: -12%; top: 12%; }
 .template-collage .tpl-star-b { right: -10%; top: 44%; }
 .template-collage .tpl-star-c { left: 4%; bottom: 14%; }
-
-
-
 
 
 .template-collage .tpl-disc-label {
@@ -5376,16 +5304,10 @@ body:has(.media-room.is-expanded) {
 }
 
 
-
-
-
-
-
 .template-collage .tpl-dot-tl { top: 3%; left: 3%; }
 .template-collage .tpl-dot-tr { top: 3%; right: 3%; }
 .template-collage .tpl-dot-bl { bottom: 3%; left: 3%; }
 .template-collage .tpl-dot-br { bottom: 3%; right: 3%; }
-
 
 
 .template-collage .tpl-fields {
@@ -5418,52 +5340,9 @@ body:has(.media-room.is-expanded) {
 }
 
 
-
-
-
-
-
-
-
-
-
-.template-collage .tpl-intro {
-  /* 顶部那四行介绍，占左半边，右半边让给竖排凹槽。 */
-  position: absolute;
-  left: 7%;
-  top: 4.5%;
-  width: 52%;
-  margin: 0;
-  display: grid;
-  gap: 0;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 2.9cqw;
-  line-height: 1.36;
-  letter-spacing: 0.01em;
-  font-style: italic;
-  opacity: 0.8;
-  z-index: 4;
-}
-
-
-
-.template-collage .tpl-intro-mirror {
-  /* 单独一行，不和上面那段挤在同一个网格行里 */
-  grid-column: 1 / -1;
-  font-size: 0.78em;
-  line-height: 1.28;
-  margin: 0;
-  transform: scaleY(-1);
-  text-align: right;
-  overflow: hidden;
-  opacity: 0.5;
-}
-
 /* 这里原本有 `.tpl-brand`（`DumbRaven bilibili` 那行署名）的定位与字体。
    这块已经从 JSX 里删掉：AE 源文件里没有 brand 图层，参考图里也没有它，
    是早期自行加的，而且正好压在倒影上。品牌在右下的 Produced By 里已有一次。 */
-
 
 
 /* 标题组只占左边 56%，右边让给竖排胶囊。 */
@@ -5483,7 +5362,6 @@ body:has(.media-room.is-expanded) {
   text-transform: capitalize;
   z-index: 5;
 }
-
 
 
 .template-collage .tpl-title-text {
@@ -5579,7 +5457,6 @@ body:has(.media-room.is-expanded) {
 .template-collage .tpl-star-c { left: 4%; bottom: 14%; }
 
 
-
 .template-collage .tpl-disc {
   /* 盘面本身：中心到边缘略暗，让它是一个「圆盘」而不是一块黑 */
   background:
@@ -5629,7 +5506,6 @@ body:has(.media-room.is-expanded) {
 }
 
 
-
 /* 第二行 `DumbRaven`：参考图里它和第一行**同字号**，只是更粗。
    注意不要再给它 display:block —— 源码里第一行后面已经有 <br />，
    两者同时存在会多出一个空行盒，实测把两行行距从 1.84cqw 撑到 2.7cqw。 */
@@ -5652,7 +5528,6 @@ body:has(.media-room.is-expanded) {
 .template-collage .tpl-dot-tr { top: 3%; right: 3%; }
 .template-collage .tpl-dot-bl { bottom: 3%; left: 3%; }
 .template-collage .tpl-dot-br { bottom: 3%; right: 3%; }
-
 
 
 .template-collage .tpl-fields {
@@ -5724,9 +5599,6 @@ body:has(.media-room.is-expanded) {
    为什么不用 mask：这版 Chromium 上 mask-composite: exclude 会把整块面板
    连同文字一起抹掉（文字元素在、位置也对，但一个像素都不显示）。
    用一圈实色环盖上去，视觉效果和真的挖洞一样，且不牵连同层内容。 */
-
-
-
 
 
 /* ══════════════════════════════════════════════════════════════
@@ -5848,7 +5720,6 @@ body:has(.media-room.is-expanded) {
 }
 
 
-
 /* 左上的年月角标。AE 里这层叫「2026 1020」：fs=12、track=81、scale=88%，
    **fill=[1,1,1] 也就是纯白**。
    早先这里写的是金色 #C5AF83 —— 那是从别的元素串过来的颜色，AE 没这么写。
@@ -5868,7 +5739,6 @@ body:has(.media-room.is-expanded) {
   text-align: left;
   z-index: 12;
 }
-
 
 
 /* 面板四角小点。 */
@@ -5953,11 +5823,8 @@ body:has(.media-room.is-expanded) {
    改动版式时只改这一段，别在别处再写 position。 */
 
 /* 正介绍：pos(1410.18,131.25)，字号 18 → 1.67cqw。相对面板：左 21.9%、上 16.2%。 */
-.template-collage .tpl-intro { left: 21.90%; top: 16.15%; width: 60%; }
-.template-collage .tpl-intro p { font-size: 1.67cqw; line-height: 1.30; }
 
 /* 镜像介绍：pos(1467.46,269)，scale(-100,-100) 就是整块上下左右都翻。 */
-.template-collage .tpl-intro-mirror { font-size: 1.85cqw; }
 
 /* 竖排 DUMBRAVEN：pos(1748.61,230.56)，字号 52 → 4.81cqw。
    相对面板：左 77.7%、上 32.7%。 */
@@ -6033,16 +5900,7 @@ body:has(.media-room.is-expanded) {
 .template-collage .tpl-block-panel { display: block; padding: 0; }
 
 /* 正介绍 pos(1410.18,131.25) 字号 18 */
-.template-collage .tpl-intro {
-  position: absolute; left: 22.63%; top: 16.15%; width: 56%;
-  margin: 0; font-size: 2.93cqw; line-height: 1.24;
-}
 /* 镜像介绍 pos(1467.46,269) 字号 20，AE 里 scale(-100,-100) 整块翻转 */
-.template-collage .tpl-intro-mirror {
-  position: absolute; right: 6.5%; top: 34.5%; width: 56%;
-  margin: 0; font-size: 3.25cqw; line-height: 1.24;
-  text-align: right; transform: scaleY(-1); opacity: 0.5;
-}
 /* 竖排 DUMBRAVEN pos(1748.61,230.56) 字号 52 */
 .template-collage .tpl-tag { right: 11.5%; top: 26.4%; width: 21%; }
 /* 标题 pos(1380.54,370.25) 字号 18 */
@@ -6527,13 +6385,6 @@ body:has(.media-room.is-expanded) {
    从上到下：正介绍 → 标题 → 镜像介绍（贴着唱片上沿）→ 唱片。
    锚点仍取自 AE，只是把互相压住的几块拉开一点。 */
 /* 镜像介绍挪到面板中下部，不再和正文抢位置。 */
-.template-collage .tpl-intro-mirror {
-  right: 8.5%;
-  top: 60.5%;
-  width: 58%;
-  font-size: 2.9cqw;
-  opacity: 0.34;
-}
 
 /* 标题块：唱片上沿之上。 */
 .template-collage .tpl-words {
@@ -6547,15 +6398,6 @@ body:has(.media-room.is-expanded) {
 /* （标题倒影规则已删，见上方说明） */
 
 /* ===== 面板文字（旧值，已被文件末尾按参考图实测的那一套覆盖） ===== */
-.template-collage .tpl-intro {
-  left: 22.63%;
-  top: 15.5%;
-  width: 54%;
-  font-size: 2.75cqw;
-  line-height: 1.32;
-  opacity: 0.78;
-}
-.template-collage .tpl-intro p { margin: 0; }
 
 /* 标题块在署名下方，底部留出唱片上沿的空档。 */
 .template-collage .tpl-words {
@@ -6567,14 +6409,6 @@ body:has(.media-room.is-expanded) {
 .template-collage .tpl-sub { font-size: 1.5cqw; margin-top: 1.0cqw; }
 
 /* 镜像介绍压到面板最下方（唱片上沿之上），只作纹理，不抢注意力。 */
-.template-collage .tpl-intro-mirror {
-  right: 7%;
-  top: 62.0%;
-  width: 56%;
-  font-size: 2.6cqw;
-  line-height: 1.3;
-  opacity: 0.28;
-}
 
 /* ===== 面板内五块，各就各位（照 AE 的绝对坐标） =====
    面板 615×602，1cqw = 6.15px。
@@ -6582,29 +6416,14 @@ body:has(.media-room.is-expanded) {
 .template-collage .tpl-block-panel { overflow: hidden; }
 
 /* 正介绍：AE (1410.18,131.25)，左上角对齐 → (22.63%, 15.5%) */
-.template-collage .tpl-intro { left: 22.63%; top: 15.5%; width: 54%; }
-.template-collage .tpl-intro p { font-size: 2.75cqw; line-height: 1.34; margin: 0; opacity: 0.82; }
 
 /* 镜像：AE (1467.46,269) 且 scale(-100,-100) → 贴在介绍右下方，压得很淡 */
 /* 正介绍：参考图实测文字带 98..177px（相对面板 11.50%..24.12%），
    左边缘 1324px → 面板左 8.46%。四行、行距 26px → line-height 1.44。 */
-.template-collage .tpl-intro { left: 8.46%; top: 11.50%; width: 56%; }
-.template-collage .tpl-intro p { font-size: 2.93cqw; line-height: 1.44; margin: 0; opacity: 0.82; }
 
 /* 镜像倒影：实测文字带 199..287px（相对面板 27.64%..41.69%），
    右边缘 1556px → 面板 46.18%，所以 right 用 53.82%。
    它是整块上下翻转的，文字右对齐，最宽那行反而在最后。 */
-.template-collage .tpl-intro-mirror {
-  position: absolute;
-  right: 53.82%;
-  top: 27.64%;
-  width: 42%;
-  margin: 0;
-  font-size: 2.93cqw;
-  line-height: 1.44;
-  opacity: 0.30;
-  text-align: right;
-}
 
 /* 品牌署名已删（JSX 里也移除了）：AE 源文件没有 brand 图层，参考图里也没有它。
    这里不留 display:none 之类的空壳——没有元素需要用规则去藏。 */
@@ -6636,4 +6455,66 @@ body:has(.media-room.is-expanded) {
   max-height: 4.7cqw;
   font-size: 1.36cqw;
   line-height: 1.55;
+}
+
+/* ===== 面板上半：此刻的环境音 =====
+   替换掉原先那四行固定英文（For more information about / This Video /
+   please read the / introduction）和它的倒影——那是给视频套版用的说明，
+   在软件里没有信息量。现在这块说「此刻你周围是什么声音、音乐响起时它让了多少」。
+
+   位置沿用原介绍的锚点：参考图实测文字带 98..177px（相对面板 11.50%..24.12%）、
+   左边缘 1324px → 面板左 8.46%。倒影仍取右下那一段（27.64% 起）。 */
+.template-collage .tpl-ambient {
+  position: absolute;
+  left: 8.46%;
+  top: 11.50%;
+  width: 60%;
+  margin: 0;
+  z-index: 4;
+}
+
+/* 标签跟信息条那三个标签同一套度量（1.32cqw / 0.14em / 0.72 透明度），
+   这样面板和信息条上的小标题看起来是同一个系统，而不是各写各的。 */
+.template-collage .tpl-ambient > b {
+  display: block;
+  font-size: 1.32cqw;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  opacity: 0.72;
+}
+
+/* 主行：此刻叠着的环境音名字。用标题那一族的衬线大字。 */
+.template-collage .tpl-ambient-layers {
+  margin: 1.05cqw 0 0;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-size: 3.15cqw;
+  line-height: 1.26;
+  opacity: 0.92;
+  overflow-wrap: anywhere;
+}
+
+/* 副行：层数 / 静音数 / 让出多少 dB。
+   等宽数字——dB 和层数会随播放变化，比例字体会让这一行左右抖。 */
+.template-collage .tpl-ambient-meta {
+  margin: 0.95cqw 0 0;
+  font-size: 1.44cqw;
+  letter-spacing: 0.09em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.62;
+}
+
+/* 倒影：把同一行环境音上下翻过来压淡，当纹理用。
+   这里用 transform 翻转，而不是像旧版那样在 JSX 里把文字倒着写一遍。 */
+.template-collage .tpl-ambient-mirror {
+  position: absolute;
+  right: 53.82%;
+  top: 27.64%;
+  width: 42%;
+  margin: 0;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-size: 3.15cqw;
+  line-height: 1.44;
+  opacity: 0.30;
+  text-align: right;
+  transform: scaleY(-1);
 }

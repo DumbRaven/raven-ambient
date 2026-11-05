@@ -68,6 +68,25 @@ export type StageFocus = {
   roundsBeforeLong: number;
 };
 
+/**
+ * 面板上半那块「此刻的环境音」。
+ *
+ * 为什么是环境音而不是曲目信息：信息条已经写着 TITLE 和 PLAYLIST 了，
+ * 面板再放一遍正在放的歌就是重复（用户原话：「那是不是有点重复了和信息栏」）。
+ * 而环境音叠加+为音乐让位是这个软件独有的、视频里根本不存在的东西，
+ * 放映页此前一处都没体现它——这里补上。
+ */
+export type StageAmbience = {
+  /** 此刻叠着的环境音名字，最多 8 个。 */
+  layers: string[];
+  /** 其中被静音的有几层（静音的不出声，不该跟出声的混在一起数）。 */
+  muted: number;
+  /** 音乐正在响、环境音正在退让。 */
+  ducked: boolean;
+  /** 在场各层里最深的避让量，分贝。0 表示大家都在原音量上。 */
+  depth: number;
+};
+
 type Props = {
   item: MediaItem;
   template: TemplateId;
@@ -80,6 +99,8 @@ type Props = {
   disc?: StageDisc | null;
   /** 番茄钟读数。不传或为 null 时信息条第二格显示「未开始」。 */
   focus?: StageFocus | null;
+  /** 此刻的环境音状况。不传或为 null 时面板上半的这块整个不渲染。 */
+  ambience?: StageAmbience | null;
   /** 用户指定的配色。不传就纯自动。 */
   hint?: ToneHint;
   /** 把取到的原始色板交出去，配色面板要拿它画可选的色块。 */
@@ -119,7 +140,7 @@ function Raven({ className }: { className: string }) {
   );
 }
 
-export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, hint, onPalette }: Props) {
+export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, hint, onPalette }: Props) {
   const preset = findTemplate(template);
   const fromWallpaper = !!item.source;
   const title = useMemo(() => templateTitle(item.name, fromWallpaper), [item.name, fromWallpaper]);
@@ -206,15 +227,38 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
             <span className="tpl-dot tpl-dot-bl" aria-hidden="true" />
             <span className="tpl-dot tpl-dot-br" aria-hidden="true" />
 
-            {/* 版式里那句固定的介绍，正着排一遍、再整块上下翻一遍当倒影。
-                原版就是这样：正反正反叠在一起，像印在纸背透过来。 */}
-            <div className="tpl-intro">
-              <p>For more information about<br />This Video<br />please read the<br />introduction</p>
-            </div>
+            {/* 面板上半：此刻的环境音。
 
-            <p className="tpl-intro-mirror" aria-hidden="true">
-              introduction<br />please read the<br />DumbRaven<br />For more information about
-            </p>
+                原先这里是四行固定英文（For more information about / This Video /
+                please read the / introduction）加它的上下翻转倒影——那是给视频
+                套版用的说明，在软件里毫无信息量，用户原话「这个是我做视频用的，
+                软件上展示这个就没什么价值了」。
+
+                现在换成环境音状况。为什么选它：信息条已经写着 TITLE 和 PLAYLIST，
+                再放一遍曲目就重复了（用户原话「那是不是有点重复了和信息栏」）；
+                而「几路环境音叠着、音乐响起时让出多少 dB」是这个软件独有的、
+                视频里根本不存在的东西，放映页此前一处都没体现它。
+
+                倒影保留——那是这个版式的语言（像印在纸背透过来），
+                只是内容从套话换成了同一份数据的镜像。 */}
+            {ambience ? (
+              <>
+                <div className="tpl-ambient">
+                  <b>AMBIENCE</b>
+                  <p className="tpl-ambient-layers">{ambience.layers.join(' · ')}</p>
+                  <p className="tpl-ambient-meta">
+                    {ambience.layers.length} 层
+                    {ambience.muted > 0 && ` · ${ambience.muted} 静音`}
+                    {ambience.ducked && ambience.depth > 0
+                      ? ` · 让出 ${ambience.depth} dB`
+                      : ' · 原音量'}
+                  </p>
+                </div>
+                <p className="tpl-ambient-mirror" aria-hidden="true">
+                  <span>{ambience.layers.join(' · ')}</span>
+                </p>
+              </>
+            ) : null}
 
             {/* 原本这里还有一行 `DumbRaven bilibili` 的品牌署名，已删掉。
                AE 源文件里没有这个图层，参考图（AE 最终渲染）里也没有它——
@@ -265,6 +309,9 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
           <div className="tpl-disc-layer">
 
             <span
+              /* key 挂碟的身份：换唱片（或换外部曲目）时整块重新挂载，
+                 CSS 那边的入场动画才会从头播一次。同 key 不会重播。 */
+              key={disc?.key ?? 'idle'}
               className={`tpl-disc pressing-${discPressing.style} ${discPalette.light ? 'is-light' : ''} ${disc?.spinning ? 'spinning' : ''} ${disc ? 'has-disc' : ''}`}
               aria-hidden="true"
             >

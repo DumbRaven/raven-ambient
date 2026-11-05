@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Droplets, FilePlus2, FolderOpen, ImageIcon, Layers, Maximize2, Minimize2, Pause, Play, RefreshCw, Sparkles, X, Palette
 } from 'lucide-react';
 import { mediaSrc, setWindowFullscreen } from './media';
-import TemplateStage, { type StageDisc, type StageFocus } from './TemplateStage';
+import TemplateStage, { type StageAmbience, type StageDisc, type StageFocus } from './TemplateStage';
 import { normaliseHex, readTone, toneHint, toneKey, writeTone, type ToneSetting } from './tone-setting';
 import OverlayLayer from './OverlayLayer';
 import RainLayer from './RainLayer';
@@ -37,6 +37,8 @@ type Props = {
   onForgetWallpapers: () => void;
   /** 「正在听」的那张碟，拼贴版右下角画的就是它。 */
   disc: StageDisc | null;
+  /** 此刻的环境音状况，拼贴版面板上半画的是它。没在叠环境音时为 null。 */
+  ambience: StageAmbience | null;
 };
 
 /**
@@ -95,7 +97,7 @@ function VideoThumb({ src, alt }: { src: string; alt: string }) {
   return <video ref={ref} src={src} aria-label={alt} preload="metadata" muted playsInline />;
 }
 
-export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, onRescan, onForgetDir, onScanWallpapers, onForgetWallpapers, disc }: Props) {
+export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, onRescan, onForgetDir, onScanWallpapers, onForgetWallpapers, disc, ambience }: Props) {
   // 只有图片和视频两档，不再有「全部」。
   // 混在一起看意义不大：两种东西的缩略图行为不同（一张解码、一段读首帧），
   // 而且用户来这儿通常心里已经知道要看哪一种。
@@ -350,6 +352,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               total={usable.length}
               disc={disc}
               focus={focusStage}
+              ambience={ambience}
               hint={toneHint(tone, palette)}
               onPalette={setPalette}
             />
