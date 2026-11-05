@@ -8,10 +8,10 @@
 //   页面把请求压进 window.__ravenMediaOutbox
 //   主进程每 400ms 取一次，处理完调 window.__ravenMedia(payload) 推回去
 // 页面永远是被动的一方，不放开任何沙箱设置。
-const { protocol, net, dialog, BrowserWindow } = require('electron');
+const { protocol, dialog, BrowserWindow } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
-const { pathToFileURL } = require('node:url');
+const { mediaResponse } = require('./media-response.cjs');
 
 const SCHEME = 'media';
 const OUTBOX = 'window.__ravenMediaOutbox';
@@ -374,13 +374,17 @@ function attachMedia() {
     if (!target) return new Response('bad request', { status: 400 });
     // 只认白名单里的目录。没有这一步，media:// 就是任意文件读取后门。
     if (!insideAllowed(target)) return new Response('forbidden', { status: 403 });
+    let size;
     try {
-      if (!fs.statSync(target).isFile()) return new Response('not a file', { status: 404 });
+      const stat = fs.statSync(target);
+      if (!stat.isFile()) return new Response('not a file', { status: 404 });
+      size = stat.size;
     } catch {
       return new Response('missing', { status: 404 });
     }
-    // net.fetch 走 Chromium 的文件加载，Range 请求与流式读取都由它处理
-    return net.fetch(pathToFileURL(target).toString());
+    // 自己回 206。以前直接 net.fetch(file://)，它会把 Range 头整个丢掉——
+    // 回 200 + 整个文件，moov 在尾部的 MP4 就永远起不了播。详见 media-response.cjs。
+    return mediaResponse(target, request, size);
   });
 
   bridge = new MediaBridge();
