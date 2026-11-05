@@ -12,7 +12,7 @@ import { ChevronLeft, ChevronRight, Droplets, FilePlus2, FolderOpen, ImageIcon, 
 } from 'lucide-react';
 import { mediaSrc, setWindowFullscreen } from './media';
 import TemplateStage, { type StageAmbience, type StageDisc, type StageFocus, type StageNow } from './TemplateStage';
-import { normaliseHex, readTone, toneHint, toneKey, writeTone, type ToneSetting } from './tone-setting';
+import { defaultTone, normaliseHex, readTone, toneGroups, toneHint, toneKey, writeTone, type ToneSetting } from './tone-setting';
 import OverlayLayer from './OverlayLayer';
 import RainLayer from './RainLayer';
 import { rainKey, rainModes, readRain, writeRain, type RainSetting } from './rain';
@@ -536,38 +536,41 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
 
                     {tone.mode === 'custom' && (
                       <div className="tone-fields">
-                        {([
-                          ['base', '底色'],
-                          ['panel', '面板'],
-                          ['bar', '信息条'],
-                        ] as const).map(([key, label]) => (
-                          <label key={key} className="tone-field">
-                            <span>{label}</span>
-                            <input
-                              type="color"
-                              value={tone.custom[key] || '#6f6f6f'}
-                              aria-label={`${label}颜色`}
-                              onChange={event => setTone(prev => ({ ...prev, custom: { ...prev.custom, [key]: event.target.value } }))}
-                            />
-                            <input
-                              className="tone-hex"
-                              type="text"
-                              inputMode="text"
-                              maxLength={7}
-                              placeholder="自动"
-                              value={tone.custom[key]}
-                              aria-label={`${label}色值`}
-                              onChange={event => {
-                                const raw = event.target.value;
-                                // 边输边认：认得出就收敛成 #rrggbb，认不出先原样留着，
-                                // 否则输到一半（"#1c2"）就被吞掉字符，根本没法打。
-                                const next = normaliseHex(raw);
-                                setTone(prev => ({ ...prev, custom: { ...prev.custom, [key]: next || raw } }));
-                              }}
-                            />
-                          </label>
+                        {/* 三组：信息条 / 面板 / 胶囊·署名。分组表在 tone-setting.ts，
+                            这里只负责画——以后加一档颜色不用改这段 JSX。 */}
+                        {toneGroups.map(group => (
+                          <fieldset key={group.key} className="tone-group">
+                            <legend>{group.title}</legend>
+                            {group.fields.map(([key, label]) => (
+                              <label key={key} className="tone-field">
+                                <span>{label}</span>
+                                <input
+                                  type="color"
+                                  value={tone.custom[key] || '#6f6f6f'}
+                                  aria-label={`${group.title}${label}颜色`}
+                                  onChange={event => setTone(prev => ({ ...prev, custom: { ...prev.custom, [key]: event.target.value } }))}
+                                />
+                                <input
+                                  className="tone-hex"
+                                  type="text"
+                                  inputMode="text"
+                                  maxLength={7}
+                                  placeholder="自动"
+                                  value={tone.custom[key]}
+                                  aria-label={`${group.title}${label}色值`}
+                                  onChange={event => {
+                                    const raw = event.target.value;
+                                    // 边输边认：认得出就收敛成 #rrggbb，认不出先原样留着，
+                                    // 否则输到一半（"#1c2"）就被吞掉字符，根本没法打。
+                                    const next = normaliseHex(raw);
+                                    setTone(prev => ({ ...prev, custom: { ...prev.custom, [key]: next || raw } }));
+                                  }}
+                                />
+                              </label>
+                            ))}
+                          </fieldset>
                         ))}
-                        <button className="tone-reset" onClick={() => setTone(prev => ({ ...prev, custom: { base: '', panel: '', bar: '' } }))}>
+                        <button className="tone-reset" onClick={() => setTone(prev => ({ ...prev, custom: { ...defaultTone.custom } }))}>
                           全部回到自动
                         </button>
                       </div>

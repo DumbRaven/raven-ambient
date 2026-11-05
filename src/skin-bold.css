@@ -5193,8 +5193,28 @@ body:has(.media-room.is-expanded) {
 /* 「自己填」：三行「名字 + 色块 + 色值」。 */
 .tone-fields {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   margin-top: 11px;
+}
+
+/* 三组（信息条 / 面板 / 胶囊·署名）。用 fieldset 是因为它本来就带
+   「一组相关控件」的语义，屏幕阅读器会念出组名；只是把浏览器默认的
+   边框和内边距清掉，组名做成和数据标签同一号的小字。 */
+.tone-group {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.tone-group > legend {
+  padding: 0 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #9a968c;
 }
 
 .tone-field {
@@ -5608,7 +5628,20 @@ body:has(.media-room.is-expanded) {
    ══════════════════════════════════════════════════════════════ */
 
 /* 画布本身是容器：里面所有 cqw 都等于「画布宽度的百分之一」。 */
+/* 拼贴版的令牌兜底值。
+   正常路径是 TemplateStage 用内联 style 注入这些变量（跟着画面取色算出来），
+   内联优先级更高，所以这里只是「万一没注入」时的退路——但**必须有**：
+   少了它，var(--tpl-gold) 解析失败会让金色变成继承来的 currentColor，
+   字忽然变成白色，而且不会报任何错。 */
 .media-theater .template-collage {
+  --tpl-base: #1c2433;
+  --tpl-panel: #4a5363;
+  --tpl-bar: #72777d;
+  --tpl-ink: #f6f2ea;
+  --tpl-ink-soft: #f6f2ea9e;
+  --tpl-on-panel: #f7f3ec;
+  --tpl-on-bar: #f7f3ec;
+  --tpl-gold: #d4a040;
   position: absolute;
   inset: 0;
   display: block;
@@ -5892,8 +5925,10 @@ body:has(.media-room.is-expanded) {
   border-radius: 2.6cqw 0 0 2.6cqw;
   background: #ffffff42;
   /* 参考图金字核心色实测 rgb(212,160,64)。原来的 #C5AF83 又淡又发灰，
-     在浅色胶囊上几乎读不出来。 */
-  color: #d4a040;
+     在浅色胶囊上几乎读不出来。
+     走 --tpl-gold：竖排胶囊的四颗星、DUMBRAVEN 字母和这行署共用同一个金色，
+     用户调一次三处一起变（配色面板「胶囊 · 署名」那一组）。 */
+  color: var(--tpl-gold);
   /* 唱片在本层里是 z-index:6，署名只有 3。唱片的深色外阴影
      「0 2.2cqw 5cqw #00000052」半径 5cqw，正好铺到署名上半行，
      把金字压成灰褐色（放大图里 Produced By 明显比 DumbRaven 灰）。
@@ -6160,12 +6195,14 @@ body:has(.media-room.is-expanded) {
   line-height: 0.90;
   letter-spacing: 0;
   /* 参考图字母核心色中位 rgb(196,143,70) = #c48f46（直方图 7794 个金色像素）。
-     原来写 #c8a56a 偏黄偏淡，压在灰白大理石底上读不出金色感。 */
-  color: #c48f46;
+     原来写 #c8a56a 偏黄偏淡，压在灰白大理石底上读不出金色感。
+     和右下角署名共用 --tpl-gold（那边实测 #d4a040，两处取同一档）。 */
+  color: var(--tpl-gold);
   /* Georgia 斜体只有一个 400 字重，font-weight 调不动笔画粗细。
      参考图的金色像素覆盖率是 0.379% 画布，纯色填充只有 0.301%——
-     用同色描边把笔画加粗一圈补回来（0.025em 实测对上；0.06em 会超出 38%）。 */
-  -webkit-text-stroke: 0.025em #c48f46;
+     用同色描边把笔画加粗一圈补回来（0.025em 实测对上；0.06em 会超出 38%）。
+     描边必须跟着 --tpl-gold 走，否则改金色后字芯和描边会分成两种颜色。 */
+  -webkit-text-stroke: 0.025em var(--tpl-gold);
   paint-order: stroke fill;
   /* 胶囊 309px 高、字母区 284px，上留 16px 下留 9px——基本是垂直居中，
      别再额外加 margin 往下推（加过一次，右列 N 直接顶穿胶囊底）。 */
@@ -6204,7 +6241,7 @@ body:has(.media-room.is-expanded) {
      要 22px 的 ink 就得 24 ÷ 0.53 = 45px = 7.0cqw。 */
   font-size: 6.2cqw;
   opacity: 1;
-  color: #c48f46;
+  color: var(--tpl-gold);
   line-height: 1;
   /* 星按**墨迹中心**对齐胶囊边沿（见下面四条位置的注释）。
      光写 translate(-50%,-50%) 只把 em 盒居中，而 ✦ 的字面 ink 在 em 盒里
@@ -6519,17 +6556,24 @@ body:has(.media-room.is-expanded) {
 }
 
 /* 倒影：把同一行环境音上下翻过来压淡，当纹理用。
-   这里用 transform 翻转，而不是像旧版那样在 JSX 里把文字倒着写一遍。 */
+   这里用 transform 翻转，而不是像旧版那样在 JSX 里把文字倒着写一遍。
+
+   **宽度必须和正的那块一模一样**（left 8.46% / width 60% / 左对齐）。
+   原来这里是 right: 53.82% + width: 42% + 右对齐——那是给参考图里
+   四行英文配的盒子。英文那四行是写死了换行位置的，宽度窄一点看不出来；
+   环境音这行是**按盒子宽度自动折行**的，42% 会比 60% 早断，
+   于是倒影的折行位置和正的对不上，看起来就是「宽度不一样」。 */
 .template-collage .tpl-ambient-mirror {
   position: absolute;
-  right: 53.82%;
+  left: 8.46%;
   top: 27.64%;
-  width: 42%;
+  width: 60%;
   margin: 0;
   font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-size: 3.15cqw;
-  line-height: 1.44;
+  line-height: 1.26;
   opacity: 0.30;
-  text-align: right;
+  text-align: left;
+  overflow-wrap: anywhere;
   transform: scaleY(-1);
 }

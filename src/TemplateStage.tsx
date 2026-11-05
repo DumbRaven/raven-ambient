@@ -196,6 +196,7 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
     '--tpl-ink-soft': tone.inkSoft,
     '--tpl-on-panel': tone.onPanel,
     '--tpl-on-bar': tone.onBar,
+    '--tpl-gold': tone.gold,
     '--disc-base': discPalette.base,
     '--disc-accent': discPalette.accent,
     '--disc-accent-2': discPalette.accent2,
@@ -217,6 +218,10 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
       loop
       playsInline
       autoPlay
+      /* 必须静音：壁纸视频大多自带雨声、海浪这些环境音，这里是「画面」不是「音轨」。
+         不静音就会和正在放的唱片叠在一起，而且用户点放映本来只是想看画面。
+         网格里的 VideoThumb 早就 muted 了，这条之前漏了。 */
+      muted
       onPlay={() => onPlayState(true)}
       onPause={() => onPlayState(false)}
     />

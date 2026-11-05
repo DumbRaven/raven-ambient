@@ -103,6 +103,8 @@ export type CollageTone = {
   onPanel: string;
   /** 压在信息条上的字。 */
   onBar: string;
+  /** 金色：竖排 DUMBRAVEN 字母、四颗 ✦，以及右下角 Produced By 署名共用这一档。 */
+  gold: string;
 };
 
 /**
@@ -130,9 +132,19 @@ export type CollageTone = {
  *
  * hint 允许用户指定：
  *   hue   强制主色相（0–360），不传就按画面算
- *   base / panel / bar  直接指定某一档的颜色，指定的那档原样用，其余照算
+ *   base / panel / bar  直接指定某一档的底色，指定的那档原样用，其余照算
+ *   onPanel / onBar     直接指定压在面板 / 信息条上的字色
+ *   gold                竖排胶囊的四颗星、DUMBRAVEN 字母与右下角署名
  */
-export type ToneHint = { hue?: number; base?: string; panel?: string; bar?: string };
+export type ToneHint = {
+  hue?: number;
+  base?: string;
+  panel?: string;
+  bar?: string;
+  onPanel?: string;
+  onBar?: string;
+  gold?: string;
+};
 
 export function collageTone(colors: string[], hint: ToneHint = {}): CollageTone {
   // 取不到色（图还没解码、路径不通）时，退回一个中性灰而不是暖砂色。
@@ -228,7 +240,13 @@ export function collageTone(colors: string[], hint: ToneHint = {}): CollageTone 
     bar,
     ink: dark ? '#151515' : '#f6f2ea',
     inkSoft: dark ? '#1515158f' : '#f6f2ea9e',
-    onPanel: luminance(panel) > 0.42 ? '#151515' : '#f7f3ec',
-    onBar: luminance(bar) > 0.45 ? '#151515' : '#f7f3ec',
+    // 字色也允许用户接管。留空就走「按底色明度自动翻深浅」这条老路——
+    // 面板和信息条的明度可能被用户改到很浅，自动翻面仍然要能跟上。
+    onPanel: hint.onPanel || (luminance(panel) > 0.42 ? '#151515' : '#f7f3ec'),
+    onBar: hint.onBar || (luminance(bar) > 0.45 ? '#151515' : '#f7f3ec'),
+    // 金色不跟画面取色走：它得在深色面板和浅色信息条上都读得出金，
+    // 自动算出来的色相会随画面一路漂，飘到绿或粉就不像「金」了。
+    // 默认取参考图实测的中位值。
+    gold: hint.gold || '#d4a040',
   };
 }
