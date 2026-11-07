@@ -22,6 +22,7 @@ import { launchSeed } from './sleeves';
 import { ravenBox, ravenPath, ravenWingPath } from './raven';
 import { videoPalette } from './video-palette';
 import { collageTone, findTemplate, templateTitle, type TemplateId, type ToneHint } from './templates';
+import { MARBLE_FILTER_ID, marbleFilterMarkup } from './marble';
 import { timerText } from './overlays';
 import { phaseCaptions, type FocusPhase } from './focus';
 import { nowDetail, nowLine, timeOfDay, type StageNow } from './stage-text';
@@ -29,22 +30,19 @@ import { nowDetail, nowLine, timeOfDay, type StageNow } from './stage-text';
 /** 右下角那只彩胶。没在放音乐时它是空的，只留一圈盘面。 */
 
 /** 凹槽的大理石纹滤镜。
- *  AE 里那层是「分型杂色 + 柔光」，CSS 没有等价物，用 SVG feTurbulence 生成。
+ *
+ *  管线为什么要这么绕、为什么不能直接生成噪声，说明在 marble.ts 里
+ *  （那边是纯字符串，可以单独测）。这里只负责把它挂上去。
+ *
  *  必须挂在 <body> 上：放在被 clip-path / overflow 裁的容器里时，
  *  Chromium 会把这个引用判为失效（computed 变成 none），和雨丝那次是同一个坑。 */
 function useMarbleFilter() {
   useEffect(() => {
-    const id = 'tpl-marble';
-    if (document.getElementById(id)) return;
+    if (document.getElementById(MARBLE_FILTER_ID)) return;
     const host = document.createElement('div');
     host.setAttribute('aria-hidden', 'true');
     host.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;pointer-events:none';
-    host.innerHTML =
-      '<svg width="300" height="300"><filter id="tpl-marble" x="0" y="0" width="100%" height="100%">' +
-      '<feTurbulence type="fractalNoise" baseFrequency="0.052" numOctaves="10" seed="41" stitchTiles="stitch" result="t"/>' +
-      '<feColorMatrix in="t" type="saturate" values="0"/>' +
-      '<feComponentTransfer><feFuncR type="linear" slope="2.4" intercept="-0.6"/><feFuncG type="linear" slope="2.4" intercept="-0.6"/><feFuncB type="linear" slope="2.4" intercept="-0.6"/></feComponentTransfer>' +
-      '</filter></svg>';
+    host.innerHTML = marbleFilterMarkup();
     document.body.appendChild(host);
     return () => { host.remove(); };
   }, []);

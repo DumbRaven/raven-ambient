@@ -3385,19 +3385,47 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 
    这里不能靠 :hover。全屏看电影时鼠标常常停在画面正中不动，
    父元素一直处于 hover 状态，黑带就永远压在画面底下。
-   所以由 MediaRoom 记「多久没动静」，2.6 秒后把 data-chrome 设成 hidden。 */
+   所以由 MediaRoom 记「多久没动静」，2.6 秒后把 data-chrome 设成 hidden。
+
+   **为什么是浮起来的胶囊，而不是贴底的通栏黑带**：原先是 left/right/bottom 全 0
+   加一条从底往上淡出的黑渐变，实测的问题是它没有边界——渐变和画面连成一片，
+   而版式的信息条正好占画面下部 25%，控制条那 62px 就压在信息条底边上，
+   读起来像「信息条上浮了一层脏东西」，而不是「控制条在上面」。
+   实测用 elementFromPoint 问过五个点，控制的确实都在最上层，所以这从来不是层级问题，
+   是**没有边界导致的从属感错误**：贴着底边、没有轮廓、和背景同色渐变，
+   再高的层级也读成背景的一部分。
+
+   现在的做法是它自己成为一条独立的浮层：离底边留缝、四角全圆、加模糊和细描边。
+   有轮廓的一小块才像一个「工具条」，压在谁身上都只是压着，不会融进去。 */
 .media-room.is-expanded .theater-bar {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 26px;
+  right: 26px;
+  bottom: 20px;
   margin: 0;
-  border-radius: 0;
-  padding: 16px 22px;
-  background: linear-gradient(to top, #000000d9, #00000000);
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: #0b0f14e0;
+  /* 模糊取画面下一条的颜色，让胶囊和画面之间有过渡而不是硬切。
+     saturate 稍微提一点，压暗之后颜色才不发灰。 */
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
+  backdrop-filter: blur(22px) saturate(1.18);
+  /* 描边只在顶部一点点亮，等于给胶囊一个上表面的高光——
+     和面板胶囊那层高光是同一套语言，不额外发明一种「发光边框」。 */
+  box-shadow:
+    inset 0 1px 0 #ffffff24,
+    0 10px 30px #00000059;
   border: 0;
   opacity: 1;
   transition: opacity 260ms ease, transform 260ms ease;
+}
+
+/* 没有 backdrop-filter 时（老 Chromium / 关掉了合成）退回实底，
+   否则半透明黑底下透出的画面会把白字搅花。 */
+@supports not (backdrop-filter: blur(2px)) {
+  .media-room.is-expanded .theater-bar {
+    background: #0b0f14f2;
+  }
 }
 
 /* 淡出时一并往下挪一点，收得干净；重新出现时从原位浮上来 */
@@ -4527,10 +4555,14 @@ body:has(.media-room.is-expanded) {
 }
 
 /* 全屏时控制条贴底不留缝。窗口态底下有页面 padding，全屏后那块 padding 还在，
-   黑带就浮在离底边 20px 的位置，看着像没贴住。 */
+   黑带就浮在离底边 20px 的位置，看着像没贴住。
+
+   ——以上是通栏黑带时候的判断。现在控制条改成了离底的玻璃胶囊（见上方
+   `.media-room.is-expanded .theater-bar` 的说明），"贴底"反而会让圆角被屏幕边缘切掉，
+   所以这里不再覆盖 bottom 与 border-radius，只留一条：**不让页面 padding 影响它**。
+   这条原本就是干这个的，改胶囊之后唯一还需要的就是别让页面 padding 把它往上顶。 */
 .media-room.is-expanded .theater-bar {
-  bottom: 0;
-  border-radius: 0;
+  margin-bottom: 0;
 }
 
 /* ---------- 放映：空库时的占位台面 ---------- */
@@ -6146,7 +6178,16 @@ body:has(.media-room.is-expanded) {
 
 /* 大理石絮纹：参考图里胶囊内是**很淡**的灰白絮状团块，主视觉是那块偏亮的底，
    纹理只是隐约一层。之前 0.9 的 soft-light 白把它铺成了一片白云，
-   把面板里的介绍文字整个糊掉了。 */
+   把面板里的介绍文字整个糊掉了。
+
+   现在这一层不再是「一块白底让滤镜去噪」，而是**先画直的脉络条带**，
+   再由 `#tpl-marble` 这个滤镜用 feDisplacementMap 把它们揉弯。
+   这里给的是石头原本的沉积层：疏密不均、有主脉有细纹。
+
+   **条带必须同时有亮有暗**：只放白条纹的话，揉弯之后还是一层均匀的提亮，
+   石头看起来是「磨砂塑料」。真石头的脉络是一亮一暗交替的——亮的是石英层，
+   暗的是杂质沉积。所以这里用黑白交替的条纹 + overlay 混合模式，
+   让明暗都真的参与合成。 */
 .template-collage .tpl-tag::before {
   content: "";
   position: absolute;
@@ -6156,12 +6197,51 @@ body:has(.media-room.is-expanded) {
      胶囊圆角外面（截图上就是胶囊四角那圈直角浅色块）。父级不能加 overflow:hidden，
      因为四颗 ✦ 星是故意探到胶囊外的。所以在这一层自己再裁一次，形状跟 border-radius 一致。 */
   clip-path: inset(0 round 999px);
-  background: #ffffff;
+  /* 条纹间隔刻意不等距：等距条纹被揉弯之后仍然看得出是「规则图案」，
+     石头不会那么规整。108deg 是参考图里脉络大致的方向。 */
+  background:
+    repeating-linear-gradient(
+      108deg,
+      #00000000 0px,
+      #00000000 7px,
+      #ffffff 9px,
+      #ffffff 11px,
+      #00000000 14px,
+      #00000000 31px,
+      #000000ac 33px,
+      #00000000 38px,
+      #ffffffc4 47px,
+      #00000000 52px,
+      #00000052 74px,
+      #00000000 79px
+    );
   filter: url(#tpl-marble);
-  mix-blend-mode: soft-light;
-  opacity: 0.28;
+  mix-blend-mode: overlay;
+  opacity: 0.46;
   z-index: -1;
   pointer-events: none;
+}
+
+/* 方向性高光：从左上打进来的一道光，斜着铺过整条胶囊。
+   为什么需要：石纹本身是平的，只有脉络没有光照，看着像贴图。
+   加一道单向渐变之后，胶囊立刻有了「凸面」的弧度——亮的一侧朝光源，
+   暗的一侧背光，这才是「用高光让它好看一点」真正的意思。
+
+   跟纹理分成两层而不是塞进同一条 background：纹理要过 SVG 滤镜，
+   高光不能过——滤镜会把渐变也一起揉弯，高光就碎了。 */
+.template-collage .tpl-tag::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  clip-path: inset(0 round 999px);
+  background:
+    linear-gradient(160deg, #ffffff52 0%, #ffffff1a 22%, #ffffff00 46%),
+    radial-gradient(120% 60% at 18% 8%, #ffffff3d 0%, #ffffff00 62%),
+    linear-gradient(340deg, #00000033 0%, #00000000 40%);
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* 两列字母：左列 DUMB、右列 RAVEN，不是按行铺的十个字母。 */
