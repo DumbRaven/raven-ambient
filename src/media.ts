@@ -57,6 +57,24 @@ export function listenMedia(onMessage: (message: MediaMessage) => void): () => v
 function push(action: unknown) {
   const bridge = raven();
   bridge.__ravenMediaOutbox = [...(bridge.__ravenMediaOutbox ?? []), action];
+  knock();
+}
+
+/**
+ * 推完动作后敲一下主进程的门，让它立刻来取，不等 400ms 那一轮。
+ *
+ * 借 media:// 协议递信号，不引 preload、不动沙箱设置。全屏这类动作对时机敏感：
+ * 晚一百毫秒，用户就会看到「画面先在窗口里铺满、过一会儿窗口才变大」。
+ *
+ * 敲门失败无所谓——下一轮轮询照样会把动作取走，只是慢一点。
+ * 用 keepalive 是怕页面正在卸载时请求被丢掉；这里其实不会，但代价为零。
+ */
+function knock() {
+  try {
+    void fetch(`media://local/__knock`, { method: 'HEAD', cache: 'no-store' }).catch(() => undefined);
+  } catch {
+    /* 敲门只是加速，失败就走轮询 */
+  }
 }
 
 /** 问主进程要一份「当前放行了哪些目录」。页面刚挂载时调一次。 */

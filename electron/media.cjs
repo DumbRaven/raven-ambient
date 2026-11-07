@@ -76,6 +76,18 @@ function targetOf(request) {
   }
 }
 
+/**
+ * 页面敲门用的伪路径。
+ *
+ * 为什么不加 preload / 不开 IPC：页面现在是 `sandbox: true`、无 preload，
+ * 这个约束是有意的（见文件头）。但 `media://` 协议本来就允许页面发请求，
+ * 借它递一个「快去看看 outbox」的信号，既不用放开任何沙箱设置，
+ * 也不用为了一个时序问题引入新的 IPC 通道。
+ *
+ * 这个路径不是文件，永远不会进白名单判断——在协议处理器最开头就分出去。
+ */
+const KNOCK = '/__knock';
+
 function mediaUrl(file) {
   return `${SCHEME}://local/${encodeURIComponent(file)}`;
 }
@@ -359,6 +371,20 @@ class MediaBridge {
     webContents.once('destroyed', () => this.stop());
   }
 
+  /**
+   * 页面敲门：立刻取一次，不等下一轮 POLL。
+   *
+   * 为什么需要：400ms 轮询对「选文件、扫描」这种无所谓时机的动作够用，
+   * 但全屏要抢在窗口开始变化之前把请求送到主进程，否则用户会看到
+   * 「画面先在窗口里铺满，等一百毫秒窗口才变大」——像跳了两下。
+   * 实测那一百毫秒里大头就是轮询的等待。
+   *
+   * 敲门本身不读任何数据，只是把 take 提前，返回后还按原来的帧走。
+   */
+  poke() {
+    if (this.target && !this.target.isDestroyed()) void this.take(this.target);
+  }
+
   stop() {
     if (this.timer !== undefined) { clearInterval(this.timer); this.timer = undefined; }
     this.target = null;
@@ -370,6 +396,14 @@ let bridge = null;
 /** app.ready 之后调用：装好协议处理与轮询。 */
 function attachMedia() {
   protocol.handle(SCHEME, async (request) => {
+    // 敲门：页面推完动作后想立刻被处理，不等下一轮 POLL。
+    // 必须在白名单判断之前分出去，否则这个伪路径会被当成越权文件。
+    if (new URL(request.url).pathname === KNOCK) {
+      if (bridge) bridge.poke();
+      // 204 不允许带 body：传 '' 会让 Response 构造抛错（页面收到的是网络错误，
+      // 于是敲门的 fetch 走进 catch——功能不受影响，但控制台会刷一屏）。
+      return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } });
+    }
     const target = targetOf(request);
     if (!target) return new Response('bad request', { status: 400 });
     // 只认白名单里的目录。没有这一步，media:// 就是任意文件读取后门。

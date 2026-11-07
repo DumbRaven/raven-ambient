@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Droplets, FilePlus2, FolderOpen, ImageIcon, Layers, Maximize2, Minimize2, Pause, Play, RefreshCw, Sparkles, X, Palette
 } from 'lucide-react';
 import { mediaSrc, setWindowFullscreen } from './media';
+import { afterResize as afterResizeWait, canToggle } from './fullscreen-timing';
 import TemplateStage, { type StageAmbience, type StageDisc, type StageFocus, type StageNow } from './TemplateStage';
 import { defaultTone, normaliseHex, readTone, toneGroups, toneHint, toneKey, writeTone, type ToneSetting } from './tone-setting';
 import OverlayLayer from './OverlayLayer';
@@ -125,6 +126,10 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   // 全屏：播放台铺满整个窗口，其余全部让开。
   // 放映本来就是「一直看着」的动作，窗口框和格子在这时候都是干扰。
   const [expanded, setExpanded] = useState(false);
+  // 上一次切换全屏的时刻（performance.now）。只用来挡住系统过渡期间的连点。
+  // 初值必须是 -Infinity 不能是 0：页面刚起来时 performance.now() 也很小，
+  // 拿 0 当「没点过」的哨兵会把第一次点击挡掉。
+  const expandedLockRef = useRef(-Infinity);
   // 全屏时控制条自动隐藏。鼠标不动两秒多就淡出，动一下立刻回来。
   // 不做成「鼠标不在控制条上就隐藏」——全屏看电影时鼠标往往停在画面正中不动，
   // 那条黑带会一直压在画面底下。
@@ -237,11 +242,50 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [active, current]);
 
+  // 等窗口内容区真的开始变尺寸后再执行，最多等 250ms（兜底见 fullscreen-timing.ts）。
+  //
+  // 为什么不能直接铺满：Windows 进/出真全屏是渐变的，页面这边立刻挂
+  // `.is-expanded` 会先把播放台撑满**旧窗口**，几十毫秒后窗口才变大——
+  // 用户看到的就是「先在窗口里铺满，再整个放大」，像跳了两下。
+  // 反过来等尺寸变化再铺满，放大就像跟着窗口一起走。
+  const cancelResizeRef = useRef<(() => void) | null>(null);
+  const afterResize = useCallback((run: () => void) => {
+    cancelResizeRef.current?.();
+    cancelResizeRef.current = afterResizeWait(
+      {
+        size: () => ({ width: window.innerWidth, height: window.innerHeight }),
+        frame: run2 => window.requestAnimationFrame(run2),
+        cancel: handle => window.cancelAnimationFrame(handle),
+        now: () => performance.now(),
+      },
+      run,
+    );
+  }, []);
+  useEffect(() => () => cancelResizeRef.current?.(), []);
+
   // 进出全屏。页面铺满只盖得住内容区，任务栏和窗口边框要主进程收。
-  // 顺带把体感做对：全屏时把窗口也切进真全屏，退出时还原。
-  useEffect(() => {
-    setWindowFullscreen(expanded);
-  }, [expanded]);
+  //
+  // 顺序统一是「先窗口、后页面」：进入时先请窗口全屏，等它开始变大再铺满；
+  // 退出时先请窗口退出，等它开始变小再撤回来。两个方向都这样，中间才不会
+  // 出现「播放台在旧窗口里撑满」那一帧。
+  //
+  // 这里不放 `useEffect(() => setWindowFullscreen(expanded), [expanded])`：
+  // expanded 现在只有 toggleFullscreen 一个来源，它自己已经推过了。
+  // 再加一个 effect 会让每次切换推两遍，主进程也就 setFullScreen 两次——
+  // 值相同但 Windows 会再走一遍过渡，事件也重复。
+  const toggleFullscreen = useCallback(() => {
+    const now = performance.now();
+    // 冷却锁：系统过渡期间连点会让两次请求互相覆盖，窗口和页面就此错开。
+    if (!canToggle(expandedLockRef.current, now)) return;
+    expandedLockRef.current = now;
+    if (expanded) {
+      setWindowFullscreen(false);
+      afterResize(() => setExpanded(false));
+    } else {
+      setWindowFullscreen(true);
+      afterResize(() => setExpanded(true));
+    }
+  }, [expanded, afterResize]);
 
   // 全屏时控制条的呼吸：出现 → 静止 2.6 秒 → 淡出。
   // 鼠标移动、按键、点画面都会把它叫回来。
@@ -284,11 +328,11 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
       if (event.key !== 'Escape' || event.repeat) return;
       event.preventDefault();
       event.stopPropagation();
-      setExpanded(false);
+      toggleFullscreen();
     };
     document.addEventListener('keydown', onKeyDown, true);
     return () => document.removeEventListener('keydown', onKeyDown, true);
-  }, [expanded]);
+  }, [expanded, toggleFullscreen]);
 
   const screenKind = current?.kind;
 
@@ -604,7 +648,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                 </>
               )}
             </div>
-            <button className="icon-button theater-expand" aria-label={expanded ? '退出全屏' : '全屏'} aria-pressed={expanded} onClick={() => setExpanded(value => !value)}>
+            <button className="icon-button theater-expand" aria-label={expanded ? '退出全屏' : '全屏'} aria-pressed={expanded} onClick={toggleFullscreen}>
               {expanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
           </div>
