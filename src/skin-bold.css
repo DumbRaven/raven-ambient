@@ -6351,26 +6351,62 @@ body:has(.media-room.is-expanded) {
 }
 
 /* 剩余时间细线。轨道半透明、内层实色——不用父级 opacity，
-   否则整棵子树一起被压暗，内层的实色也会跟着变淡。 */
+   否则整棵子树一起被压暗，内层的实色也会跟着变淡。
+
+   线高 0.16cqw 时实测只有 1.88px：用户在 m05853 问「这是个进度条吗，
+   怎么感觉没在动」。它确实在动——25 分钟走满一整条 387px，
+   每 800ms 一拍只挪 0.207px，满一像素要 3.9 秒。
+   加粗是为了先把「它是一条会变的线」立住；真正让它可读的是下面那个端点圆点。 */
 .template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-bar {
-  position: static;
+  position: relative;
   display: block;
   width: 100%;
-  height: 0.16cqw;
-  margin-top: 0.3cqw;
+  height: 0.22cqw;
+  margin-top: 0.34cqw;
   border-radius: 999px;
   background: color-mix(in srgb, currentColor 18%, transparent);
-  overflow: hidden;
+  /* 不能写 overflow: hidden——端点圆点要探出线头一点点，
+     裁掉就只剩半个圆，看着像线头上有个毛刺。 */
+  overflow: visible;
 }
 
+/* 已走过的部分。
+   实心度用 color-mix 而不是 opacity：opacity 会连带把子元素（那个圆点）
+   一起压淡，而圆点需要比线更实才读得出来。
+
+   `max-width: none` 必须写：`.media-room.is-expanded .tpl-fields span`
+   （`src/skin-bold.css:4231`）给文字格里的所有 span 设了 `max-width: 30ch`，
+   那是给长文字防溢出的，但它的选择器也命中了这个填充块。实测 30ch ≈ 294px，
+   于是整条线最宽只到 294.77 / 387.2 = 76.13% —— 剩余时间在 76% 以上时
+   （也就是刚开工那大半个阶段）这条线**一直是同一根**，用户看到的就是
+   「它根本没在动」。这条 bug 藏了很久，因为 76% 的线看起来完全正常。 */
 .template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-bar > span {
-  position: static;
+  position: relative;
   display: block;
+  max-width: none;
   height: 100%;
-  background: currentColor;
-  opacity: 0.8;
+  background: color-mix(in srgb, currentColor 80%, transparent);
   border-radius: inherit;
   transition: width 800ms linear;
+}
+
+/* 端点圆点：进度走到哪儿的那颗珠子。
+   为什么非要有它：一条线的边缘在缓慢变短，人眼很难注意到；一个有明确形状的
+   小点缓慢平移，哪怕 4 秒才挪 1px，也比「线段变短了」更容易被理解成「在走」。
+   它同时回答了「这条线是什么」——有个头就说明有进程。
+
+   直径取 0.52cqw（≈8px）：线本身只有 2.58px 高，圆点只比线粗一点点是没有
+   意义的——第一版 0.34cqw 实测 4px，和线几乎分不开，等于没加。 */
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-bar > span::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 0.52cqw;
+  height: 0.52cqw;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translate(50%, -50%);
 }
 
 .template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-meta {
