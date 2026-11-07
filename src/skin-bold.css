@@ -3417,6 +3417,18 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
     0 10px 30px #00000059;
   border: 0;
   opacity: 1;
+  /* 必须显式抬起来：版式信息条 `.tpl-block-bar` 是 `z-index: 8`，而控制条是
+     `z-index: auto`（= 0），于是信息条真的压在控制条上面。
+
+     一开始量错了、以为不是层级问题：控制条原来 `bottom: 0`、高 62，
+     中线 y=1049，而信息条底边在 y=1042——中线整个落在信息条下方，
+     elementFromPoint 五个点全命中控制条自己。改成离底的胶囊之后
+     两者重叠 32px，那一段一直是信息条在画（实测像素亮度 116，
+     和没盖住的信息条一模一样），看起来就像「胶囊只有右半边浮起来了」。
+
+     取 14：高于信息条的 8 和日期那层 12，低于叠加菜单的 71
+     （菜单要能从控制条里弹出来、盖在它上面）。 */
+  z-index: 14;
   transition: opacity 260ms ease, transform 260ms ease;
 }
 
