@@ -54,8 +54,38 @@ const cabinet = {
 
 const MEASURE = `(() => {
   const text = sel => document.querySelector(sel)?.textContent ?? null;
+  // 副行：本地是「1:12 / 3:48 · 列表循环」，外部是专辑名。
+  // 它没内容时 JSX 整个不渲染，所以 null 也是一条结论（不是量失败）。
+  const detailEl = document.querySelector('.tpl-now-detail');
+  const listEl = document.querySelector('.tpl-block-bar .tpl-list');
+  const barEl = document.querySelector('.tpl-block-bar');
+  const inBar = el => {
+    if (!el || !barEl) return null;
+    const r = el.getBoundingClientRect();
+    const b = barEl.getBoundingClientRect();
+    return {
+      x: +(((r.left - b.left) / b.width) * 100).toFixed(2),
+      y: +(((r.top - b.top) / b.height) * 100).toFixed(2),
+      w: +((r.width / b.width) * 100).toFixed(2),
+      h: +((r.height / b.height) * 100).toFixed(2),
+      bottom: +(((r.bottom - b.top) / b.height) * 100).toFixed(2),
+    };
+  };
   return {
     playlist: text('.tpl-block-bar .tpl-list span'),
+    detail: detailEl
+      ? {
+          text: detailEl.textContent,
+          fontSize: getComputedStyle(detailEl).fontSize,
+          weight: getComputedStyle(detailEl).fontWeight,
+          rect: inBar(detailEl),
+          // 副行被 ellipsis 截掉时 scrollWidth 会比 clientWidth 大
+          clipped: detailEl.scrollWidth > detailEl.clientWidth + 1,
+        }
+      : null,
+    // 两行加起来有没有顶出信息条底边。信息条只有 274px 高，
+    // 溢出的话这里能直接看出来，不用靠截图猜。
+    list: { rect: inBar(listEl), scrollH: listEl?.scrollHeight ?? 0, clientH: listEl?.clientHeight ?? 0 },
     // 信息条 TITLE 那一格仍然是画面名——它问的就是「这一页是什么」
     titleField: text('.tpl-block-bar .tpl-fields > div:first-child span'),
     heading: text('.tpl-title-text'),
@@ -92,6 +122,10 @@ guard(async () => {
   // 所以 PLAYLIST 应当留空而不是瞎写一个画面文件名。
   // 「本地模式在放的时候写什么」由 tests/stage-text.test.ts 覆盖。
   const localIdle = await probe.run(MEASURE);
+
+  // 本地「在放的时候」副行长什么样由 tests/stage-text.test.ts 覆盖。
+  // 这里不点播放：探针里的唱片资源是假的（asset:music:1 读不到文件），
+  // 点了也只会报错，而副行的排版靠下面外部模式那一趟就能验到——两者共用同一套 CSS。
 
   // 切到外部音乐模式。**必须从当前 localStorage 读出来再改**，不能用常量重建：
   // cabinet 里还有 version 这类字段，缺了会被 sanitizeCabinet 当成旧数据丢掉，

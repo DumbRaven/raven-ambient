@@ -24,7 +24,7 @@ import { videoPalette } from './video-palette';
 import { collageTone, findTemplate, templateTitle, type TemplateId, type ToneHint } from './templates';
 import { timerText } from './overlays';
 import { phaseCaptions, type FocusPhase } from './focus';
-import { nowLine, timeOfDay, type StageNow } from './stage-text';
+import { nowDetail, nowLine, timeOfDay, type StageNow } from './stage-text';
 
 /** 右下角那只彩胶。没在放音乐时它是空的，只留一圈盘面。 */
 
@@ -52,9 +52,9 @@ function useMarbleFilter() {
 
 export type StageDisc = { cover?: string; color: string; key: string; spinning: boolean };
 
-/* StageNow / timeOfDay / nowLine 住在 stage-text.ts：纯字符串逻辑，不碰 DOM，
+/* StageNow / timeOfDay / nowLine / nowDetail 住在 stage-text.ts：纯字符串逻辑，不碰 DOM，
    单独一个文件就能直接测，不用把 React 拖进测试里。 */
-export { nowLine, timeOfDay, type StageNow } from './stage-text';
+export { nowDetail, nowLine, timeOfDay, type StageNow } from './stage-text';
 
 /**
  * 信息条右半边那块番茄钟的读数。
@@ -156,6 +156,9 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
      不缓存：MediaRoom 每 800ms 会把番茄钟读数交上来，组件本来就在持续重渲染，
      时段跨过整点时下一拍就跟上了。 */
   const heading = timeOfDay();
+  /* PLAYLIST 的副行：本地是「01:12 / 03:48 · 列表循环」，外部是专辑。
+     空串表示这一行没内容，JSX 那边就不渲染它，不留一根空线。 */
+  const detail = nowDetail(now);
   const [colors, setColors] = useState<string[]>([]);
   const [discColors, setDiscColors] = useState<string[]>([]);
 
@@ -375,8 +378,10 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
                   ① 这里取的是当前画面的文件名，画面和数据没关系；
                   ② 把后面 9 首用顿号串成一大段，那不是「此刻在放什么」。
                   现在按模式分两条路：本地读唱片名 + 艺人，外部读媒体会话的
-                  歌名 + 歌手 + 播放器名（三样拼起来才够认，外部音乐没有封面可看）。 */}
+                  歌名 + 歌手 + 播放器名（三样拼起来才够认，外部音乐没有封面可看）。
+                  第二行讲「放到哪了」：本地是进度 + 播放顺序，外部是专辑。 */}
               <span>{nowLine(now)}</span>
+              {detail && <span className="tpl-now-detail">{detail}</span>}
             </div>
             <Raven className="tpl-raven" />
           </div>

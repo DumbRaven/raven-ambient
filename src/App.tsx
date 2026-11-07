@@ -465,6 +465,9 @@ export default function App() {
         artist: nowPlaying.artist,
         app: appLabel(nowPlaying.app),
         playing: nowPlaying.playing,
+        // 系统媒体会话顺带给了专辑，拿来当 PLAYLIST 的副行。
+        // 拿不到（很多本地文件没有这张标签）时是空串，副行自然不渲染。
+        album: nowPlaying.album,
       };
     }
     const record = cabinet.records.find(item => item.id === status.currentId);
@@ -476,8 +479,13 @@ export default function App() {
       // musicPlaying 而不是 running：整间停止时 running 也会下去，
       // 但那和「这一首被暂停了」是两件事，这里只关心后者。
       playing: status.musicPlaying,
+      // 进度来自 audio.ts 每次 tick 写入的 currentTime / duration，
+      // 播放顺序是收藏柜自己的设置。两样都是现成的，不用新开数据源。
+      at: status.currentTime,
+      span: status.duration,
+      order: orderNames[cabinet.order],
     };
-  }, [cabinet.lineMode, cabinet.records, status.currentId, status.musicPlaying, nowPlaying]);
+  }, [cabinet.lineMode, cabinet.order, cabinet.records, status.currentId, status.musicPlaying, status.currentTime, status.duration, nowPlaying]);
 
   const artFor = (record: RecordItem) => pickSleeve(record.id, launchSeed);
   const selected = (record: RecordItem) => (record.category === 'music' ? cabinet.queue : cabinet.ambience).includes(record.id);

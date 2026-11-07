@@ -9,10 +9,25 @@
  *
  * 分两条路是必须的：本地模式的数据在 cabinet.records 里，
  * 外部模式的数据来自系统媒体会话（NowPlaying），字段名字都不一样。
+ *
+ * 主行之外还有一份「副行」：本地是进度 + 播放顺序，外部是专辑。
+ * 两边的副行内容不一样，是因为能拿到的数据本来就不一样——
+ * 外部播放器的媒体会话只给标题、歌手、专辑，不给播放位置。
  */
 export type StageNow =
-  | { kind: 'local'; title: string; artist: string; playing: boolean }
-  | { kind: 'external'; title: string; artist: string; app: string; playing: boolean }
+  | {
+      kind: 'local'; title: string; artist: string; playing: boolean;
+      /** 播放进度，秒。拿不到时为 0。 */
+      at?: number;
+      /** 总时长，秒。拿不到时为 0。 */
+      span?: number;
+      /** 播放顺序的显示名，比如「列表循环」。 */
+      order?: string;
+    }
+  | {
+      kind: 'external'; title: string; artist: string; app: string; playing: boolean;
+      album?: string;
+    }
   | null;
 
 /**
@@ -48,4 +63,40 @@ export function nowLine(now: StageNow | undefined): string {
     : [now.title, now.artist];
   const line = parts.filter(Boolean).join(' · ');
   return now.playing ? line : `${line} · 已暂停`;
+}
+
+/** 秒 → `m:ss`。超过一小时才补小时位，绝大多数歌用不上。 */
+export function clock(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+  const total = Math.floor(seconds);
+  const s = total % 60;
+  const m = Math.floor(total / 60) % 60;
+  const h = Math.floor(total / 3600);
+  const mm = String(m).padStart(2, '0');
+  const ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+}
+
+/**
+ * PLAYLIST 的副行：主行讲「是哪一首」，这一行讲「放到哪了」。
+ *
+ * 本地模式有进度也有播放顺序；外部模式两样都拿不到（系统媒体会话只给
+ * 标题/歌手/专辑），所以如实换成专辑——**不要编一个假进度出来**，
+ * 那会让人以为播放器真的在报位置。
+ *
+ * 两样都没有时返回空串，调用方据此不渲染这一行，不留一根空线。
+ */
+export function nowDetail(now: StageNow | undefined): string {
+  if (!now) return '';
+  if (now.kind === 'external') {
+    // 专辑常常跟歌名、歌手重复（单曲、翻唱合辑里很常见），去掉就没信息量了。
+    const album = (now.album ?? '').trim();
+    if (!album) return '';
+    const dupe = album === now.title.trim() || album === now.artist.trim();
+    return dupe ? '' : album;
+  }
+  const parts: string[] = [];
+  if ((now.span ?? 0) > 0) parts.push(`${clock(now.at ?? 0)} / ${clock(now.span ?? 0)}`);
+  if (now.order) parts.push(now.order);
+  return parts.join(' · ');
 }

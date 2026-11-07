@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nowLine, timeOfDay } from '../src/stage-text.ts';
+import { clock, nowDetail, nowLine, timeOfDay } from '../src/stage-text.ts';
 
 test('时段词按本机时钟切四段', () => {
   const at = (hour: number) => timeOfDay(new Date(2026, 10, 5, hour, 30));
@@ -55,4 +55,59 @@ test('缺字段时跳过而不是留下空的那一格', () => {
     nowLine({ kind: 'local', title: 'Only Title', artist: '', playing: true }),
     'Only Title',
   );
+});
+
+test('秒数写成 m:ss，超过一小时才补小时位', () => {
+  assert.equal(clock(0), '0:00');
+  assert.equal(clock(9), '0:09');
+  assert.equal(clock(72), '1:12');
+  assert.equal(clock(228), '3:48');
+  assert.equal(clock(600), '10:00');
+  assert.equal(clock(3661), '1:01:01');
+});
+
+test('时长拿不到时写 0:00，不写 NaN 也不写负数', () => {
+  assert.equal(clock(NaN), '0:00');
+  assert.equal(clock(-5), '0:00');
+  assert.equal(clock(Infinity), '0:00');
+});
+
+test('本地模式的副行是进度加播放顺序', () => {
+  assert.equal(
+    nowDetail({ kind: 'local', title: 'Ocean', artist: 'DumbRaven', playing: true, at: 72, span: 228, order: '列表循环' }),
+    '1:12 / 3:48 · 列表循环',
+  );
+});
+
+test('没有时长时只写播放顺序，不写 0:00 / 0:00', () => {
+  assert.equal(
+    nowDetail({ kind: 'local', title: 'Ocean', artist: 'DumbRaven', playing: true, at: 0, span: 0, order: '随机播放' }),
+    '随机播放',
+  );
+});
+
+test('外部模式拿不到进度，副行如实写专辑——不编一个假进度', () => {
+  assert.equal(
+    nowDetail({ kind: 'external', title: 'Ab Ovo', artist: 'Joep Beving', app: '网易云音乐', playing: true, album: 'Henosis' }),
+    'Henosis',
+  );
+  // 系统媒体会话不给播放位置，所以到这里也不该出现任何时间
+  const line = nowDetail({ kind: 'external', title: 'Ab Ovo', artist: '', app: '', playing: true });
+  assert.equal(line, '');
+});
+
+test('专辑跟歌名或歌手重复时不显示，否则等于同一句话说两遍', () => {
+  assert.equal(
+    nowDetail({ kind: 'external', title: 'Ab Ovo', artist: 'Joep Beving', app: '', playing: true, album: 'Ab Ovo' }),
+    '',
+  );
+  assert.equal(
+    nowDetail({ kind: 'external', title: 'Ab Ovo', artist: 'Joep Beving', app: '', playing: true, album: 'Joep Beving' }),
+    '',
+  );
+});
+
+test('什么都没有时副行是空串，调用方据此不渲染那一行', () => {
+  assert.equal(nowDetail(null), '');
+  assert.equal(nowDetail(undefined), '');
 });

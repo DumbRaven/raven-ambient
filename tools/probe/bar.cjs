@@ -36,7 +36,40 @@ const CODE = `(() => {
     };
   };
   const tags = [...document.querySelectorAll('.tpl-block-bar .tpl-fields > div > b, .tpl-block-bar .tpl-list > b')];
+  // 标签下面那几个「值」的字号：TITLE 的画面名、PLAYLIST 的曲目串，以及
+  // 曲目串下面那行副信息。用户问过「为什么这两个不一样大」，所以量的时候一并带上。
+  const values = [...document.querySelectorAll('.tpl-block-bar .tpl-fields > div > span, .tpl-block-bar .tpl-list > span')];
+  // 副行是空串时不渲染，量不到就说明这一行确实没出现——这本身也是个结论。
+  const detail = document.querySelector('.tpl-now-detail');
+  const list = document.querySelector('.tpl-block-bar .tpl-list');
   return {
+    detail: detail
+      ? ((cs => ({
+          text: detail.textContent,
+          fontSize: cs.fontSize,
+          fontWeight: cs.fontWeight,
+          opacity: cs.opacity,
+          rectInBar: relBar(detail),
+        }))(getComputedStyle(detail)))
+      : null,
+    // 信息条只有 274px 高：PLAYLIST 这两行加起来有没有顶到底边外面，
+    // 看 list 的底边相对信息条的位置就知道。
+    listBox: { rectInBar: relBar(list), scrollH: list.scrollHeight, clientH: list.clientHeight },
+    values: values.map(el => {
+      const cs = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      return {
+        text: (el.textContent || '').slice(0, 40),
+        fontSize: cs.fontSize,
+        lineHeight: cs.lineHeight,
+        fontWeight: cs.fontWeight,
+        fontFamily: cs.fontFamily.split(',')[0],
+        opacity: cs.opacity,
+        w: +r.width.toFixed(1),
+        h: +r.height.toFixed(1),
+        rectInBar: relBar(el),
+      };
+    }),
     barPx: { w: +bb.width.toFixed(1), h: +bb.height.toFixed(1) },
     tags: tags.map(el => {
       const cs = getComputedStyle(el);
