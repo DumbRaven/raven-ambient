@@ -12,46 +12,13 @@
  * 沉积层的平行条纹被压成弯弯曲曲的脉络。所以正确做法不是「生成噪声」，
  * 而是「先画直的条纹，再用低频噪声把它揉弯」——这正是 feDisplacementMap 干的事。
  * 直接照搬 feTurbulence 出来的是一片**均匀噪点**，像电视雪花。
- * （AE 源里那层就是「分型杂色 + 柔光」，照搬过来正是用户说的
- *  「看着就有点像分型杂色原来的样子」。）
  *
- * `jade`（玉石）：参考视频里那块胶囊放大看，是**大块的明暗、边界清楚、
- * 整体落差不大**的玉质感。用户 m07154 原话「不是云雾，而是类似于玉石那样的质感，
- * 明暗比较分明」，m07352 再确认「这个图一是我想要的感觉」。
- *
- * ## jade 的参数是怎么定的（三次失败之后）
- *
- * 一开始照统计靶子调：量参考图裁片的 sd / 峰度 / range95，然后搜参数。
- * 连做七轮都不像，原因有三层，每一层都是「测量骗人」：
- *
- *   1. **采样位置错了**：量的是胶囊左右两侧的无字窄带（6%~17% 与 83%~94%），
- *      那两条恰好是整块里最均匀的部分。拿边缘的统计去逼近整体，
- *      必然做出「均匀的糊」。
- *
- *   2. **绝对 sd 不可比**：参考图是从 134px 放大到 700px 的低通片，
- *      我们的截图是原生 140px。一路压 opacity 去追绝对 sd，压到看不见为止。
- *      改成比**衰减形状**（块均值 sd ÷ 1px sd）之后才有意义。
- *
- *   3. **峰度这个判据本身是错的**：`feTurbulence` 只有单一尺度，
- *      分布天生接近高斯，峰度停在 8~17 做不出参考图的 3.33。
- *      为了压峰度去加第二尺度，反而把纹理做成斑点。
- *
- * 最后靠两个数把形态定死（口径见 `tools/measure/stone-stats.cjs`）：
- *
- * |        | sd  | gradP95 | sd / gradP95 |
- * |--------|-----|---------|--------------|
- * | 参考图  | 12.1|   4.2   |     2.88     |
- * | 本版    | 13.0|   3.0   |     4.33     |
- *
- * `sd / gradP95` 说的是「这么大起伏里有多少是清楚的边界」。
- * 云雾版是 13.2（全是糊），`turbulence` 高频版是 1.8（全是碎点）。
- * `turbulence` 配大 slope 落在 3~4 之间，与参考图同量级——这一步才找对方向。
- *
- * 两条踩过的坑固化在参数里：
- *   - **alpha 必须钉死**：feTurbulence 的 alpha 也是噪声，不钉整块会半透明，
- *     柔光叠上去只剩一层灰雾。
- *   - **blur 不能大**：`stdDeviation` 超过 1 边界就糊回去（变塑料），
- *     小于 0.3 又留 1px 锯齿。0.6 是试出来的。
+ * `jade`（玉石）：参考视频里那块胶囊，是**大块明暗之间带连贯纹路**的玉。
+ * 用户三次否定的原话决定了它的样子：
+ *   m07154「不是云雾，而是类似于玉石那样的质感，明暗比较分明」
+ *   m07574「有那种玉石里面有那种色彩纹路渐隐渐现的沁在里面一样……现在单纯是色块了，没有链接感」
+ *   m08231「有点太雾了，没有玉石明显的纹路感啊，你自己没发现吗」
+ * 三句连起来是：**要有纹路，纹路要连贯、渐隐渐现，但不要硬边、不要糊成雾**。
  */
 export const MARBLE_FILTER_ID = 'tpl-marble';
 
@@ -66,7 +33,7 @@ export type StoneStyle = 'sea' | 'jade';
  */
 export const stoneStyles: ReadonlyArray<{ id: StoneStyle; name: string; hint: string }> = [
   { id: 'sea', name: '浪脊', hint: '横向起伏的石纹' },
-  { id: 'jade', name: '玉石', hint: '大块明暗，像玉里的雾' },
+  { id: 'jade', name: '玉石', hint: '明暗之间连着纹' },
 ];
 
 export function isStoneStyle(value: unknown): value is StoneStyle {
@@ -106,101 +73,163 @@ function seaMarkup(id: string): string {
   );
 }
 
+/** 折一次 = 一条纹。峰处落 `lo`，其余落 `hi`。 */
+function foldTable(rings: number, sharp: number, lo: number, hi: number): string {
+  const steps = Math.max(96, 32 * rings + 1);
+  const values: string[] = [];
+  for (let index = 0; index < steps; index += 1) {
+    const unit = index / (steps - 1);
+    // |sin| 每跨 1/rings 循环一次，每次都是一个「峰」——峰处画一条暗纹。
+    const peak = Math.pow(Math.abs(Math.sin(unit * rings * Math.PI)), sharp);
+    values.push((hi - peak * (hi - lo)).toFixed(3));
+  }
+  return values.join(' ');
+}
+
 /**
- * 玉石：两尺度噪声叠加 → 揉弯 → 抬底裁顶。
+ * 玉石：折叠出纹路 → 揉弯 → 多层 lerp → 末尾一级线性收尾。
  *
- * 这一版和最初那版（`type="turbulence"` + 大 slope 做「脊」）是完全两条路。
- * 走到现在换了二十多轮，把结论留在这里，改参数之前先读：
+ * 走到这一版换了五十多轮，把结论留在这里，改参数之前先读。
  *
- * ## 参考图到底是什么
+ * ## 参考图到底是什么（前四次都读错了）
  *
- * 放大 6 倍看（`tools/measure/ref-top.png`）是一片**连续的灰雾**：
- * 有明有暗，但**没有任何一条边界线**；最暗处只到中灰，最亮处远不到白。
- * 没有丝、没有石脉、没有颗粒。此前十几轮追求的「边界清楚 / 有主有支的丝」
- * 在参考图里根本不存在——那是照着错误的统计靶子想象出来的。
+ * 放大 6 倍看像「一片连续的灰雾、没有任何边界」，于是做了十几轮雾；
+ * 用户回「有点太雾了，没有玉石明显的纹路感啊，你自己没发现吗」。
+ * 真正的结构是**大块明暗之间连着纹**：纹是半透明的、边缘晕开的，
+ * 所以放大后看着不像「线」，但走向、粗细变化都在。
+ * **把「边缘不生硬」读成「没有边界」**，是这一整段弯路的总根因。
  *
- * ## 三条把方向纠正过来的硬结论
+ * ## 四条把方向纠正过来的硬结论
  *
- *   1. **`turbulence` 出的是等值线**（丝、细胞、闭合圈）。用它配大 slope，
- *      无论怎么调都是「满屏均匀斑驳」。要做雾必须用 `fractalNoise`，
- *      且 `numOctaves` 只取 2（多了立刻碎成颗粒）。
+ *   1. **`feTurbulence` 的线性缩放只能改「振幅」，做不出「形状」**。
+ *      各向异性只会把脊压扁（出来是拉丝金属），调 slope 只会改对比。
+ *      要纹路必须是**等值线**——靠折叠 `pow(|sin(v·rings·π)|, sharp)`
+ *      把噪声值反复循环，每跨一个 1/rings 就是一条线。
+ *      `rings` 等于线的条数，`sharp` 等于线宽。这是唯一走出
+ *      「雾 / 斑点 / 竖条」三条死路的路。
  *
- *   2. **`<feComposite operator="over">` 会把整张灰度图盖上去**，
- *      得到一层不透明灰，CSS 的底色完全看不见。这一条静默出错，
- *      是前十几版「怎么做都像海绵」的直接原因。
- *      要乘用 `operator="arithmetic" k1="1"`。
+ *   2. **遮罩必须用 lerp，不能用乘法**。乘法（`operator="multiply"` 或
+ *      `arithmetic k1="1"` 直接连乘）会把均值一起砍半，整块发闷；
+ *      lerp 的均值由纹路与背景两端共同决定。
  *
- *   3. **`operator="in"` 会用 SourceGraphic 的 alpha 当遮罩**。
+ *   3. **`<feComposite operator="over">` 会把整张灰度图盖上去**，
+ *      得到一层不透明灰，CSS 底色完全看不见。这条静默出错，
+ *      是前十几版「怎么做都像海绵」的直接原因。要乘用 `arithmetic k1="1"`。
+ *
+ *   4. **`operator="in"` 会用 SourceGraphic 的 alpha 当遮罩**。
  *      `::before` 的 `background` 一旦是透明，整张纹理就被乘成 0——
  *      现象是「换个底色，纹理忽然不见」，而且不报错。
  *      圆角裁剪由 CSS 的 `clip-path` 负责，这里不需要它。
  *
- * ## 参数
+ * ## 参数（口径见 `tools/measure/hist-round.cjs` 与 `tools/measure/blobs.cjs`）
  *
- * - `baseFrequency 0.022`（横向）：胶囊约 140 CSS px 宽，周期 ≈ 45px，
- *   团块横跨胶囊三分之一。**这个数改大过也改小过，两头都不对**：
- *   0.062（周期 16px）实机是一粒一粒的霜花；0.014 以下整条胶囊
- *   只有一处起伏，读起来像渐变而不像石头。
- * - `freqY = freq / 1.45`：参考图量出的各向异性是**纵向拉长 1.41 倍**
- *   （`texture-scale.cjs` 的相关半衰 x 6.73 / y 9.77），所以纵向频率更低。
- * - `blur 0.9`（只作用在细层）：磨掉 `feTurbulence` 等值面的硬边。
- *   没有模糊时那些等值线边界清楚，像霜花；加到 1.4 以上整块糊成
- *   一片均匀浅灰（`stone-jade35.cjs` 六档全平），结构没了。
- * - `room 1.6 / center 0.487`：`center` 取裸玻璃的实测亮度（124/255），
- *   纹理围绕它上下浮动，**不改变整体明暗**。`room` 大于 1 是有意的，
- *   两端被钳到 0/1，形成少量极亮极暗的小块。
- * - 第二层 `baseFrequency 0.005`（周期 ≈ 200px，比胶囊还宽）提供
- *   **整片的明暗过渡**，`room 2.0` 比细层更阔，负责那处「一半亮一半暗」。
- *   两层按 0.45 加权**相加**——相乘会把暗处压得更暗，均值会崩。
- * - 可见度在 CSS 那层（`opacity`），不在滤镜里。分开放的理由：
- *   滤镜决定「起伏多大」，CSS 决定「能不能看见」，两件事调的时候不该互相干扰。
+ * 参考图（`tools/measure/tag-raw.png`，按胶囊自身圆角造掩膜）：
+ *
+ *   mean 133.2  sd 9.7  skew −0.55
+ *   暗区占 0.498，其中 ≥12px 的连通块占 **0.908**，块数 30，直径 p95 **33.8**
+ *
+ * 本版实测 `mean 132.7 / sd 9.5 / skew −0.69 / large 0.871 / blobs 32 / diam p95 27.2`。
+ *
+ * - **`sharp 4.5 / rings 1`（不是高 sharp）**：这一条推翻了前面十几轮的判断。
+ *   高 `sharp` 能把 `skew` 调成负的（亮底暗点），但暗部会碎成麻点——
+ *   参考图是**几大片连着的暗团**，`blobs.cjs` 量出大块占比 0.908，
+ *   而高 sharp 版只有 0.742。**直方图对不出这个差别**：
+ *   一片 100px 的暗团与 100 个 10px 的点，直方图完全一样。
+ *   所以判据必须是暗区的**连通性**，不是分布。
+ * - **主纹周期 ≈50px、细纹 ≈12px**：细层只贡献边缘碎边、权重 0.22，
+ *   不参与暗区主体——它一多，暗区就被切成小点。
+ * - **位移 `scale 62` + 位移场频率 `0.011`**：把规整的等值线揉成不规则长团。
+ *   位移太小出来是等值线圈，太大就散成斑。
+ * - **`squeeze` 绕 0.625 等比压缩跨度**：结构对了之后剩下的只是「幅度太大」，
+ *   `k` 只影响对比度、不影响均值。
+ * - **末尾一级 `feColorMatrix` 收尾**：`y' = gain·y + offset`，
+ *   同时给三通道不同的 offset 补偏色（`TINT`，见下）。
+ *   `gain` 定跨度、`offset` 定均值，两者正交；解耦公式是
+ *   `offset = 均值 / 255 − gain × 中间值`，中间值由实测反推。
+ * - 可见度在 CSS 那层（`opacity: 1`），不在滤镜里。
  */
 function jadeMarkup(id: string): string {
-  const CENTER = 0.487;
-
   /**
-   * 一层噪声 → 去色 →（可选）揉弯 → 抬底裁顶。
+   * 一层纹路：噪声 → 去色 → 折叠成等值线 → 抬到 `[lo, hi]`。
    *
-   * `warp` 为 0 时用 `feOffset` 占位而不是省掉这一步：后面统一按
-   * `${name}b` 取输入，少一个分支就少一种「某一层没接上」的可能。
+   * 折叠必须写在 `feComponentTransfer type="table"` 里——`tableValues`
+   * 就是映射表，浏览器按输入值在表里插值，等价于对整张图做一次折函数。
    */
-  const layer = (name: string, opts: { freq: string; seed: number; room: number; warp: number; warpSeed: number; blur: number }) => {
-    const { freq, seed, room, warp, warpSeed, blur } = opts;
-    // 保留三位小数：0.487 - 0.8 在浮点下是 -0.31300000000000006，
-    // 直接插进 markup 会让标签字符串变脏（测试、探针、diff 都受影响）。
-    const intercept = (CENTER - room / 2).toFixed(3);
-    const bend = warp > 0
-      ? '<feTurbulence type="fractalNoise" baseFrequency="0.01 0.0069" numOctaves="2" seed="' + warpSeed + '" result="' + name + 'wn"/>' +
-        '<feColorMatrix in="' + name + 'wn" type="saturate" values="0" result="' + name + 'wg"/>' +
-        '<feDisplacementMap in="' + name + 'g" in2="' + name + 'wg" scale="' + warp + '" xChannelSelector="R" yChannelSelector="G" result="' + name + 'b"/>'
-      : '<feOffset in="' + name + 'g" dx="0" dy="0" result="' + name + 'b"/>';
-    // 模糊只磨等值面的硬边。加到 1.4 以上整块会糊成一片均匀浅灰（试过）。
-    const soft = blur > 0 ? '<feGaussianBlur in="' + name + 'b" stdDeviation="' + blur + '" result="' + name + 's"/>' : '';
-    const tail = blur > 0 ? name + 's' : name + 'b';
+  const vein = (
+    name: string,
+    cfg: { freq: string; seed: number; rings: number; sharp: number; lo: number; hi: number },
+  ): string => {
+    const table = foldTable(cfg.rings, cfg.sharp, cfg.lo, cfg.hi);
     return (
-      `<feTurbulence type="fractalNoise" baseFrequency="${freq}" numOctaves="2" seed="${seed}" result="${name}n"/>` +
+      `<feTurbulence type="turbulence" baseFrequency="${cfg.freq}" numOctaves="2" seed="${cfg.seed}" result="${name}n"/>` +
       `<feColorMatrix in="${name}n" type="saturate" values="0" result="${name}g"/>` +
-      bend +
-      soft +
-      `<feComponentTransfer in="${tail}" result="${name}">` +
-      `<feFuncR type="linear" slope="${room}" intercept="${intercept}"/>` +
-      `<feFuncG type="linear" slope="${room}" intercept="${intercept}"/>` +
-      `<feFuncB type="linear" slope="${room}" intercept="${intercept}"/>` +
+      `<feComponentTransfer in="${name}g" result="${name}c">` +
+      `<feFuncR type="table" tableValues="${table}"/>` +
+      `<feFuncG type="table" tableValues="${table}"/>` +
+      `<feFuncB type="table" tableValues="${table}"/>` +
       // alpha 钉死：feTurbulence 的 alpha 也是噪声，不钉整块会半透明。
       `<feFuncA type="linear" slope="0" intercept="1"/>` +
       `</feComponentTransfer>`
     );
   };
 
+  const bgTable = foldTable(1, 5, 0.66, 0.90);
+
+  // 末尾收尾的跨度。`sd` 与 gain 近似成正比，参考图 9.7 对应这一档。
+  const gain = 0.5;
+
+  // 均值：`offset = 0.5224 − gain × 0.7168`。0.5224 是参考图 133.2/255，
+  // 0.7168 是本管线折叠表的中间值（由实测反推），于是降 gain 只收跨度、
+  // 均值钉在 133 不动——这是「提亮」与「加对比」两件事解耦的唯一办法。
+  const offset = 0.164;
+
+  /**
+   * 偏色：参考图那块胶囊明显偏蓝（`r 120.5 g 129.4 b 144.9`，
+   * `blueMinusRed +24.3`），而我们原先是中性偏红（`−3.1`）。
+   * 只看亮度完全发现不了这件事，并排一看却差得很明显。
+   *
+   * 必须用 `feColorMatrix`：早期试过给三个 `feFuncX` 不同 intercept，
+   * 结果**六档统计完全相同**——`feComponentTransfer` 的多个 `feFuncX`
+   * 在同一作用域里会让 `innerHTML` 解析出错，整段静默失效。
+   */
+  const tint = [-0.050, -0.008, 0.057];
+
   return (
-    `<svg width="300" height="300"><filter id="${id}" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">` +
-    // 细纹理：0.022 横向（周期 ≈ 45px，团块横跨胶囊三分之一）。
-    // 揉弯让等值面不再闭合；模糊 0.9 磨掉硬边但保住结构。
-    layer('fine', { freq: '0.022 0.0152', seed: 23, room: 1.6, warp: 22, warpSeed: 31, blur: 0.9 }) +
-    // 大块：周期比胶囊还宽，只负责整片的明暗过渡，不揉弯（揉弯会把它切成块）。
-    layer('big', { freq: '0.005', seed: 41, room: 2.0, warp: 0, warpSeed: 0, blur: 0 }) +
-    // 相加：细纹理打底，大块明暗托住。k2 + k3 = 1，中心值不变。
-    '<feComposite in="fine" in2="big" operator="arithmetic" k1="0" k2="0.55" k3="0.45" k4="0"/>' +
+    // 位移与模糊都会让像素跑出元素边界，region 放宽一圈，否则四周被裁。
+    `<svg width="300" height="300"><filter id="${id}" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">` +
+    // 1. 主纹与支纹：主纹宽而连续（暗区主体），细纹窄而碎（只做边缘）。
+    vein('vm', { freq: '0.018 0.025', seed: 23, rings: 1, sharp: 4.5, lo: 0.05, hi: 0.94 }) +
+    vein('vs', { freq: '0.080 0.108', seed: 67, rings: 1, sharp: 14, lo: 0.28, hi: 0.92 }) +
+    // 2. 位移场：两层共用同一个，否则主支朝不同方向弯，像两层贴在一起。
+    //    频率 0.011 配 scale 62 是把等值线揉成「不规则长团」的档位，
+    //    频率再低只会整体平移，再高就散成斑。
+    '<feTurbulence type="fractalNoise" baseFrequency="0.011 0.008" numOctaves="2" seed="31" result="wn"/>' +
+    '<feColorMatrix in="wn" type="saturate" values="0" result="wg"/>' +
+    '<feDisplacementMap in="vmc" in2="wg" scale="62" xChannelSelector="R" yChannelSelector="G" result="vmb"/>' +
+    '<feDisplacementMap in="vsc" in2="wg" scale="62" xChannelSelector="R" yChannelSelector="G" result="vsb"/>' +
+    // 3. 模糊只磨等值面的硬边。主纹 1.8 是为了让暗团边缘晕开（参考图就是晕的）。
+    '<feGaussianBlur in="vmb" stdDeviation="1.8" result="vmf"/>' +
+    '<feGaussianBlur in="vsb" stdDeviation="0.55" result="vsf"/>' +
+    '<feComposite in="vmf" in2="vsf" operator="arithmetic" k1="0" k2="0.78" k3="0.22" k4="0" result="vv"/>' +
+    // 4. 背景层：低频 turbulence 折叠一次，出「大片浅灰 + 少数几处深斑」。
+    '<feTurbulence type="turbulence" baseFrequency="0.006 0.0044" numOctaves="2" seed="41" result="bn"/>' +
+    '<feColorMatrix in="bn" type="saturate" values="0" result="bg"/>' +
+    `<feComponentTransfer in="bg" result="bgt">` +
+    `<feFuncR type="table" tableValues="${bgTable}"/>` +
+    `<feFuncG type="table" tableValues="${bgTable}"/>` +
+    `<feFuncB type="table" tableValues="${bgTable}"/>` +
+    `<feFuncA type="linear" slope="0" intercept="1"/>` +
+    `</feComponentTransfer>` +
+    '<feGaussianBlur in="bgt" stdDeviation="2.2" result="bc"/>' +
+    // 5. 加权平均（不是 lerp、不是乘法）：两层都偏亮，只在纹与暗斑处下拉。
+    //    用乘积会把均值一起砍半，整块发闷。
+    '<feComposite in="vv" in2="bc" operator="arithmetic" k1="0" k2="0.42" k3="0.58" k4="0" result="mix"/>' +
+    // 6. 收尾：gain 定跨度、offset 定均值，三通道各自补一点偏色。
+    `<feColorMatrix in="mix" type="matrix" result="out" values="` +
+    `${gain} 0 0 0 ${(offset + tint[0]).toFixed(3)} ` +
+    `0 ${gain} 0 0 ${(offset + tint[1]).toFixed(3)} ` +
+    `0 0 ${gain} 0 ${(offset + tint[2]).toFixed(3)} ` +
+    `0 0 0 1 0"></feColorMatrix>` +
     '</filter></svg>'
   );
 }
