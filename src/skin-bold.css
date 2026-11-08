@@ -5198,6 +5198,126 @@ body:has(.media-room.is-expanded) {
   color: #ffffff;
 }
 
+/* 「挑一个」：画面取出来的几个主色，圆点里留白勾。 */
+.tone-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 11px;
+}
+
+.tone-swatches button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px #00000016;
+  transition: transform .14s cubic-bezier(.2, .7, .3, 1), box-shadow .14s;
+}
+
+.tone-swatches button:hover {
+  transform: scale(1.08);
+}
+
+.tone-swatches button.on {
+  box-shadow: inset 0 0 0 1px #00000016, 0 0 0 2px #ffffff, 0 0 0 3.5px #101010;
+}
+
+.tone-swatches small {
+  flex-basis: 100%;
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #8b8b85;
+}
+
+/* 「自己填」：三行「名字 + 色块 + 色值」。 */
+.tone-fields {
+  display: grid;
+  gap: 10px;
+  margin-top: 11px;
+}
+
+/* 三组（信息条 / 面板 / 胶囊·署名）。用 fieldset 是因为它本来就带
+   「一组相关控件」的语义，屏幕阅读器会念出组名；只是把浏览器默认的
+   边框和内边距清掉，组名做成和数据标签同一号的小字。 */
+.tone-group {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.tone-group > legend {
+  padding: 0 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #9a968c;
+}
+
+.tone-field {
+  display: grid;
+  grid-template-columns: 44px 26px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.tone-field > span {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #6f6f68;
+}
+
+.tone-field input[type="color"] {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--bold-line, #eceae5);
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.tone-field input[type="color"]::-webkit-color-swatch-wrapper { padding: 3px; }
+.tone-field input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 5px; }
+
+.tone-hex {
+  height: 26px;
+  min-width: 0;
+  padding: 0 9px;
+  border: 1px solid var(--bold-line, #eceae5);
+  border-radius: 8px;
+  background: #faf9f6;
+  color: #101010;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: .02em;
+}
+
+.tone-hex::placeholder { color: #b6b5ae; }
+.tone-hex:focus { outline: 2px solid #101010; outline-offset: -1px; }
+
+.tone-reset {
+  justify-self: start;
+  margin-top: 2px;
+  padding: 5px 10px;
+  border: 1px solid var(--bold-line, #eceae5);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #6f6f68;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tone-reset:hover { color: #101010; border-color: #d5d2c9; }
+
 .tone-hint {
   margin: 10px 0 0;
   font-size: 10px;
