@@ -6293,19 +6293,27 @@ body:has(.media-room.is-expanded) {
    和上面的浪脊是两种质感，所以做成可选项，
    由用户在设置里挑（风格表在 marble.ts 的 stoneStyles）。
 
-   这里只负责「怎么用滤镜产出的那张灰度图」，纹理本身全在 marble.ts：
-   - `background: transparent`：滤镜不读 SourceGraphic，自己生成整张图，
-     填什么底色都只是垫在下面被盖住。真填了反而会干扰 `operator="in"`
-     那一类合成（透明背景 + `in` = 整张被乘成 0，而且不报错）。
-   - `mix-blend-mode: normal` 不是 soft-light：柔光在**白底**上几乎只提亮
-     （底色接近 1 时输出趋近 1），均值永远压不下来——实测 158.8 对参考图 127.8。
-   - `opacity: 1`：滤镜末尾那一级 `y' = gain·y + offset` 已经把均值
-     和跨度都对到参考图了（实机 127.7 / sd 13.6，参考 127.8 / 12.1），
-     这里再乘一个系数只会把对好的数又推开。
-     **纹理的「多重」在滤镜末尾定，「能不能看见」才是这里的活**——
-     现在两者重合，所以取 1。 */
+   这里只负责「给纹理一层什么底色」，纹理本身全在 marble.ts：
+   - `background: hsl(from var(--tpl-panel) h s calc(l * 1.6))`：**这层颜色就是
+     胶囊的颜色**，纹理只在它上面加减明暗。为什么必须这样：用户 m09087 指出
+     「胶囊本身是没有色彩的，他是根据面板的颜色来变色的」——参考图那块偏蓝
+     是面板的蓝透过来的，不是纹理自带。我先前把偏蓝写死进滤镜，面板换成
+     暖色时胶囊纹丝不动（实测六档面板 dR=dG=dB=0）。
+     试过 `mix-blend-mode: multiply` 让纹理直接乘背后的面板：六档候选里
+     multiply 与 normal 的数值一字不差——`.tpl-tag` 上有 `isolation: isolate`，
+     混合只发生在胶囊自己的层叠上下文里，背后根本没有面板色可乘；
+     拆掉 isolation 又会把整块压暗（mean 132 → 92）。所以颜色由这一层显式算，
+     而不是靠混合模式「透」。
+   - `opacity: 1`：幅度全在滤镜的 `amount` 里，这里再乘系数会连颜色一起淡掉。 */
 .template-collage[data-stone="jade"] .tpl-tag::before {
-  background: transparent;
+  /* 用相对颜色语法抬明度，而不是混白。
+     混白（color-mix(#fff 34%, panel)）会同时提亮**和**褪色：
+     蓝面板下 blueMinusRed 只剩 11.9，而参考图那块是 24.3——
+     参考图的胶囊「又亮又蓝」，混白做不到这两件事同时成立。
+     `hsl(from … h s calc(l * 1.6))` 只抬明度，色相与饱和度原样保留：
+     实测 blueMinusRed 27.0、mean 128.5（参考 24.3 / 130.1），
+     暖色面板下 -24.3，跟色幅度与面板自身一致。 */
+  background: hsl(from var(--tpl-panel) h s calc(l * 1.6));
   mix-blend-mode: normal;
   opacity: 1;
 }

@@ -90,13 +90,18 @@ test('玉石：纹路与背景用加权平均拼，不能用纯乘积', () => {
   // 纯乘积（k1=1 的连乘）会把均值一起砍半，整块发闷（j44 实测 mean 掉到 96.8~106）。
   // 也不是 lerp：lerp 需要一个遮罩决定「哪儿显示纹、哪儿显示底」，
   // 而参考图是**到处都有纹**，只是浓淡不同——加权平均才对。
+  //
+  // 注意末尾那级「亮度系数 × 底色」**确实**是纯乘积（k1=1），
+  // 但那是乘在底色上的，不是把两张灰度图连乘——所以这里只查 k2/k3 非零的那两处。
   const mixes = [...jade.matchAll(/operator="arithmetic" k1="0" k2="([\d.]+)" k3="([\d.]+)" k4="0"/g)];
-  assert.ok(mixes.length >= 2, `要有主支合成与纹底合成两处，实际 ${mixes.length}`);
+  assert.equal(mixes.length, 2, `要有主支合成与纹底合成两处，实际 ${mixes.length}`);
   // 权重和必须为 1，否则整体亮度会跟着权重跑。
   for (const [, k2, k3] of mixes) {
     assert.ok(Math.abs(Number(k2) + Number(k3) - 1) < 0.001, `权重和应为 1，实际 ${k2}+${k3}`);
   }
-  assert.ok(!/operator="arithmetic" k1="1"/.test(jade), '不允许纯乘积连乘');
+  // 中间合成里不许出现纯乘积（末尾那一级单独由下面的测试守）。
+  const grays = jade.slice(0, jade.indexOf('result="mix"'));
+  assert.ok(!/operator="arithmetic" k1="1"/.test(grays), '中间层不允许纯乘积连乘');
 });
 
 test('玉石：每一层都要钉死 alpha，否则整块半透明只剩灰雾', () => {
@@ -104,29 +109,6 @@ test('玉石：每一层都要钉死 alpha，否则整块半透明只剩灰雾',
   // 三层：主纹、支纹、背景。
   const pinned = jade.match(/<feFuncA type="linear" slope="0" intercept="1"\/>/g) ?? [];
   assert.ok(pinned.length >= 3, `每层（两纹路 + 背景）都要钉，实际 ${pinned.length}`);
-});
-
-test('玉石：末尾用 feColorMatrix 收尾，同时定跨度、均值与偏色', () => {
-  // 前面每层的 lo/hi 互相耦合，改一层会连带改均值。末尾这一级是唯一
-  // 能同时精确指定「跨度」和「均值」的地方，而且它不改变形状。
-  //
-  // 必须是 `feColorMatrix type="matrix"` 而不是三个 `feFuncX`：
-  // 早期给三个通道不同 intercept，`feComponentTransfer` 的多个子节点
-  // 会让 innerHTML 解析出错、整段静默失效（六档统计完全相同）。
-  const tail = jade.match(/<feColorMatrix in="mix" type="matrix" result="out" values="([^"]+)"/);
-  assert.ok(tail, '找不到末尾收尾那一级（应接在 mix 之后）');
-  const numbers = tail[1].trim().split(/\s+/).map(Number);
-  assert.equal(numbers.length, 20, '颜色矩阵要 20 个数');
-  const gain = numbers[0];
-  // 跨度系数：小于 1 才是「压」，大于 1 会把已经对好的 sd 又推开。
-  assert.ok(gain > 0.3 && gain < 1.1, `gain ${gain} 应在 0.3~1.1`);
-  // 三通道的 offset 落在第 5、10、15 个，必须**依次递增**（蓝 > 绿 > 红）。
-  const offsets = [numbers[4], numbers[9], numbers[14]];
-  assert.ok(offsets[0] < offsets[1] && offsets[1] < offsets[2], `偏色应偏蓝，实际 ${offsets.join(',')}`);
-  // 蓝红要拉开：参考图 blueMinusRed 是 +24.3/255 ≈ 0.095。
-  assert.ok(offsets[2] - offsets[0] > 0.05, `蓝红差太小，补不出参考图的偏色：${offsets[2] - offsets[0]}`);
-  // 收尾必须是管线最后一段：放在中间的话后面的层会把它又改掉。
-  assert.ok(jade.lastIndexOf('feColorMatrix') > jade.indexOf('result="mix"'), '收尾应在 mix 之后');
 });
 
 test('玉石：两层纹路的频率不同，粗细才有分别', () => {
@@ -170,9 +152,65 @@ test('玉石：走 sRGB 插值，否则拉对比之后颜色会偏', () => {
   assert.ok(jade.includes('color-interpolation-filters="sRGB"'));
 });
 
-test('玉石：不读 SourceGraphic，整张纹理是凭空生成的', () => {
-  // 一旦引用 SourceGraphic，纹理就会随底色变——那是海浪版的做法。
-  assert.ok(!jade.includes('SourceGraphic'));
+test('玉石：末尾把中性灰当成亮度系数，与底色相乘', () => {
+  // 前几层算出来的是**中性灰**（三通道相同），最后一步把它当成
+  // 「亮度乘数」盖到底色上：`底色 × (1 ± amount/2)`。
+  //
+  // 为什么必须是乘、不是覆盖：用户 m09087 指出
+  // 「胶囊本身是没有色彩的，他是根据面板的颜色来变色的」。
+  // 覆盖就是给胶囊刷一层死灰，面板换暖色它也不动（实测 dR=dG=dB=0）。
+  // 相乘只缩放亮度、不改色相，胶囊的颜色于是恒等于底色——
+  // 而底色是 CSS 用 `hsl(from var(--tpl-panel) h s calc(l * 1.6))` 现算的。
+  const tail = jade.match(/<feComposite in="SourceGraphic" in2="lit" operator="arithmetic" (.+?) result="out"\/>/);
+  assert.ok(tail, '末尾必须把亮度系数与 SourceGraphic 相乘');
+  const numbers = new Map(
+    [...tail[1].matchAll(/(k\d)="(-?[\d.]+)"/g)].map(([, key, value]) => [key, Number(value)]),
+  );
+  assert.equal(numbers.get('k1'), 1, '乘积项必须是 k1，否则底色不会被纹理调制');
+  for (const key of ['k2', 'k3', 'k4']) {
+    assert.equal(numberOf(numbers.get(key)), 0, `${key} 应为 0，颜色只能来自底色`);
+  }
+
+  // 映射到亮度系数的那一级：三通道必须完全一致——纹理无色，
+  // 一旦三通道不同，胶囊就又自带了颜色。
+  const lit = jade.match(/<feComponentTransfer in="mix" result="lit">([\s\S]*?)<\/feComponentTransfer>/);
+  assert.ok(lit, '找不到把 mix 映射成亮度系数的那一级');
+  const funcs = [...lit[1].matchAll(/<feFunc[RGB] type="linear" slope="([\d.]+)" intercept="(-?[\d.]+)"/g)];
+  assert.equal(funcs.length, 3, '三通道都要映射');
+  const slopes = funcs.map(([, v]) => Number(v));
+  assert.equal(new Set(slopes).size, 1, `三通道 slope 必须相同：${slopes.join(',')}`);
+  assert.ok(slopes[0] > 0.3 && slopes[0] < 2.5, `amount ${slopes[0]} 应在 0.3~2.5（太小看不见纹，太大整块发黑）`);
+
+  // **映射中心必须对准纹理的真实均值**。
+  //
+  // 这条是踩了坑之后补的：取值域中心 0.5 时，纹理实际均值是 0.73，
+  // 算出来 `0.34·0.73 + 0.83 = 1.08`，一大片被钳在 1 ——
+  // 调 amount 只改「被钳面积」，sd 从 0.7 到 0.8 几乎不动，
+  // 只有 skew 在翻。找了很久「为什么怎么调都不动」，根因就是这一条。
+  //
+  // 判据：解出「输出 = 1」那个输入值（也就是乘 1 的位置），它必须落在中灰以上。
+  // 落在 0.5 附近说明有人又把中心当成「中灰」写死了。
+  // 注意解的是 `slope·x + intercept = 1`，不是 `= x`——后者求的是「输出等于输入」，
+  // 在这个映射里恒等于 0.28，跟中心没关系（第一次就写错了这一条）。
+  const intercepts = funcs.map(([, , v]) => Number(v));
+  assert.equal(new Set(intercepts).size, 1, `三通道 intercept 必须相同：${intercepts.join(',')}`);
+  const center = (1 - intercepts[0]) / slopes[0];
+  assert.ok(center > 0.6 && center < 0.85, `乘 1 的位置应在 0.6~0.85（纹理实测均值约 0.73），实际 ${center.toFixed(3)}`);
+
+  // 收尾必须是管线最后一段。
+  assert.ok(jade.indexOf('result="lit"') > jade.indexOf('result="mix"'), '映射应在 mix 之后');
+});
+
+function numberOf(value) {
+  return value === undefined ? Number.NaN : Number(value);
+}
+
+test('玉石：读 SourceGraphic —— 纹理没有自己的颜色，只调制底色的明暗', () => {
+  // 与浪脊版相反：浪脊是「凭空生成一张石纹图」，玉石是「给底色加减明暗」。
+  // 这条断言是用户 m09087 那次纠正的守门人：
+  // 谁把 SourceGraphic 从管线里拿掉，胶囊就会退回「自带颜色」，
+  // 换配色时它不跟着变——而且不会有任何报错。
+  assert.ok(jade.includes('SourceGraphic'), '玉石必须读取底色，否则颜色跟面板脱钩');
 });
 
 test('风格表里的每一项都能生成滤镜，非法值收敛成浪脊', () => {

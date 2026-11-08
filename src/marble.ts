@@ -175,24 +175,44 @@ function jadeMarkup(id: string): string {
 
   const bgTable = foldTable(1, 5, 0.66, 0.90);
 
-  // 末尾收尾的跨度。`sd` 与 gain 近似成正比，参考图 9.7 对应这一档。
-  const gain = 0.5;
-
-  // 均值：`offset = 0.5224 − gain × 0.7168`。0.5224 是参考图 133.2/255，
-  // 0.7168 是本管线折叠表的中间值（由实测反推），于是降 gain 只收跨度、
-  // 均值钉在 133 不动——这是「提亮」与「加对比」两件事解耦的唯一办法。
-  const offset = 0.164;
+  /**
+   * 调制幅度：纹理只在这层底色上**加减明暗**，不改它是什么颜色。
+   *
+   * 这一条是用户 m09087 指出来的，也是我先前做错的地方：
+   * 「这个胶囊不是分型杂色吗，也就是说它本身是没有色彩的，
+   *   他是根据面板的颜色来变色的」。
+   *
+   * 参考图那块胶囊偏蓝（`blueMinusRed +24.3`），我量到之后**把蓝写死进了
+   * 滤镜末尾的三个 offset**。数值是对上了，但那是把「面板的蓝透过半透明
+   * 胶囊」这件事拍成了一张死照片——用户把面板换成暖色，胶囊纹丝不动。
+   * 实测（`tools/probe/stone-follow.cjs` 六档面板）时 `dR=dG=dB=0`。
+   *
+   * 改法：管线最后一级**读 `SourceGraphic`**（也就是 CSS 给 `::before` 的
+   * 那层底色，由 `color-mix(白, var(--tpl-panel))` 算出来），把中性灰纹理
+   * 当代数和加上去。颜色于是始终等于「面板提亮后的颜色」，
+   * 纹理只负责明暗起伏。
+   *
+   * 试过但不对的：给 `::before` 换 `mix-blend-mode: multiply`。
+   * 实测六档候选里 multiply 与 normal 的数值一字不差——`.tpl-tag` 上有
+   * `isolation: isolate`，混合只在胶囊自己的层叠上下文里发生，背景里
+   * 根本没有面板色可乘。拆掉 isolation 直接乘面板又会把整块压暗
+   * （mean 132 → 92）。
+   */
+  const amount = 1.6;
 
   /**
-   * 偏色：参考图那块胶囊明显偏蓝（`r 120.5 g 129.4 b 144.9`，
-   * `blueMinusRed +24.3`），而我们原先是中性偏红（`−3.1`）。
-   * 只看亮度完全发现不了这件事，并排一看却差得很明显。
+   * 纹理的亮度中心（0~1）。
    *
-   * 必须用 `feColorMatrix`：早期试过给三个 `feFuncX` 不同 intercept，
-   * 结果**六档统计完全相同**——`feComponentTransfer` 的多个 `feFuncX`
-   * 在同一作用域里会让 `innerHTML` 解析出错，整段静默失效。
+   * **这个数必须实测，不能假设 0.5。** 前两层折叠后的 `hi` 是 0.94/0.92、
+   * 背景层 0.66~0.90，加权平均下来整张纹理的平均亮度是 **0.73**，
+   * 比中灰亮不少（`tools/probe/stone-mixrange.cjs` 截 mix 层直接量的）。
+   *
+   * 我一开始按「中灰」把它映射成 `amount·mix + (1 − amount/2)`，
+   * 于是均值落在 1.078，一大片被钳在 1 —— 调 `amount` 只是让被钳的面积
+   * 变大变小，纹理对比度（sd）几乎不动（0.7 → 0.8），只有 skew 在翻。
+   * 找了很久「为什么调不动」，就是这一条。
    */
-  const tint = [-0.050, -0.008, 0.057];
+  const CENTER = 0.73;
 
   return (
     // 位移与模糊都会让像素跑出元素边界，region 放宽一圈，否则四周被裁。
@@ -224,12 +244,19 @@ function jadeMarkup(id: string): string {
     // 5. 加权平均（不是 lerp、不是乘法）：两层都偏亮，只在纹与暗斑处下拉。
     //    用乘积会把均值一起砍半，整块发闷。
     '<feComposite in="vv" in2="bc" operator="arithmetic" k1="0" k2="0.42" k3="0.58" k4="0" result="mix"/>' +
-    // 6. 收尾：gain 定跨度、offset 定均值，三通道各自补一点偏色。
-    `<feColorMatrix in="mix" type="matrix" result="out" values="` +
-    `${gain} 0 0 0 ${(offset + tint[0]).toFixed(3)} ` +
-    `0 ${gain} 0 0 ${(offset + tint[1]).toFixed(3)} ` +
-    `0 0 ${gain} 0 ${(offset + tint[2]).toFixed(3)} ` +
-    `0 0 0 1 0"></feColorMatrix>` +
+    // 6. 把中性灰映射成**亮度系数**：`m = amount·(mix − CENTER) + 1`，
+    //    于是 `mix = CENTER` 处正好乘 1（不改整体明暗），上下各 `±amount/2`。
+    //    中心取实测的 0.73，不是中灰 0.5——写成 0.5 会让均值越界被钳住。
+    `<feComponentTransfer in="mix" result="lit">` +
+    `<feFuncR type="linear" slope="${amount}" intercept="${(1 - amount * CENTER).toFixed(3)}"/>` +
+    `<feFuncG type="linear" slope="${amount}" intercept="${(1 - amount * CENTER).toFixed(3)}"/>` +
+    `<feFuncB type="linear" slope="${amount}" intercept="${(1 - amount * CENTER).toFixed(3)}"/>` +
+    `<feFuncA type="linear" slope="0" intercept="1"/>` +
+    `</feComponentTransfer>` +
+    // 7. 与 `SourceGraphic`（CSS 给的那层「白 + 面板色」）相乘。
+    //    相乘只缩放亮度、不改色相，所以胶囊的颜色始终等于面板色提亮后的样子——
+    //    面板换成暖色，胶囊自动跟着变暖。这就是「纹理本身没有颜色」的落地方式。
+    '<feComposite in="SourceGraphic" in2="lit" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" result="out"/>' +
     '</filter></svg>'
   );
 }
