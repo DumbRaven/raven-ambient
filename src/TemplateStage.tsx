@@ -22,30 +22,39 @@ import { launchSeed } from './sleeves';
 import { ravenBox, ravenPath, ravenWingPath } from './raven';
 import { videoPalette } from './video-palette';
 import { collageTone, findTemplate, templateTitle, type TemplateId, type ToneHint } from './templates';
-import { MARBLE_FILTER_ID, marbleFilterMarkup } from './marble';
+import { MARBLE_FILTER_ID, marbleFilterMarkup, type StoneStyle } from './marble.ts';
 import { timerText } from './overlays';
 import { phaseCaptions, type FocusPhase } from './focus';
 import { nowDetail, nowLine, timeOfDay, type StageNow } from './stage-text';
 
 /** 右下角那只彩胶。没在放音乐时它是空的，只留一圈盘面。 */
 
-/** 凹槽的大理石纹滤镜。
+/** 凹槽的石纹滤镜。
  *
  *  管线为什么要这么绕、为什么不能直接生成噪声，说明在 marble.ts 里
  *  （那边是纯字符串，可以单独测）。这里只负责把它挂上去。
  *
  *  必须挂在 <body> 上：放在被 clip-path / overflow 裁的容器里时，
- *  Chromium 会把这个引用判为失效（computed 变成 none），和雨丝那次是同一个坑。 */
-function useMarbleFilter() {
+ *  Chromium 会把这个引用判为失效（computed 变成 none），和雨丝那次是同一个坑。
+ *
+ *  同一个页面上会同时有两只放映台（网格里那只、全屏那只），都读同一个
+ *  `tone.stone`。所以这里不登记「谁负责清理」——谁先挂上谁来挂，后到的发现
+ *  风格已经对就直接返回。换风格时整体替换掉，不留清理责任给任何一方，
+ *  否则先卸载的那只会把还在用的滤镜一起带走。 */
+function useMarbleFilter(style: StoneStyle) {
   useEffect(() => {
-    if (document.getElementById(MARBLE_FILTER_ID)) return;
+    const existing = document.getElementById(MARBLE_FILTER_ID);
+    if (existing?.parentElement?.getAttribute('data-tpl-marble') === style) return;
+    document.querySelectorAll('[data-tpl-marble]').forEach(node => node.remove());
     const host = document.createElement('div');
     host.setAttribute('aria-hidden', 'true');
+    // 注意别和版式根节点上的 `data-stone` 撞名：那个标记的是「这一页用哪种石纹」，
+    // 下面这两个 query 是「找出所有挂滤镜的宿主」。撞名会把整个版式删掉。
+    host.setAttribute('data-tpl-marble', style);
     host.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;pointer-events:none';
-    host.innerHTML = marbleFilterMarkup();
+    host.innerHTML = marbleFilterMarkup(style);
     document.body.appendChild(host);
-    return () => { host.remove(); };
-  }, []);
+  }, [style]);
 }
 
 export type StageDisc = { cover?: string; color: string; key: string; spinning: boolean };
@@ -108,6 +117,8 @@ type Props = {
   now?: StageNow;
   /** 用户指定的配色。不传就纯自动。 */
   hint?: ToneHint;
+  /** 竖排胶囊表面的石纹。不传按浪脊。 */
+  stone?: StoneStyle;
   /** 把取到的原始色板交出去，配色面板要拿它画可选的色块。 */
   onPalette?: (colors: string[]) => void;
 };
@@ -146,7 +157,7 @@ function Raven({ className }: { className: string }) {
   );
 }
 
-export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, now, hint, onPalette }: Props) {
+export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, now, hint, stone = 'sea', onPalette }: Props) {
   const preset = findTemplate(template);
   const fromWallpaper = !!item.source;
   const title = useMemo(() => templateTitle(item.name, fromWallpaper), [item.name, fromWallpaper]);
@@ -179,7 +190,7 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
     return () => { live = false; };
   }, [discCover]);
 
-  useMarbleFilter();
+  useMarbleFilter(stone);
   const tone = useMemo(() => collageTone(colors, hint), [colors, hint]);
   // 把取到的色板交给外层：配色面板要用它画「从这里挑一个」的色块。
   useEffect(() => { onPalette?.(colors); }, [colors, onPalette]);
@@ -231,7 +242,7 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
   );
 
   return (
-    <div className={`template template-${preset.id}`} style={style} aria-label={`${preset.name}版式`}>
+    <div className={`template template-${preset.id}`} data-stone={stone} style={style} aria-label={`${preset.name}版式`}>
       {preset.id === 'collage' && (
         <>
           <div className="tpl-block tpl-block-media">{media}</div>

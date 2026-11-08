@@ -15,6 +15,10 @@
  *
  * 存 localStorage，和版式、叠加元素一样属于「看片偏好」，不进收藏库。
  */
+/* 扩展名要写出来：这个文件被 tests/tone-setting.test.ts 直接用 node 跑，
+   而 node 的 TS 加载器不像打包器那样帮你补 .ts。 */
+import { findStoneStyle, type StoneStyle } from './marble.ts';
+
 export type ToneMode = 'auto' | 'pick' | 'custom';
 
 /** 手填的那几档。留空表示这一档仍然吃自动算出来的值。 */
@@ -32,6 +36,11 @@ export type ToneSetting = {
   /** pick 模式下：画面取出的第几个主色当主色（0–3）。 */
   pick: number;
   custom: ToneCustom;
+  /**
+   * 竖排胶囊表面的石纹。跟配色放在同一个设置里，因为它们回答的是同一个问题：
+   * 「这一页看上去该是什么样」。分两处存会让「恢复默认」只恢复一半。
+   */
+  stone: StoneStyle;
 };
 
 export const toneKey = 'raven-stage-tone';
@@ -40,6 +49,7 @@ export const defaultTone: ToneSetting = {
   mode: 'auto',
   pick: 1,
   custom: { base: '', panel: '', onPanel: '', bar: '', onBar: '', gold: '' },
+  stone: 'sea',
 };
 
 /**
@@ -91,6 +101,8 @@ export function readTone(raw: string | null): ToneSetting {
         onBar: readField(custom.onBar),
         gold: readField(custom.gold),
       },
+      // 老数据里没有这个字段，或者被改成了别的字符串，都收敛回默认。
+      stone: findStoneStyle(value.stone),
     };
   } catch {
     return defaultTone;

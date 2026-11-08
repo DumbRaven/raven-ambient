@@ -14,6 +14,7 @@ import { mediaSrc, setWindowFullscreen } from './media';
 import { afterResize as afterResizeWait, canToggle } from './fullscreen-timing';
 import TemplateStage, { type StageAmbience, type StageDisc, type StageFocus, type StageNow } from './TemplateStage';
 import { defaultTone, normaliseHex, readTone, toneGroups, toneHint, toneKey, writeTone, type ToneSetting } from './tone-setting';
+import { stoneStyles } from './marble.ts';
 import OverlayLayer from './OverlayLayer';
 import RainLayer from './RainLayer';
 import { rainKey, rainModes, readRain, writeRain, type RainSetting } from './rain';
@@ -401,6 +402,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               ambience={ambience}
               now={now}
               hint={toneHint(tone, palette)}
+              stone={tone.stone}
               onPalette={setPalette}
             />
             <RainLayer value={rain} />
@@ -561,6 +563,24 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                       ))}
                     </div>
 
+                    {/* 胶囊表面的石纹。与取色方式并列而不是塞进里面：
+                        换石头和换颜色是两个独立的问题，用户可能想保留配色只换质地。
+                        说明挂在每个选项自己的副标题上，不在这里再写一行通用解释。 */}
+                    <div className="tone-stones" role="radiogroup" aria-label="胶囊石纹">
+                      {stoneStyles.map(stone => (
+                        <button
+                          key={stone.id}
+                          role="radio"
+                          aria-checked={tone.stone === stone.id}
+                          className={tone.stone === stone.id ? 'on' : ''}
+                          onClick={() => setTone(prev => ({ ...prev, stone: stone.id }))}
+                        >
+                          <span>{stone.name}</span>
+                          <small>{stone.hint}</small>
+                        </button>
+                      ))}
+                    </div>
+
                     {tone.mode === 'pick' && (
                       <div className="tone-swatches" role="radiogroup" aria-label="从画面里挑一个主色">
                         {(palette.length ? palette : ['#6f6f6f']).map((color, at) => (
@@ -666,6 +686,8 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               onPlayState={setPlaying}
               index={0}
               total={0}
+              hint={toneHint(tone, palette)}
+              stone={tone.stone}
             />
             <RainLayer value={rain} />
             <OverlayLayer

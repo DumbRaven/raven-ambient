@@ -5198,6 +5198,50 @@ body:has(.media-room.is-expanded) {
   color: #ffffff;
 }
 
+/* 胶囊石纹：两块并排的卡片，副标题跟着各自的选项走。
+   为什么不做成和上面一样的胶囊按钮：石纹的差别靠名字说不清（「浪脊」「云雾」
+   都是好词，但看不出长什么样），得让副标题有地方放。胶囊条太矮塞不下两行。 */
+.tone-stones {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.tone-stones button {
+  display: grid;
+  gap: 2px;
+  padding: 7px 9px;
+  border: 1px solid #e6e3dc;
+  border-radius: 11px;
+  background: #faf9f6;
+  color: #101010;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .16s, background .16s;
+}
+
+.tone-stones button:hover {
+  border-color: #cfcac0;
+}
+
+.tone-stones button.on {
+  border-color: #101010;
+  background: #f2f0eb;
+}
+
+.tone-stones button span {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.tone-stones button small {
+  font-size: 10px;
+  line-height: 1.35;
+  color: #8b8b85;
+}
+
 /* 「挑一个」：画面取出来的几个主色，圆点里留白勾。 */
 .tone-swatches {
   display: flex;
@@ -6210,10 +6254,19 @@ body:has(.media-room.is-expanded) {
      因为四颗 ✦ 星是故意探到胶囊外的。所以在这一层自己再裁一次，形状跟 border-radius 一致。 */
   clip-path: inset(0 round 999px);
   /* 条纹间隔刻意不等距：等距条纹被揉弯之后仍然看得出是「规则图案」，
-     石头不会那么规整。108deg 是参考图里脉络大致的方向。 */
+     石头不会那么规整。
+
+     角度从 108deg 改到 20deg（用户 m06408「好，你试试」）：
+     108deg 接近竖直偏斜，纹路是自上而下斜着走的，像大理石的脉络。
+     但用户实际想要的是「海浪的感觉」——浪脊是横着的、一层压一层。
+     把条纹压向水平之后，横向的低频位移几乎不改变条纹的走向，
+     真正把它推弯的是纵向那个更高的频率（0.019），于是形成一条条
+     横向起伏的浪脊。扫过 0/20/40/60/80/108/130/160 八个角度，
+     0deg 太死板（在窄高胶囊里读作横线），20deg 带一点倾斜才有流动感，
+     40deg 以上又退回斜纹了。 */
   background:
     repeating-linear-gradient(
-      108deg,
+      20deg,
       #00000000 0px,
       #00000000 7px,
       #ffffff 9px,
@@ -6232,6 +6285,39 @@ body:has(.media-room.is-expanded) {
   opacity: 0.46;
   z-index: -1;
   pointer-events: none;
+}
+
+/* 另一种石头：云雾。
+   参考视频里那块胶囊放大看不是条纹、也不是脉络，是**大团柔和的明暗**——
+   边缘晕开、没有方向，像浓雾或者水下。和上面的浪脊是两种质感，
+   所以做成可选项，由用户在设置里挑（风格表在 marble.ts 的 stoneStyles）。
+
+   这里只换「喂给滤镜的原料」和「怎么合成」：
+   - 不再放条纹：云雾版滤镜自己生成团块噪声，完全不读 SourceGraphic。
+   - 底色用**白**不是灰：这一条踩过坑。垫 #808080 时形状已经对上了参考图，
+     但整块读起来发闷，像磨砂塑料。原因是浪脊版的条纹里一大半是透明段，
+     底下那层半透明白胶囊能透出来；而云雾版垫的是一整块不透明灰，
+     那 30% 的覆盖里一点白都没有，等于给胶囊蒙了层灰。
+     换成白底后 sd 几乎不变（15.6 → 15.6），均值往上走——**发闷是均值问题，
+     不是对比度问题**。真滤镜失效时白色叠在柔光里也是提亮，不会露馅。
+   - soft-light 而不是 overlay：柔光围绕 0.5 对称地提亮/压暗，
+     幅度小、曲线平，正好是「极轻的雾」；overlay 的暗部太硬，会读成脏。
+   - opacity 0.30 是量出来的（tools/probe/stone-tune.cjs 与 stone-base.cjs）：
+     与 `::after` 的 0.6 配成一对，粗化块 sd 与衰减形状最接近参考图裁片。
+     **两层必须一起调**——只压这一层的话，总对比度的大头来自那道横跨整条
+     胶囊的方向性高光，压到 0.22 也几乎不动（实测 sd 只从 20.0 掉到 17.8）。 */
+.template-collage[data-stone="cloud"] .tpl-tag::before {
+  background: #ffffff;
+  mix-blend-mode: soft-light;
+  opacity: 0.3;
+}
+
+/* 云雾版的高光要跟着减弱。为什么：浪脊版是「石面上有脉络」，
+   高光负责给胶囊一个凸面的弧度，两者叠起来正好；云雾版本身就是
+   一团柔和明暗，再压一道强高光，整块会读成「糊了东西的塑料」。
+   数值与上面那层配成一对扫出来的，改一个就要重新扫另一个。 */
+.template-collage[data-stone="cloud"] .tpl-tag::after {
+  opacity: 0.6;
 }
 
 /* 方向性高光：从左上打进来的一道光，斜着铺过整条胶囊。
