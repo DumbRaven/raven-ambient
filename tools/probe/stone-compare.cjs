@@ -3,10 +3,10 @@
  *
  * 为什么要单独一个探针：石纹是很淡的一层，整页截图缩到 1920 宽之后基本看不清。
  * 而且这一版新增了「换风格要换掉整只滤镜宿主」的逻辑——如果宿主没被替换，
- * 屏幕上会继续用旧管线，但 CSS 已经切到 `soft-light + #808080`，
+ * 屏幕上会继续用旧管线，但 CSS 已经切到 `soft-light + #ffffff`，
  * 结果是「一片平灰」，**不会报错**。所以这里两件事一起验：
- *   1. 切到 cloud 之后，`document.querySelectorAll('[data-tpl-marble]')` 只能剩一只；
- *   2. 那只宿主里的 turbulence 参数得是云雾那条（0.025 0.0177）。
+ *   1. 切到 jade 之后，`document.querySelectorAll('[data-tpl-marble]')` 只能剩一只；
+ *   2. 那只宿主里的 turbulence 参数得是玉石那条（0.020，单值）。
  *
  * 跑法（改完源码先 build）：
  *   env -u ELECTRON_RUN_AS_NODE node_modules/electron/dist/electron.exe \
@@ -22,6 +22,7 @@ const READ = `(() => {
   if (!tag) return { error: 'no .tpl-tag' };
   const r = tag.getBoundingClientRect();
   const before = getComputedStyle(tag, '::before');
+  const after = getComputedStyle(tag, '::after');
   const hosts = [...document.querySelectorAll('[data-tpl-marble]')];
   const svg = hosts[0] ? hosts[0].querySelector('svg') : null;
   const turb = svg ? [...svg.querySelectorAll('feTurbulence')] : [];
@@ -33,9 +34,11 @@ const READ = `(() => {
     beforeColor: before.backgroundColor,
     beforeBlend: before.mixBlendMode,
     beforeOpacity: before.opacity,
+    afterOpacity: after.opacity,
     hosts: hosts.length,
     hostStone: hosts[0]?.getAttribute('data-tpl-marble') ?? null,
     freqs: turb.map(node => node.getAttribute('baseFrequency')),
+    turbTypes: turb.map(node => node.getAttribute('type')),
     filterExists: !!document.getElementById('tpl-marble'),
   };
 })()`;
@@ -43,7 +46,7 @@ const READ = `(() => {
 /** 通过真实点击面板里的那颗按钮来切换——顺便验证按钮接得上。 */
 const pick = stone => `(() => {
   const button = [...document.querySelectorAll('.tone-stones button')]
-    .find(node => node.textContent.includes(${JSON.stringify(stone === 'sea' ? '浪脊' : '云雾')}));
+    .find(node => node.textContent.includes(${JSON.stringify(stone === 'sea' ? '浪脊' : '玉石')}));
   if (!button) return { error: 'no stone button' };
   button.click();
   return { clicked: true, pressed: button.getAttribute('aria-checked') };
@@ -80,15 +83,15 @@ guard(async () => {
   const sea = await probe.run(READ);
   await shoot('sea', sea);
 
-  const clickCloud = await probe.run(pick('cloud'));
+  const clickJade = await probe.run(pick('jade'));
   // 换风格会重建滤镜宿主，等一拍让 React 与 DOM 都落定。
   await wait(600);
-  const cloud = await probe.run(READ);
-  await shoot('cloud', cloud);
+  const jade = await probe.run(READ);
+  await shoot('jade', jade);
 
   const clickSea = await probe.run(pick('sea'));
   await wait(600);
   const backToSea = await probe.run(READ);
 
-  report({ opened, sea, clickCloud, cloud, clickSea, backToSea, shots });
+  report({ opened, sea, clickJade, jade, clickSea, backToSea, shots });
 });
