@@ -119,6 +119,14 @@ type Props = {
   hint?: ToneHint;
   /** 竖排胶囊表面的石纹。不传按浪脊。 */
   stone?: StoneStyle;
+  /**
+   * 点胶囊换下一种石纹。不传就只是装饰，不能点。
+   *
+   * 为什么放在胶囊自己身上而不是配色菜单（用户 m09905）：
+   * 「这个直接做成在胶囊上点击就切换吧，别在调色板显示了」——
+   * 石纹是这一块表面的性质，改它自然该在它自己身上改。
+   */
+  onStone?: () => void;
   /** 把取到的原始色板交出去，配色面板要拿它画可选的色块。 */
   onPalette?: (colors: string[]) => void;
 };
@@ -157,7 +165,7 @@ function Raven({ className }: { className: string }) {
   );
 }
 
-export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, now, hint, stone = 'sea', onPalette }: Props) {
+export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, now, hint, stone = 'sea', onStone, onPalette }: Props) {
   const preset = findTemplate(template);
   const fromWallpaper = !!item.source;
   const title = useMemo(() => templateTitle(item.name, fromWallpaper), [item.name, fromWallpaper]);
@@ -309,8 +317,17 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
 
             {/* 竖排 DUMBRAVEN：两列（DUMB / RAVEN），装在面板右上那枚半透明胶囊里。
                 右列从第 0 个字母起就比左列低半行，这是 AE 源里的错位，
-                不是排版事故——所以下沉量写在 CSS 的 .tpl-badge-col-right 上。 */}
-            <div className="tpl-tag">
+                不是排版事故——所以下沉量写在 CSS 的 .tpl-badge-col-right 上。
+
+                用 <button> 而不是 <div>：点一下换石纹（用户 m09905），
+                键盘用户也能 Tab 过来按 Enter / Space，不用另写一套按键处理。 */}
+            <button
+              type="button"
+              className="tpl-tag"
+              onClick={onStone}
+              disabled={!onStone}
+              aria-label={stone === 'jade' ? '石纹：玉石，点击换浪脊' : '石纹：浪脊，点击换玉石'}
+            >
               <span className="tpl-badge" aria-hidden="true">
                 <span className="tpl-badge-col tpl-badge-col-left">
                   {Array.from(BADGE.left, (letter, at) => (
@@ -327,7 +344,7 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
               <span className="tpl-star tpl-star-b" aria-hidden="true">✦</span>
               <span className="tpl-star tpl-star-c" aria-hidden="true">✦</span>
               <span className="tpl-star tpl-star-d" aria-hidden="true">✦</span>
-            </div>
+            </button>
 
           </div>
 

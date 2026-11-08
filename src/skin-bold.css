@@ -5198,170 +5198,6 @@ body:has(.media-room.is-expanded) {
   color: #ffffff;
 }
 
-/* 胶囊石纹：两块并排的卡片，副标题跟着各自的选项走。
-   为什么不做成和上面一样的胶囊按钮：石纹的差别靠名字说不清（「浪脊」「云雾」
-   都是好词，但看不出长什么样），得让副标题有地方放。胶囊条太矮塞不下两行。 */
-.tone-stones {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.tone-stones button {
-  display: grid;
-  gap: 2px;
-  padding: 7px 9px;
-  border: 1px solid #e6e3dc;
-  border-radius: 11px;
-  background: #faf9f6;
-  color: #101010;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color .16s, background .16s;
-}
-
-.tone-stones button:hover {
-  border-color: #cfcac0;
-}
-
-.tone-stones button.on {
-  border-color: #101010;
-  background: #f2f0eb;
-}
-
-.tone-stones button span {
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-
-.tone-stones button small {
-  font-size: 10px;
-  line-height: 1.35;
-  color: #8b8b85;
-}
-
-/* 「挑一个」：画面取出来的几个主色，圆点里留白勾。 */
-.tone-swatches {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 7px;
-  margin-top: 11px;
-}
-
-.tone-swatches button {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: inset 0 0 0 1px #00000016;
-  transition: transform .14s cubic-bezier(.2, .7, .3, 1), box-shadow .14s;
-}
-
-.tone-swatches button:hover {
-  transform: scale(1.08);
-}
-
-.tone-swatches button.on {
-  box-shadow: inset 0 0 0 1px #00000016, 0 0 0 2px #ffffff, 0 0 0 3.5px #101010;
-}
-
-.tone-swatches small {
-  flex-basis: 100%;
-  margin-top: 2px;
-  font-size: 10px;
-  line-height: 1.5;
-  color: #8b8b85;
-}
-
-/* 「自己填」：三行「名字 + 色块 + 色值」。 */
-.tone-fields {
-  display: grid;
-  gap: 10px;
-  margin-top: 11px;
-}
-
-/* 三组（信息条 / 面板 / 胶囊·署名）。用 fieldset 是因为它本来就带
-   「一组相关控件」的语义，屏幕阅读器会念出组名；只是把浏览器默认的
-   边框和内边距清掉，组名做成和数据标签同一号的小字。 */
-.tone-group {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.tone-group > legend {
-  padding: 0 0 4px;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #9a968c;
-}
-
-.tone-field {
-  display: grid;
-  grid-template-columns: 44px 26px 1fr;
-  align-items: center;
-  gap: 8px;
-}
-
-.tone-field > span {
-  font-size: 10.5px;
-  font-weight: 600;
-  color: #6f6f68;
-}
-
-.tone-field input[type="color"] {
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 1px solid var(--bold-line, #eceae5);
-  border-radius: 8px;
-  background: #ffffff;
-  cursor: pointer;
-}
-
-.tone-field input[type="color"]::-webkit-color-swatch-wrapper { padding: 3px; }
-.tone-field input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 5px; }
-
-.tone-hex {
-  height: 26px;
-  min-width: 0;
-  padding: 0 9px;
-  border: 1px solid var(--bold-line, #eceae5);
-  border-radius: 8px;
-  background: #faf9f6;
-  color: #101010;
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 11px;
-  letter-spacing: .02em;
-}
-
-.tone-hex::placeholder { color: #b6b5ae; }
-.tone-hex:focus { outline: 2px solid #101010; outline-offset: -1px; }
-
-.tone-reset {
-  justify-self: start;
-  margin-top: 2px;
-  padding: 5px 10px;
-  border: 1px solid var(--bold-line, #eceae5);
-  border-radius: 999px;
-  background: #ffffff;
-  color: #6f6f68;
-  font-size: 10.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.tone-reset:hover { color: #101010; border-color: #d5d2c9; }
-
 .tone-hint {
   margin: 10px 0 0;
   font-size: 10px;
@@ -6230,20 +6066,47 @@ body:has(.media-room.is-expanded) {
   background-color: #ffffff3d;
   box-shadow: none;
   isolation: isolate;
+  /* 这是个 <button>：点一下换石纹（用户 m09905）。把浏览器默认的
+     按钮外观全部抹掉，只留 cursor 与按下反馈。 */
+  appearance: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  /* 不许选中文字：连点两下不该选中 DUMB / RAVEN。 */
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 160ms cubic-bezier(.2, .8, .3, 1);
 }
 
-/* 大理石絮纹：参考图里胶囊内是**很淡**的灰白絮状团块，主视觉是那块偏亮的底，
-   纹理只是隐约一层。之前 0.9 的 soft-light 白把它铺成了一片白云，
-   把面板里的介绍文字整个糊掉了。
+/* 按下时给一点点形变。为什么这么轻：这块胶囊在画面里占得不小，
+   动大了会从「石面」变成「一个按钮」。 */
+.template-collage .tpl-tag:active {
+  transform: scale(0.985);
+}
 
-   现在这一层不再是「一块白底让滤镜去噪」，而是**先画直的脉络条带**，
-   再由 `#tpl-marble` 这个滤镜用 feDisplacementMap 把它们揉弯。
-   这里给的是石头原本的沉积层：疏密不均、有主脉有细纹。
+.template-collage .tpl-tag:focus-visible {
+  outline: 2px solid var(--tpl-gold);
+  outline-offset: 3px;
+}
 
-   **条带必须同时有亮有暗**：只放白条纹的话，揉弯之后还是一层均匀的提亮，
-   石头看起来是「磨砂塑料」。真石头的脉络是一亮一暗交替的——亮的是石英层，
-   暗的是杂质沉积。所以这里用黑白交替的条纹 + overlay 混合模式，
-   让明暗都真的参与合成。 */
+@media (prefers-reduced-motion: reduce) {
+  .template-collage .tpl-tag { transition: none; }
+  .template-collage .tpl-tag:active { transform: none; }
+}
+
+/* 胶囊表面的纹理层。
+
+   两种石纹（浪脊 / 玉石）共用这一层，差别只在 marble.ts 的参数表：
+   - `background: hsl(from var(--tpl-panel) h s calc(l * 1.6))` 是**胶囊的颜色**，
+     纹理只输出中性灰当亮度系数，与这一层相乘，所以换配色它自动跟着变。
+     为什么要相对颜色语法而不是混白：用户 m09087 指出「胶囊本身是没有色彩的，
+     他是根据面板的颜色来变色的」。混白会同时提亮**和**褪色——蓝面板下
+     blueMinusRed 只剩 11.9，参考图是 24.3；而 `hsl(from …)` 只抬明度，
+     实测 27.0 / mean 128.5（参考 24.3 / 130.1），暖色面板下 -24.3。
+   - `opacity: 1`：幅度全在滤镜的 `amount` 里，这里再乘系数会把颜色一起淡掉。
+   - 两种石纹必须用同一套底色与混合模式，否则「换个石纹整块胶囊都换了亮度」——
+     用户 m09905 就是在浪脊看着比玉石弱的时候提的意见。 */
 .template-collage .tpl-tag::before {
   content: "";
   position: absolute;
@@ -6253,77 +6116,12 @@ body:has(.media-room.is-expanded) {
      胶囊圆角外面（截图上就是胶囊四角那圈直角浅色块）。父级不能加 overflow:hidden，
      因为四颗 ✦ 星是故意探到胶囊外的。所以在这一层自己再裁一次，形状跟 border-radius 一致。 */
   clip-path: inset(0 round 999px);
-  /* 条纹间隔刻意不等距：等距条纹被揉弯之后仍然看得出是「规则图案」，
-     石头不会那么规整。
-
-     角度从 108deg 改到 20deg（用户 m06408「好，你试试」）：
-     108deg 接近竖直偏斜，纹路是自上而下斜着走的，像大理石的脉络。
-     但用户实际想要的是「海浪的感觉」——浪脊是横着的、一层压一层。
-     把条纹压向水平之后，横向的低频位移几乎不改变条纹的走向，
-     真正把它推弯的是纵向那个更高的频率（0.019），于是形成一条条
-     横向起伏的浪脊。扫过 0/20/40/60/80/108/130/160 八个角度，
-     0deg 太死板（在窄高胶囊里读作横线），20deg 带一点倾斜才有流动感，
-     40deg 以上又退回斜纹了。 */
-  background:
-    repeating-linear-gradient(
-      20deg,
-      #00000000 0px,
-      #00000000 7px,
-      #ffffff 9px,
-      #ffffff 11px,
-      #00000000 14px,
-      #00000000 31px,
-      #000000ac 33px,
-      #00000000 38px,
-      #ffffffc4 47px,
-      #00000000 52px,
-      #00000052 74px,
-      #00000000 79px
-    );
-  filter: url(#tpl-marble);
-  mix-blend-mode: overlay;
-  opacity: 0.46;
-  z-index: -1;
-  pointer-events: none;
-}
-
-/* 另一种石头：玉石。
-   参考视频里那块胶囊不是雾，是**大块明暗之间连着纹**——纹是半透明的、
-   边缘晕开的，所以放大看不像「线」，但走向、粗细变化都在。
-   和上面的浪脊是两种质感，所以做成可选项，
-   由用户在设置里挑（风格表在 marble.ts 的 stoneStyles）。
-
-   这里只负责「给纹理一层什么底色」，纹理本身全在 marble.ts：
-   - `background: hsl(from var(--tpl-panel) h s calc(l * 1.6))`：**这层颜色就是
-     胶囊的颜色**，纹理只在它上面加减明暗。为什么必须这样：用户 m09087 指出
-     「胶囊本身是没有色彩的，他是根据面板的颜色来变色的」——参考图那块偏蓝
-     是面板的蓝透过来的，不是纹理自带。我先前把偏蓝写死进滤镜，面板换成
-     暖色时胶囊纹丝不动（实测六档面板 dR=dG=dB=0）。
-     试过 `mix-blend-mode: multiply` 让纹理直接乘背后的面板：六档候选里
-     multiply 与 normal 的数值一字不差——`.tpl-tag` 上有 `isolation: isolate`，
-     混合只发生在胶囊自己的层叠上下文里，背后根本没有面板色可乘；
-     拆掉 isolation 又会把整块压暗（mean 132 → 92）。所以颜色由这一层显式算，
-     而不是靠混合模式「透」。
-   - `opacity: 1`：幅度全在滤镜的 `amount` 里，这里再乘系数会连颜色一起淡掉。 */
-.template-collage[data-stone="jade"] .tpl-tag::before {
-  /* 用相对颜色语法抬明度，而不是混白。
-     混白（color-mix(#fff 34%, panel)）会同时提亮**和**褪色：
-     蓝面板下 blueMinusRed 只剩 11.9，而参考图那块是 24.3——
-     参考图的胶囊「又亮又蓝」，混白做不到这两件事同时成立。
-     `hsl(from … h s calc(l * 1.6))` 只抬明度，色相与饱和度原样保留：
-     实测 blueMinusRed 27.0、mean 128.5（参考 24.3 / 130.1），
-     暖色面板下 -24.3，跟色幅度与面板自身一致。 */
   background: hsl(from var(--tpl-panel) h s calc(l * 1.6));
+  filter: url(#tpl-marble);
   mix-blend-mode: normal;
   opacity: 1;
-}
-
-/* 玉石版的高光要跟着减弱。为什么：浪脊版是「石面上有脉络」，
-   高光负责给胶囊一个凸面的弧度，两者叠起来正好；玉石版本身就是
-   一块有明暗的石头，再压一道强高光，整块会读成「糊了东西的塑料」。
-   数值与上面那层配成一对扫出来的，改一个就要重新扫另一个。 */
-.template-collage[data-stone="jade"] .tpl-tag::after {
-  opacity: 0.35;
+  z-index: -1;
+  pointer-events: none;
 }
 
 /* 方向性高光：从左上打进来的一道光，斜着铺过整条胶囊。

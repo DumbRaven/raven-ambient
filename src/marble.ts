@@ -56,53 +56,73 @@ export function findStoneStyle(value: unknown): StoneStyle {
 
 /** 挂滤镜用的 <svg> 标记。插到 <body> 上，不要放进被裁的容器里。 */
 export function marbleFilterMarkup(style: StoneStyle = 'sea', id = MARBLE_FILTER_ID): string {
-  return style === 'jade' ? jadeMarkup(id) : seaMarkup(id);
+  return bandMarkup(id, style === 'jade' ? JADE_SPEC : SEA_SPEC);
 }
-
-/** 浪脊：条纹 → 揉弯 → 模糊 → 提对比 → 叠细颗粒。 */
-function seaMarkup(id: string): string {
-  return (
-    // 位移会让像素跑出元素边界，region 必须放宽，否则四周会被裁掉一圈。
-    `<svg width="300" height="300"><filter id="${id}" x="-25%" y="-25%" width="150%" height="150%">` +
-    // 位移场：x 频率远低于 y，条纹主要被「左右挤」，这是大理石脉络的方向感来源。
-    // numOctaves 4 而不是 10：层数多了又变成细碎噪点，正是要避免的那种。
-    '<feTurbulence type="fractalNoise" baseFrequency="0.006 0.019" numOctaves="4" seed="23" result="warp"/>' +
-    '<feDisplacementMap in="SourceGraphic" in2="warp" scale="46" xChannelSelector="R" yChannelSelector="G" result="bent"/>' +
-    '<feGaussianBlur in="bent" stdDeviation="0.9" result="soft"/>' +
-    '<feComponentTransfer in="soft" result="contrast">' +
-    '<feFuncR type="linear" slope="1.55" intercept="-0.28"/>' +
-    '<feFuncG type="linear" slope="1.55" intercept="-0.28"/>' +
-    '<feFuncB type="linear" slope="1.55" intercept="-0.28"/>' +
-    '</feComponentTransfer>' +
-    // 细颗粒：石面不是光滑的，但只留一点点，多了就又回到雪花。
-    '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="grain"/>' +
-    '<feColorMatrix in="grain" type="saturate" values="0" result="gray"/>' +
-    '<feBlend in="contrast" in2="gray" mode="soft-light"/>' +
-    '</filter></svg>'
-  );
-}
-
-
 
 /**
- * 玉石：三层中值等值带 → 揉弯 → 加权平均 → 亮度系数 × 底色。
+ * 换下一个石纹。
  *
- * 走到这一版换了六十多轮，结论留在这里，改参数之前先读。
+ * 为什么要有这个函数：切换入口在胶囊自己身上（点一下换一种），
+ * 组件里不该知道「有两种、顺序是什么」——那是风格表的事。
+ */
+export function nextStoneStyle(value: unknown): StoneStyle {
+  const current = findStoneStyle(value);
+  const at = stoneStyles.findIndex(style => style.id === current);
+  return stoneStyles[(at + 1) % stoneStyles.length].id;
+}
+
+/**
+ * 中值等值带管线：两个风格共用。
  *
- * ## 为什么是「中值等值带」而不是折叠
- *
- * 上一版用折叠 `pow(|sin(v·rings·π)|, sharp)` 出等值线。
- * 那出的是**闭合等值线圈**，挤在一起就成了圆斑——
- * `blobs.cjs` 量出 149 个块、直径 p50 只有 1.1px，用户正是因此说
- * 「太像龟裂 / 像点不像根」。
- *
- * 中值等值带取噪声值等于 0.5 的那一层：
+ * 取噪声值等于 0.5 的那一层——
  *
  *   `val = hi − (hi − lo)·exp(−((x − 0.5)/width)²)`
  *
  * 噪声的等值面天然连成蜿蜒曲线，细长、会分叉、铺满整个平面。
- * 三层不同频率叠加（主干 / 中枝 / 细枝），宽度依次收窄，
- * 就得到「有粗有细、有主有支」的树根感。
+ * 多层的差别只在频率、带宽、权重，所以两个风格共用一套代码，
+ * 换风格只是换参数表。早期浪脊走的是另一条路（白条纹 + 位移），
+ * 那条路出的是「条纹」而不是「纹路」，而且白色叠在白底上对比度被吃掉，
+ * 用户 m09905 说「波浪这个不太明显」，就是这条路的问题。
+ */
+type BandLayer = {
+  /** 噪声频率。两个数（x y）时 y 高于 x，等值线就横着走。 */
+  freq: string;
+  seed: number;
+  /** 带子半宽（0~1）：越大线越粗。 */
+  width: number;
+  /** 线心亮度（最暗处）。 */
+  lo: number;
+  /** 带的边界亮度。 */
+  hi: number;
+  /** 只磨等值面的硬边。越粗的线给越大的值，边缘才晕得开。 */
+  blur: number;
+  /** 加权平均的权重，三条加起来必须为 1。 */
+  weight: number;
+};
+
+type BandSpec = {
+  layers: BandLayer[];
+  /** 三条共用的位移场。频率太低只会整体平移，太高会散成斑。 */
+  warp: { freq: string; seed: number; scale: number };
+  /** 亮度系数幅度：把中性灰乘到多大范围。对到参考图 sd 的那一档。 */
+  amount: number;
+  /** 纹理的亮度中心，`mix = center` 处正好乘 1。必须实测，不能假设 0.5。 */
+  center: number;
+};
+
+/** 一条丝的映射表：在 x = 0.5 处取到 `lo`（最暗），离得越远越亮。 */
+function bandTable(lo: number, hi: number, width: number, samples = 160): string {
+  const values: string[] = [];
+  for (let index = 0; index < samples; index += 1) {
+    const unit = index / (samples - 1);
+    const offset = (unit - 0.5) / width;
+    values.push((hi - (hi - lo) * Math.exp(-offset * offset)).toFixed(4));
+  }
+  return values.join(' ');
+}
+
+/**
+ * 这套管线的结论都在这，改参数之前先读。
  *
  * ## 三条静默出错（都不报错，只是「看着不对」）
  *
@@ -153,27 +173,8 @@ function seaMarkup(id: string): string {
  * 色偏实机会更大（`blueMinusRed` +64 vs 参考 +25），因为探针壁纸取到的
  * 面板本身更饱和。要调该去调面板取色，不要往胶囊里加白。
  */
-function jadeMarkup(id: string): string {
-  /**
-   * 一条丝的映射表：`val = hi − (hi − lo)·exp(−((x − 0.5)/width)²)`。
-   *
-   * 在 x = 0.5 处取到 `lo`（最暗），离得越远越亮，`width` 越大带越宽。
-   * 写成 `feComponentTransfer type="table"` 就是在整张图上执行这条曲线。
-   */
-  const bandTable = (lo: number, hi: number, width: number, samples = 160): string => {
-    const values: string[] = [];
-    for (let index = 0; index < samples; index += 1) {
-      const unit = index / (samples - 1);
-      const offset = (unit - 0.5) / width;
-      values.push((hi - (hi - lo) * Math.exp(-offset * offset)).toFixed(4));
-    }
-    return values.join(' ');
-  };
-
-  const layer = (
-    name: string,
-    cfg: { freq: string; seed: number; width: number; lo: number; hi: number },
-  ): string => {
+function bandMarkup(id: string, spec: BandSpec): string {
+  const layer = (name: string, cfg: BandLayer): string => {
     const table = bandTable(cfg.lo, cfg.hi, cfg.width);
     return (
       `<feTurbulence type="fractalNoise" baseFrequency="${cfg.freq}" numOctaves="2" seed="${cfg.seed}" result="${name}n"/>` +
@@ -188,55 +189,95 @@ function jadeMarkup(id: string): string {
     );
   };
 
-  /**
-   * 调制幅度。纹理只在这层底色上**加减明暗**，不改它是什么颜色。
-   * 1.6 是把对比度对到参考图 sd 12.22 的那一档（stone-amount.cjs 扫出来的）。
-   */
-  const amount = 1.6;
+  const { layers } = spec;
+  const lit = (1 - spec.amount * spec.center).toFixed(3);
 
-  /**
-   * 纹理的亮度中心。**必须实测，不能假设 0.5**（见上方「均值与幅度」）。
-   * 0.54 来自 `stone-root.cjs` 的自动标定，对应最终这组 `lo/width`。
-   */
-  const center = 0.54;
-
-  const lit = (1 - amount * center).toFixed(3);
+  // 加权平均：每合一层，左边累计权重乘以自身、右边乘以新层的权重。
+  // 权重和从 0.46 一路涨到 1，所以最后一级的两数之和恰好是 1 ——
+  // 整体亮度不跟着权重跑。用乘积会把均值一起砍半，整块发闷。
+  let chain = '';
+  let accName = 'v0f';
+  let accWeight = layers[0].weight;
+  for (let index = 1; index < layers.length; index += 1) {
+    const last = index === layers.length - 1;
+    const out = last ? 'mix' : `s${index}`;
+    chain +=
+      `<feComposite in="${accName}" in2="v${index}f" operator="arithmetic" k1="0" ` +
+      `k2="${accWeight.toFixed(2)}" k3="${layers[index].weight.toFixed(2)}" k4="0" result="${out}"/>`;
+    accName = out;
+    accWeight += layers[index].weight;
+  }
 
   return (
     // 位移与模糊都会让像素跑出元素边界，region 放宽一圈，否则四周被裁。
     `<svg width="300" height="300"><filter id="${id}" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">` +
-    // 1. 三条丝：主干宽而深，中枝与细枝依次收窄提亮——「有粗有细，有主有支」。
-    layer('v0', { freq: '0.007', seed: 23, width: 0.150, lo: 0.0, hi: 0.9 }) +
-    layer('v1', { freq: '0.030', seed: 67, width: 0.022, lo: 0.24, hi: 0.9 }) +
-    layer('v2', { freq: '0.070', seed: 91, width: 0.009, lo: 0.32, hi: 0.9 }) +
-    // 2. 位移场：三条丝共用同一个，否则主支朝不同方向弯，像三层贴在一起。
-    //    频率 0.007 配 scale 66 是把等值线揉成「不规则长团」的档位；
-    //    频率再低只会整体平移，再高就散成斑。
-    '<feTurbulence type="fractalNoise" baseFrequency="0.007" numOctaves="2" seed="31" result="wn"/>' +
+    layers.map((cfg, index) => layer(`v${index}`, cfg)).join('') +
+    `<feTurbulence type="fractalNoise" baseFrequency="${spec.warp.freq}" numOctaves="2" seed="${spec.warp.seed}" result="wn"/>` +
     '<feColorMatrix in="wn" type="saturate" values="0" result="wg"/>' +
-    '<feDisplacementMap in="v0t" in2="wg" scale="66" xChannelSelector="R" yChannelSelector="G" result="v0b"/>' +
-    '<feDisplacementMap in="v1t" in2="wg" scale="66" xChannelSelector="R" yChannelSelector="G" result="v1b"/>' +
-    '<feDisplacementMap in="v2t" in2="wg" scale="66" xChannelSelector="R" yChannelSelector="G" result="v2b"/>' +
-    // 3. 模糊只磨等值面的硬边。主干 2.8 是为了让暗团边缘晕开（参考图就是晕的）。
-    '<feGaussianBlur in="v0b" stdDeviation="2.8" result="v0f"/>' +
-    '<feGaussianBlur in="v1b" stdDeviation="0.85" result="v1f"/>' +
-    '<feGaussianBlur in="v2b" stdDeviation="0.4" result="v2f"/>' +
-    // 4. 加权平均：权重和 = 1，均值才不跟着权重跑。
-    //    主干 0.46（决定暗区主体）、中枝 0.30、细枝 0.24（只补边缘碎线）。
-    //    用乘积会把均值一起砍半，整块发闷，所以只能是加权平均。
-    '<feComposite in="v0f" in2="v1f" operator="arithmetic" k1="0" k2="0.46" k3="0.30" k4="0" result="s1"/>' +
-    '<feComposite in="s1" in2="v2f" operator="arithmetic" k1="0" k2="0.76" k3="0.24" k4="0" result="mix"/>' +
-    // 5. 把中性灰映射成**亮度系数**：`m = amount·(mix − center) + 1`，
-    //    于是 `mix = center` 处正好乘 1（不改整体明暗），上下各 ±amount/2。
+    layers
+      .map(
+        (_, index) =>
+          `<feDisplacementMap in="v${index}t" in2="wg" scale="${spec.warp.scale}" ` +
+          `xChannelSelector="R" yChannelSelector="G" result="v${index}b"/>`,
+      )
+      .join('') +
+    layers
+      .map(
+        (cfg, index) =>
+          `<feGaussianBlur in="v${index}b" stdDeviation="${cfg.blur}" result="v${index}f"/>`,
+      )
+      .join('') +
+    chain +
+    // 把中性灰映射成**亮度系数**：`m = amount·(mix − center) + 1`。
     '<feComponentTransfer in="mix" result="lit">' +
-    `<feFuncR type="linear" slope="${amount}" intercept="${lit}"/>` +
-    `<feFuncG type="linear" slope="${amount}" intercept="${lit}"/>` +
-    `<feFuncB type="linear" slope="${amount}" intercept="${lit}"/>` +
+    `<feFuncR type="linear" slope="${spec.amount}" intercept="${lit}"/>` +
+    `<feFuncG type="linear" slope="${spec.amount}" intercept="${lit}"/>` +
+    `<feFuncB type="linear" slope="${spec.amount}" intercept="${lit}"/>` +
     '<feFuncA type="linear" slope="0" intercept="1"/>' +
     '</feComponentTransfer>' +
-    // 6. 与 `SourceGraphic`（CSS 给的那层底色）相乘。只缩放亮度、不改色相，
-    //    所以胶囊的颜色始终等于面板色提亮后的样子——换配色它自动跟着变。
+    // 与 `SourceGraphic`（CSS 给的那层底色）相乘。只缩放亮度、不改色相，
+    // 所以胶囊的颜色始终等于面板色提亮后的样子——换配色它自动跟着变。
     '<feComposite in="SourceGraphic" in2="lit" operator="arithmetic" k1="1" k2="0" k3="0" k4="0" result="out"/>' +
     '</filter></svg>'
   );
 }
+
+/**
+ * 浪脊：横着流的等值带。
+ *
+ * 和玉石同一套管线，只换参数：噪声的 y 频率是 x 的四倍多，
+ * 梯度主要沿竖直方向，等值线于是横着走——一层压一层的浪。
+ *
+ * 为什么不再是「白条纹 + 位移」：那条路出的是「条纹」而不是「纹路」，
+ * 而且白色叠在白底上，对比度被底色吃掉。用户 m09905 说
+ * 「波浪这个不太明显，能不能也和玉石一样」，指的就是这件事。
+ *
+ * `center / amount` 是按本组参数**实测标定**的（`tools/probe/stone-sea.cjs`）：
+ * 纹理均值 0.498、`amount 1.41` 时输出 sd 11.2，与玉石（11.4）和参考图（12.2）
+ * 同一档。**换频率就要重新标一次**——两个数跟纹理分布绑定，不能照抄玉石的。
+ */
+const SEA_SPEC: BandSpec = {
+  layers: [
+    // 主干：又厚又晕，负责整块起伏。
+    { freq: '0.004 0.018', seed: 23, width: 0.180, lo: 0.0, hi: 0.9, blur: 3.2, weight: 0.46 },
+    // 中枝：横向压扁但仍在横向低频，形成一层压一层。
+    { freq: '0.0088 0.0396', seed: 67, width: 0.034, lo: 0.22, hi: 0.9, blur: 1.0, weight: 0.32 },
+    // 细枝：只补浪尖上的碎线，多了就变涟漪。
+    { freq: '0.0152 0.0684', seed: 91, width: 0.014, lo: 0.30, hi: 0.9, blur: 0.5, weight: 0.22 },
+  ],
+  // 位移场与主干同频：低频只在整体平移，不会把浪拆碎。
+  warp: { freq: '0.004 0.018', seed: 31, scale: 58 },
+  amount: 1.41,
+  center: 0.498,
+};
+
+const JADE_SPEC: BandSpec = {
+  layers: [
+    { freq: '0.007', seed: 23, width: 0.150, lo: 0.0, hi: 0.9, blur: 2.8, weight: 0.46 },
+    { freq: '0.030', seed: 67, width: 0.022, lo: 0.24, hi: 0.9, blur: 0.85, weight: 0.30 },
+    { freq: '0.070', seed: 91, width: 0.009, lo: 0.32, hi: 0.9, blur: 0.4, weight: 0.24 },
+  ],
+  warp: { freq: '0.007', seed: 31, scale: 66 },
+  amount: 1.6,
+  center: 0.54,
+};

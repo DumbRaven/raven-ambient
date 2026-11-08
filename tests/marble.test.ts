@@ -27,20 +27,24 @@ test('滤镜 id 与 CSS 里引用的那个一致', () => {
   assert.ok(jade.includes(`id="${MARBLE_FILTER_ID}"`));
 });
 
-test('浪脊：先位移再模糊再提对比——顺序错了就揉不出石纹', () => {
-  // 位移必须在模糊之前：先糊一遍再位移，脉络边缘会被拉成糊条。
+test('浪脊：位移在模糊之前，位移场低频且横向拉长', () => {
+  // 两种石纹现在共用同一条管线，浪脊只是参数不同：
+  // 横向频率低于纵向（梯度朝竖直走），等值线于是横着流，一层压一层。
   const bend = sea.indexOf('feDisplacementMap');
   const blur = sea.indexOf('feGaussianBlur');
-  const contrast = sea.indexOf('feComponentTransfer');
-  assert.ok(bend > 0 && blur > bend && contrast > blur, `顺序不对: bend=${bend} blur=${blur} contrast=${contrast}`);
-});
+  assert.ok(bend > 0 && blur > bend, `位移应在模糊之前: bend=${bend} blur=${blur}`);
 
-test('浪脊：位移场低频、横向拉长——高频会把条纹打回噪点', () => {
-  const warp = sea.match(/baseFrequency="([\d.]+) ([\d.]+)" numOctaves="(\d+)"/);
-  assert.ok(warp, '找不到位移场的湍流参数');
-  const [, fx, fy, octaves] = warp;
-  assert.ok(Number(fx) < Number(fy), '横向频率应低于纵向，条纹才被左右挤成脉络');
-  assert.ok(Number(octaves) <= 4, 'octaves 多了就退回细碎噪点，这是当初换管线的理由');
+  // 只取三层纹路的频率——最后那条是**位移场**，它和主干同频，
+  // 一起算进去会让跨度看起来是 1.00（曾经就这么误报过）。
+  const freqs = [...sea.matchAll(/baseFrequency="([\d.]+) ([\d.]+)" numOctaves="\d+" seed="\d+" result="v\d+n"/g)]
+    .map(([, fx, fy]) => [Number(fx), Number(fy)]);
+  assert.equal(freqs.length, 3, `三层纹路各有自己的噪声，实际 ${freqs.length}`);
+  for (const [fx, fy] of freqs) {
+    assert.ok(fx < fy, `横向频率 ${fx} 应低于纵向 ${fy}，否则浪就竖着走了`);
+  }
+  // 三层的纵频必须拉开，否则只剩一种粗细，看着像涟漪不像浪。
+  const ratio = freqs[2][1] / freqs[0][1];
+  assert.ok(ratio >= 2.5, `纵频跨度应 ≥2.5 倍，实际 ${ratio.toFixed(2)}`);
 });
 
 test('浪脊：位移区域放宽过，否则四周会被裁掉一圈', () => {
@@ -48,9 +52,14 @@ test('浪脊：位移区域放宽过，否则四周会被裁掉一圈', () => {
   assert.match(sea, /width="1[0-9]{2}%"/);
 });
 
-test('浪脊：细颗粒走 saturate 0 去色，柔光叠在脉络上', () => {
-  assert.ok(sea.includes('type="saturate" values="0"'), '颗粒没去色会带出一层彩色噪点');
-  assert.ok(sea.includes('mode="soft-light"'), '颗粒应以柔光叠上去，直接叠加会把脉络压死');
+test('浪脊：和玉石同一条管线，不再有柔光叠颗粒那一套', () => {
+  // 旧版浪脊是「白条纹 + feBlend soft-light」，白色叠在白底上对比度被吃掉，
+  // 所以用户 m09905 说「波浪这个不太明显」。现在两者共用等值带管线。
+  assert.ok(sea.includes('type="saturate" values="0"'), '噪声要先去掉彩色通道');
+  assert.ok(!sea.includes('mode="soft-light"'), '不应再有柔光叠层——那是旧管线的特征');
+  const tables = [...sea.matchAll(/<feFuncR type="table"/g)];
+  assert.equal(tables.length, 3, `三层各要一张等值带映射表，实际 ${tables.length}`);
+  assert.ok(sea.includes('in2="lit" operator="arithmetic" k1="1"'), '末尾同样要乘底色');
 });
 
 test('玉石：三条丝都靠 type="table" 的等值带映射出来，不是靠调对比', () => {
