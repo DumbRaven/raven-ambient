@@ -14,13 +14,12 @@
  */
 
 import type { MediaItem } from './records';
-import type { Overlays } from './overlays';
+import type { LayerList } from './layers';
 import type { RainSetting } from './rain';
 import type { StoneStyle } from './marble.ts';
 import type { TemplateId } from './templates';
 import type { ToneHint } from './templates';
 import type { StageAmbience, StageDisc, StageFocus, StageNow } from './TemplateStage';
-import type { WidgetList } from './widgets';
 
 /**
  * 主窗口交给桌面窗的一整份「放映状态」。
@@ -43,22 +42,21 @@ export type StageSnapshot = {
   ambience: StageAmbience | null;
   now: StageNow;
   rain: RainSetting;
-  overlay: Overlays;
-  /** 番茄钟剩余毫秒，叠加层画计时用。 */
+  /**
+   * 图层表（时间/日期/标题/番茄钟/唱片/曲目）。
+   *
+   * 主窗口与桌面窗两边都能拖、都能删——所以这份表是一个来回跑的双向状态：
+   * 主窗口改完推过去，桌面窗拖完发 {@link StageCommand} 里的 `layers` 回来。
+   * 存档只有主窗口那份（localStorage），桌面窗那边永远是只读的副本。
+   */
+  layers: LayerList;
+  /** 番茄钟剩余毫秒，图层里计时那块用。 */
   focusLeft: number | null;
-  /** 叠加层里「标题」那一块写的字。 */
+  /** 图层里「标题」那一块写的字。 */
   title: string;
   /** 能不能切歌，决定桌面窗里的唱片接不接指针。 */
   canPrev: boolean;
   canNext: boolean;
-  /**
-   * 透明模式的组件表。
-   *
-   * 主窗口与桌面窗两边都能拖、都能删——所以这份表是一个来回跑的双向状态：
-   * 主窗口改完推过去，桌面窗拖完发 {@link StageCommand} 里的 `widgets` 回来。
-   * 存档只有主窗口那份（localStorage），桌面窗那边永远是只读的副本。
-   */
-  widgets: WidgetList;
 };
 
 /**
@@ -72,16 +70,15 @@ export type StageCommand =
   | { type: 'stone' }
   | { type: 'prev' }
   | { type: 'next' }
-  | { type: 'overlay'; value: Overlays }
   | { type: 'rain'; value: RainSetting }
   /**
-   * 桌面窗里拖了 / 删了一块组件，整份表回传。
+   * 桌面窗里拖了 / 删了一块图层，整份表回传。
    *
    * 为什么回整份而不是「哪一块挪到了哪」：位置是连续拖出来的，
    * 一次拖动会经过几十个中间位置，只有松手那一下才该落盘——回整份就天然合并了，
    * 主窗口直接覆盖回去，不需要在这两条线之间对账。
    */
-  | { type: 'widgets'; value: WidgetList };
+  | { type: 'layers'; value: LayerList };
 
 type RavenWindow = Window & {
   __ravenStageSnapshot?: StageSnapshot;

@@ -1,42 +1,34 @@
 /**
- * 控制条上那颗「叠加元素 / 组件」按钮。
+ * 控制条上那颗「图层」按钮。
  *
- * 为什么把两件事并成一颗：透明模式的「组件」和另外两套版式的「叠加元素」
- * 干的是同一件事——在画面上加一层能拖的东西，只是能加的东西不一样。
- * 并排两颗按钮会让人以为它们是两套独立功能，还得自己记住哪颗在哪套版式下有用。
+ * 以前这里是两颗（「叠加元素」和「加组件」），干的却是同一件事——在画面上加一层
+ * 能拖的东西，只是能加的东西不一样。用户 m11693 让它们合一，m12005 又问
+ * 「加组件和叠加元素能完全一套吗」——能，所以现在连数据都只有一份 `LayerList`，
+ * 这颗按钮也就只剩一个模式了。
  *
- * 用户原话（m11693）：「加组件和叠加元素现在重复了，如果确实只能用两套来实现，
- * 那就切换下面视频模式的时候自动把按钮的内容切换一下，就是虽然长得一样但是内容不一样」。
- * 所以外观一个（`Layers` 图标 + 同一套菜单样式），内容由 `mode` 决定。
- *
- * 菜单壳子、遮罩、开关点这些都是同一套 CSS（`.theater-overlays` / `-veil` / `-menu` /
- * `.overlay-dot`），合并后不需要再维护两份样式。
+ * 菜单壳子、遮罩、开关点沿用同一套 CSS（`.theater-overlays` / `-veil` / `-menu` /
+ * `.overlay-dot`），只有那行提示随版式变：透明版式说「加上去」，其余说「打开之后」。
  */
 import { Layers } from 'lucide-react';
-import { overlays as overlayMetas, type Overlays } from './overlays';
-import { addWidget, removeWidget, widgetLimit, widgetMetas, type WidgetList } from './widgets';
+import { addLayer, canAddLayer, layerLimit, layerMetas, removeLayer, type LayerList } from './layers';
 
 type Props = {
-  /** 透明版式下管组件，其余版式管叠加元素。 */
-  mode: 'overlay' | 'widgets';
-  overlay: Overlays;
-  onOverlay: (next: Overlays) => void;
-  widgets: WidgetList;
-  onWidgets: (next: WidgetList) => void;
+  layers: LayerList;
+  onLayers: (next: LayerList) => void;
   open: boolean;
   onOpen: (open: boolean) => void;
+  /** 透明版式：菜单里说「加上去 / 放满了」，其余版式说「打开之后」。 */
+  desktop: boolean;
 };
 
-export default function TheaterLayers({ mode, overlay, onOverlay, widgets, onWidgets, open, onOpen }: Props) {
-  const label = mode === 'widgets' ? '组件' : '叠加元素';
-
+export default function TheaterLayers({ layers, onLayers, open, onOpen, desktop }: Props) {
   return (
     <div className="theater-overlays">
       <button
         className={`icon-button theater-overlay-toggle ${open ? 'on' : ''}`}
-        aria-label={label}
+        aria-label="图层"
         aria-expanded={open}
-        title={label}
+        title="图层"
         onClick={() => onOpen(!open)}
       >
         <Layers size={13} />
@@ -45,42 +37,31 @@ export default function TheaterLayers({ mode, overlay, onOverlay, widgets, onWid
         <>
           <button className="theater-overlay-veil" aria-label="收起" onClick={() => onOpen(false)} />
           <div className="theater-overlay-menu" role="menu">
-            {mode === 'widgets'
-              ? widgetMetas.map(meta => {
-                  const present = widgets.some(widget => widget.id === meta.id);
-                  return (
-                    <button
-                      key={meta.id}
-                      role="menuitemcheckbox"
-                      aria-checked={present}
-                      onClick={() => onWidgets(present ? removeWidget(widgets, meta.id) : addWidget(widgets, meta.id))}
-                    >
-                      <span className={`overlay-dot ${present ? 'on' : ''}`} aria-hidden="true" />
-                      <span>
-                        <b>{meta.name}</b>
-                        <small>{meta.hint}</small>
-                      </span>
-                    </button>
-                  );
-                })
-              : overlayMetas.map(meta => (
-                  <button
-                    key={meta.id}
-                    role="menuitemcheckbox"
-                    aria-checked={overlay[meta.id].on}
-                    onClick={() => onOverlay({ ...overlay, [meta.id]: { ...overlay[meta.id], on: !overlay[meta.id].on } })}
-                  >
-                    <span className={`overlay-dot ${overlay[meta.id].on ? 'on' : ''}`} aria-hidden="true" />
-                    <span>
-                      <b>{meta.name}</b>
-                      <small>{meta.hint}</small>
-                    </span>
-                  </button>
-                ))}
+            {layerMetas.map(meta => {
+              const present = layers.some(layer => layer.id === meta.id);
+              const full = !present && !canAddLayer(layers, meta.id);
+              return (
+                <button
+                  key={meta.id}
+                  role="menuitemcheckbox"
+                  aria-checked={present}
+                  disabled={full}
+                  onClick={() => onLayers(present ? removeLayer(layers, meta.id) : addLayer(layers, meta.id))}
+                >
+                  <span className={`overlay-dot ${present ? 'on' : ''}`} aria-hidden="true" />
+                  <span>
+                    <b>{meta.name}</b>
+                    <small>{meta.hint}</small>
+                  </span>
+                </button>
+              );
+            })}
             <p className="theater-overlay-tip">
-              {mode === 'widgets'
-                ? (widgets.length >= widgetLimit ? '已经放满了。' : '加上去之后，在画面里按住它就能拖。')
-                : '打开之后，在画面里按住它拖动就能换位置。'}
+              {layers.length >= layerLimit
+                ? '已经放满了。'
+                : desktop
+                  ? '加上去之后，在画面里按住它就能拖。'
+                  : '打开之后，在画面里按住它拖动就能换位置。'}
             </p>
           </div>
         </>

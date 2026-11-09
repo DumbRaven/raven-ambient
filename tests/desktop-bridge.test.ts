@@ -44,15 +44,13 @@ test('取走期间新压进来的动作留在新队列里', () => {
   assert.deepEqual(drainCommands(host), [{ type: 'prev' }]);
 });
 
-test('叠加元素与雨滴这两条带值的动作原样带过去', () => {
-  const overlay = {
-    clock: { on: true, spot: { x: 10, y: 20 } },
-    title: { on: false, spot: { x: 0, y: 0 } },
-    date: { on: false, spot: { x: 0, y: 0 } },
-    timer: { on: false, spot: { x: 0, y: 0 } },
-  };
-  const host: Host = { __ravenDesktopQueue: [{ type: 'overlay', value: overlay }] };
+test('图层与雨滴这两条带值的动作原样带过去', () => {
+  const layers = [
+    { id: 'clock' as const, spot: { x: 0.4, y: 0.2 }, scale: 1 },
+    { id: 'title' as const, spot: { x: 0.4, y: 0.5 }, scale: 1.2 },
+  ];
+  const host: Host = { __ravenDesktopQueue: [{ type: 'layers', value: layers }] };
   const [command] = drainCommands(host);
-  assert.equal(command.type, 'overlay');
-  assert.deepEqual('value' in command ? command.value : null, overlay);
+  assert.equal(command.type, 'layers');
+  assert.deepEqual('value' in command ? command.value : null, layers);
 });

@@ -97,9 +97,10 @@ const DRAG = (id, dx, dy) => `(async () => {
   };
 })()`;
 
-/** 主窗口那份存档（localStorage）里，时钟那块的坐标。 */
+/** 主窗口那份存档（localStorage）里，时钟那块的坐标。
+ *  图层合并之后键是 `raven-layers`（旧的两份键只读一次、搬家用，不再写）。 */
 const STORED_SPOT = `(() => {
-  const raw = localStorage.getItem('raven-desktop-widgets');
+  const raw = localStorage.getItem('raven-layers');
   if (!raw) return null;
   try {
     const list = JSON.parse(raw);

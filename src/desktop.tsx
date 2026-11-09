@@ -16,9 +16,8 @@ import './styles.css';
 import './skin-bold.css';
 import './desktop.css';
 import TemplateStage from './TemplateStage';
-import OverlayLayer from './OverlayLayer';
+import LayerStack from './LayerStack';
 import RainLayer from './RainLayer';
-import DesktopWidgets from './DesktopWidgets';
 import { installStageDrain, installStagePaint, sendStageCommand, type StageSnapshot } from './desktop-bridge';
 
 function DesktopStage() {
@@ -63,35 +62,24 @@ function DesktopStage() {
             onNextTrack={snapshot.canNext ? nextTrack : undefined}
             /* 色板由主窗口算好了传过来：这里自己取色会对 4K 视频再解一帧。 */
             colors={snapshot.palette}
+            /* 图层只有一份，皮肤跟着版式走：透明版式用壁纸上的白字，其余用深色小字。
+               这边也能拖、也能删——这个窗口就是用户平时看着的那块，要调整位置当然在这里调。
+               松手后整份表回传主窗口落盘（存档只有主窗口那份）。 */
             widgets={
-              snapshot.template === 'desktop' ? (
-                /* 桌面窗里也能拖、也能删——这个窗口就是用户平时看着的那块，
-                   要调整位置当然在这里调。松手后整份表回传主窗口落盘
-                   （位置和存档都以主窗口那份为准）。 */
-                <DesktopWidgets
-                  value={snapshot.widgets}
-                  onChange={value => sendStageCommand({ type: 'widgets', value })}
-                  remaining={snapshot.focusLeft}
-                  now={snapshot.now}
-                  disc={snapshot.disc}
-                  title={snapshot.title}
-                  editable
-                />
-              ) : undefined
+              <LayerStack
+                value={snapshot.layers}
+                onChange={value => sendStageCommand({ type: 'layers', value })}
+                remaining={snapshot.focusLeft}
+                now={snapshot.now}
+                disc={snapshot.disc}
+                title={snapshot.title}
+                editable
+                skin={snapshot.template === 'desktop' ? 'widgets' : 'overlay'}
+                big
+              />
             }
           />
           <RainLayer value={snapshot.rain} />
-          {/* 透明模式下不画叠加层：那四件和组件里同名的那几块会重着画在
-              同一个位置，屏幕上出现两份时间。主窗口那边也是这么排的。 */}
-          {snapshot.template !== 'desktop' && (
-            <OverlayLayer
-              value={snapshot.overlay}
-              onChange={value => sendStageCommand({ type: 'overlay', value })}
-              remaining={snapshot.focusLeft}
-              title={snapshot.title}
-              big
-            />
-          )}
         </div>
       </div>
     </section>

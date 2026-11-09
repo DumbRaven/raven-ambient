@@ -16,14 +16,12 @@ import { listenStageClosed, listenStageCommand, publishStage, type StageSnapshot
 import TemplateStage, { type StageAmbience, type StageDisc, type StageFocus, type StageNow } from './TemplateStage';
 import { defaultTone, normaliseHex, readTone, toneGroups, toneHint, toneKey, writeTone, type ToneSetting } from './tone-setting';
 import { nextStoneStyle } from './marble.ts';
-import OverlayLayer from './OverlayLayer';
+import LayerStack from './LayerStack';
 import RainLayer from './RainLayer';
-import DesktopWidgets from './DesktopWidgets';
 import TheaterLayers from './TheaterLayers';
-import { readWidgets, widgetsKey, writeWidgets, type WidgetList } from './widgets';
+import { layersKey, legacyOverlaysKey, legacyWidgetsKey, readLayers, writeLayers, type LayerList } from './layers';
 import { rainKey, rainModes, readRain, writeRain, type RainSetting } from './rain';
 import { readFocus } from './focus-bridge';
-import { readOverlays, writeOverlays, overlaysKey, type Overlays } from './overlays';
 import { templates, type TemplateId } from './templates';
 import type { MediaItem } from './records';
 
@@ -150,21 +148,26 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   // 不做成「鼠标不在控制条上就隐藏」——全屏看电影时鼠标往往停在画面正中不动，
   // 那条黑带会一直压在画面底下。
   const [chrome, setChrome] = useState(true);
-  // 叠加元素（时间/标题/日期/番茄钟）。位置是用户拖出来的，存 localStorage 而不是收藏——
-  // 这是「怎么看」的偏好，不该触发一次写盘。
-  const [overlay, setOverlay] = useState<Overlays>(() => readOverlays(localStorage.getItem(overlaysKey)));
+  // 图层（时间/日期/标题/番茄钟/唱片/曲目）。位置是用户拖出来的，存 localStorage
+  // 而不是收藏——这是「怎么看」的偏好，不该触发一次写盘。
+  //
+  // 以前这里是两份（叠加元素 + 组件），用户 m12005 问能不能一套——能，
+  // 所以现在只有 `layers` 一份，四个版式共用。皮肤差别在渲染层（LayerStack），
+  // 存档差别在两份旧键的搬家（readLayers 的第三、四个参数）。
+  const [layers, setLayers] = useState<LayerList>(() =>
+    readLayers(
+      localStorage.getItem(layersKey),
+      localStorage.getItem(legacyOverlaysKey),
+      localStorage.getItem(legacyWidgetsKey),
+    ),
+  );
   // 「叠加元素」与「加组件」合并成一颗按钮：外观一样，菜单内容跟着版式走。
   // 为什么不再各留一个开关：合并之后只剩一个菜单，两个 state 一定会有一个忘了同步。
   const [layersMenu, setLayersMenu] = useState(false);
-  // 雨层。和叠加元素一样存 localStorage——这是「怎么看」的偏好，不该写盘。
+  // 雨层。和图层一样存 localStorage——这是「怎么看」的偏好，不该写盘。
   const [rain, setRain] = useState<RainSetting>(() => readRain(localStorage.getItem(rainKey)));
   const [rainMenu, setRainMenu] = useState(false);
   useEffect(() => { writeRain(rain); }, [rain]);
-  // 透明模式的组件（时间/日期/标题/番茄钟/唱片/曲目）。
-  // 跟上面几项一样存 localStorage：这是「桌面怎么摆」的偏好，不进收藏库。
-  // 位置和缩放都是用户拖出来的，换一台机器不该被同步走。
-  const [widgets, setWidgets] = useState<WidgetList>(() => readWidgets(localStorage.getItem(widgetsKey)));
-  useEffect(() => { writeWidgets(widgets); }, [widgets]);
   // 番茄钟读数：跟着专注页走，自己不另起计时器（两处各算各的，暂停一次就对不上）。
   // 800ms 一刷就够——叠加上只显示到分:秒。
   // 除了剩余毫秒，还留一份完整快照：拼贴版信息条那一格要显示阶段和轮次，
@@ -194,7 +197,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
     const timer = window.setInterval(tick, 800);
     return () => window.clearInterval(timer);
   }, []);
-  useEffect(() => { writeOverlays(overlay); }, [overlay]);
+  useEffect(() => { writeLayers(layers); }, [layers]);
   const screen = useRef<HTMLVideoElement>(null);
   const grid = useRef<HTMLUListElement>(null);
   // 已经进过视口的条目。壁纸库一次能读进来一百多件，每个视频都要读文件头、
@@ -397,10 +400,8 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
     if (command.type === 'stone') setTone(prev => ({ ...prev, stone: nextStoneStyle(prev.stone) }));
     else if (command.type === 'prev') onPrevTrack?.();
     else if (command.type === 'next') onNextTrack?.();
-    else if (command.type === 'overlay') setOverlay(command.value);
+    else if (command.type === 'layers') setLayers(command.value);
     else if (command.type === 'rain') setRain(command.value);
-    // 桌面窗里拖了组件：整份覆盖回来。那边松手才发一条，所以不会抖。
-    else if (command.type === 'widgets') setWidgets(command.value);
   }), [onPrevTrack, onNextTrack]);
 
   /**
@@ -424,15 +425,14 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
       ambience,
       now,
       rain,
-      overlay,
+      layers,
       focusLeft,
       title: current ? titleOf(current) : '',
       canPrev: !!onPrevTrack,
       canNext: !!onNextTrack,
-      widgets,
     };
     publishStage(snapshot);
-  }, [current, usable, template, tone, palette, disc, focusStage, ambience, now, rain, overlay, focusLeft, widgets, onPrevTrack, onNextTrack]);
+  }, [current, usable, template, tone, palette, disc, focusStage, ambience, now, rain, layers, focusLeft, onPrevTrack, onNextTrack]);
 
   return (
     <section className={`media-room ${expanded ? 'is-expanded' : ''}`} data-chrome={chrome ? 'visible' : 'hidden'} aria-label="放映">
@@ -505,32 +505,20 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               onNextTrack={onNextTrack}
               onPalette={setPalette}
               widgets={
-                desktopMode ? (
-                  <DesktopWidgets
-                    value={widgets}
-                    onChange={setWidgets}
-                    remaining={focusLeft}
-                    now={now}
-                    disc={disc}
-                    title={titleOf(current)}
-                    editable
-                  />
-                ) : undefined
+                <LayerStack
+                  value={layers}
+                  onChange={setLayers}
+                  remaining={focusLeft}
+                  now={now}
+                  disc={disc}
+                  title={titleOf(current)}
+                  editable
+                  skin={desktopMode ? 'widgets' : 'overlay'}
+                  big={expanded}
+                />
               }
             />
             <RainLayer value={rain} />
-            {/* 透明模式下不画叠加层：那四件（时间/标题/日期/番茄钟）和
-                组件里同名的那几块会重着画在同一个位置，屏幕上出现两份时间。
-                透明模式的「往上加东西」只有一条路——控制条上那颗按钮。 */}
-            {!desktopMode && (
-              <OverlayLayer
-                value={overlay}
-                onChange={setOverlay}
-                remaining={focusLeft}
-                title={titleOf(current)}
-                big={expanded}
-              />
-            )}
           </div>
           <div className="theater-bar">
             <div className="theater-controls">
@@ -734,16 +722,8 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                 </>
               )}
             </div>
-            {/* 叠加元素 / 组件：同一颗按钮，菜单内容跟着版式走。 */}
-            <TheaterLayers
-              mode={desktopMode ? 'widgets' : 'overlay'}
-              overlay={overlay}
-              onOverlay={setOverlay}
-              widgets={widgets}
-              onWidgets={setWidgets}
-              open={layersMenu}
-              onOpen={setLayersMenu}
-            />
+            {/* 图层：一颗按钮、一份菜单，六项在两个版式里都能用。 */}
+            <TheaterLayers layers={layers} onLayers={setLayers} open={layersMenu} onOpen={setLayersMenu} desktop={desktopMode} />
             {/* 全屏键在透明版式下变成「放到桌面」。
                 透明模式的意义就是把画面贴回桌面上看，这时候窗口全屏没有意义——
                 两个按钮并排反而要用户自己判断该点哪个。 */}
@@ -781,30 +761,20 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               stone={tone.stone}
               onStone={cycleStone}
               widgets={
-                desktopMode ? (
-                  <DesktopWidgets
-                    value={widgets}
-                    onChange={setWidgets}
-                    remaining={focusLeft}
-                    now={now}
-                    disc={disc}
-                    title=""
-                    editable
-                  />
-                ) : undefined
+                <LayerStack
+                  value={layers}
+                  onChange={setLayers}
+                  remaining={focusLeft}
+                  now={now}
+                  disc={disc}
+                  title=""
+                  editable
+                  skin={desktopMode ? 'widgets' : 'overlay'}
+                  big={expanded}
+                />
               }
             />
             <RainLayer value={rain} />
-            {/* 和主台一致：透明版式下不画叠加层，否则会和组件重着画。 */}
-            {!desktopMode && (
-              <OverlayLayer
-                value={overlay}
-                onChange={setOverlay}
-                remaining={focusLeft}
-                title="Untitled"
-                big={expanded}
-              />
-            )}
             <div className="theater-blank-hint">
               <ImageIcon size={16} strokeWidth={1.2} />
               <span>先「从本地添加」几张图片或视频</span>
@@ -904,15 +874,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                 </>
               )}
             </div>
-            <TheaterLayers
-              mode={desktopMode ? 'widgets' : 'overlay'}
-              overlay={overlay}
-              onOverlay={setOverlay}
-              widgets={widgets}
-              onWidgets={setWidgets}
-              open={layersMenu}
-              onOpen={setLayersMenu}
-            />
+            <TheaterLayers layers={layers} onLayers={setLayers} open={layersMenu} onOpen={setLayersMenu} desktop={desktopMode} />
             {/* 空台面也要有全屏 / 桌面键：上面那张画面已经是同一块舞台，
                 换到空库时忽然没得全屏会很怪。透明版式下这颗仍走桌面放映。 */}
             {desktopMode ? (

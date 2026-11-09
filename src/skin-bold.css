@@ -4588,6 +4588,65 @@ body:has(.media-room.is-expanded) {
   background: var(--bold-mint, #a8e6c1);
 }
 
+/* 唱片与曲目：这两块原来只有透明版式有，现在图层只有一份，
+   拼贴/照片也能加。样式照搬 .dw-disc 那一套，只把尺寸换成跟着全屏档走——
+   透明版式的直径是相对屏高算的，这里没有 --disc-size 可用。 */
+.overlay-disc .ov-disc {
+  display: block;
+  position: relative;
+  width: clamp(64px, 9vw, 148px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #0d0d0f 0 6%, #17181b 6% 8%, #0d0d0f 8% 36%, #17181b 36% 37.4%, #0d0d0f 37.4% 100%);
+  box-shadow:
+    0 0 0 1px #ffffff1f,
+    0 12px 36px #0000008a;
+  rotate: 0deg;
+  animation: dw-spin 12s linear infinite paused;
+}
+
+.overlay-disc .ov-disc.is-spinning {
+  animation-play-state: running;
+}
+
+.overlay-disc .ov-disc-label {
+  position: absolute;
+  inset: 30%;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: #9a8b78;
+  box-shadow: inset 0 0 0 1px #ffffff24;
+}
+
+.overlay-disc .ov-disc-hole {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3.2%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #0b0c0e;
+  translate: -50% -50%;
+}
+
+.overlay-now .ov-now {
+  display: block;
+  max-width: 62vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(10px, 1vw, 14px);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #ffffffd9;
+}
+
+.overlay-layer[data-big='true'] .ov-now {
+  font-size: clamp(13px, 1.3vw, 20px);
+}
+
 /* 全屏时整体放大一档：那一屏才是真拿来看的 */
 .overlay-layer[data-big='true'] .ov-clock {
   font-size: clamp(64px, 8vw, 148px);

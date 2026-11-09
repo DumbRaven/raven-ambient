@@ -1,6 +1,5 @@
 import { test } from 'node:test';
 import fs from 'node:fs';
-import { clockText, dateText, defaultOverlays, readOverlays, timerText, writeOverlays } from '../src/overlays.ts';
 import assert from 'node:assert/strict';
 import { isMediaKind, sanitizeCabinet, type MediaItem } from '../src/records.ts';
 import { dropWallpapers, isInside, looseMedia, mediaSrc, mergeMedia, replaceMediaDir, replaceWallpapers, toMediaItem, toWallpaperItem, type WallpaperFile } from '../src/media.ts';
@@ -159,38 +158,4 @@ test('单独导入的文件不在任何目录里，重启时要单独补进白�
   // 前后缀相似的目录不算「在里面」，否则素材二里的文件会被漏掉
   const near = toMediaItem(file('F:\\素材二\\别的.png'));
   assert.deepEqual(looseMedia([near], dirs), ['F:\\素材二\\别的.png']);
-});
-
-test('叠加元素：坏存档退回默认值，不让一份脏数据把界面卡死', () => {
-  assert.deepEqual(readOverlays(null), defaultOverlays);
-  assert.deepEqual(readOverlays('{ 这不是 json'), defaultOverlays);
-  assert.deepEqual(readOverlays('[]'), defaultOverlays);
-  assert.deepEqual(readOverlays('{"clock":{"on":true}}'), {
-    ...defaultOverlays,
-    clock: { on: true, spot: defaultOverlays.clock.spot },
-  });
-});
-
-test('叠加元素：坐标被夹在 0–1，越界和坏数字都拉回来', () => {
-  const parsed = readOverlays(JSON.stringify({ clock: { on: true, spot: { x: -3, y: 9 } } }));
-  assert.deepEqual(parsed.clock.spot, { x: 0, y: 1 });
-  const broken = readOverlays(JSON.stringify({ clock: { on: true, spot: { x: 'a', y: 0.5 } } }));
-  assert.deepEqual(broken.clock.spot, defaultOverlays.clock.spot);
-});
-
-test('叠加元素：读存档时认的是 on === true，缺字段当作关闭', () => {
-  const parsed = readOverlays(JSON.stringify({ date: { on: 'yes', spot: { x: 0.5, y: 0.5 } } }));
-  assert.equal(parsed.date.on, false);
-  const on = readOverlays(JSON.stringify({ date: { on: true, spot: { x: 0.5, y: 0.5 } } }));
-  assert.equal(on.date.on, true);
-});
-
-test('叠加元素的文字：时钟补零、日期是月.日 星期、计时器按分:秒', () => {
-  const morning = new Date(2026, 9, 26, 9, 4);
-  assert.equal(clockText(morning), '09:04');
-  assert.equal(dateText(morning), 'Oct.26 Monday');
-  assert.equal(timerText(0), '00:00');
-  assert.equal(timerText(25 * 60 * 1000), '25:00');
-  assert.equal(timerText(-5000), '00:00');
-  assert.equal(timerText(59_400), '00:59');
 });

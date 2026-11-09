@@ -23,7 +23,7 @@ import { ravenBox, ravenPath, ravenWingPath } from './raven';
 import { videoPalette } from './video-palette';
 import { collageTone, findTemplate, templateTitle, type TemplateId, type ToneHint } from './templates';
 import { MARBLE_FILTER_ID, marbleFilterMarkup, type StoneStyle } from './marble.ts';
-import { timerText } from './overlays';
+import { timerText } from './layers';
 import { phaseCaptions, type FocusPhase } from './focus';
 import { nowDetail, nowLine, timeOfDay, type StageNow } from './stage-text';
 import { beginSwipe, moveSwipe, swipeFollow, swipeFires } from './disc-swipe';

@@ -206,7 +206,7 @@ app.whenReady().then(async () => {
     // （原来是点胶囊验石纹，但透明版式下画面里没有胶囊——那颗按钮长在拼贴版式上。
     //  透明版式里唯一能点的东西就是组件本身，正好也就是这次要验的「全屏也能拖」。）
     const dragBefore = await run(`(() => {
-      const raw = localStorage.getItem('raven-desktop-widgets');
+      const raw = localStorage.getItem('raven-layers');
       const list = raw ? JSON.parse(raw) : [];
       const clock = list.find(w => w.id === 'clock');
       return clock ? clock.spot : null;
@@ -232,7 +232,7 @@ app.whenReady().then(async () => {
     })()`);
     await wait(900);
     const dragAfter = await run(`(() => {
-      const raw = localStorage.getItem('raven-desktop-widgets');
+      const raw = localStorage.getItem('raven-layers');
       const list = raw ? JSON.parse(raw) : [];
       const clock = list.find(w => w.id === 'clock');
       return clock ? clock.spot : null;
