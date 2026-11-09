@@ -26,6 +26,8 @@ import {
   SCALE_MAX,
   SCALE_MIN,
   scaleLayer,
+  settleAt,
+  settleConfirm,
   timerText,
   type LayerList,
 } from '../src/layers.ts';
@@ -161,4 +163,42 @@ test('文字：时钟补零、日期是月.日 星期、计时器按分:秒', ()
   assert.equal(timerText(25 * 60 * 1000), '25:00');
   assert.equal(timerText(-5000), '00:00');
   assert.equal(timerText(59_400), '00:59');
+});
+
+test('松手先钉住：位置立刻生效，不等上层确认', () => {
+  const pinned = settleAt({}, 'clock', { x: 0.4, y: 0.3 });
+  assert.deepEqual(pinned.clock, { x: 0.4, y: 0.3 });
+  // 再拖另一块，前一块还留着
+  const both = settleAt(pinned, 'date', { x: 0.6, y: 0.7 });
+  assert.deepEqual(both.clock, { x: 0.4, y: 0.3 });
+  assert.deepEqual(both.date, { x: 0.6, y: 0.7 });
+});
+
+test('上层确认之后摘掉那一条，没对上的继续钉着', () => {
+  const settling = {
+    clock: { x: 0.4, y: 0.3 },
+    date: { x: 0.6, y: 0.7 },
+  };
+  const confirmed = settleConfirm(settling, [
+    { id: 'clock', spot: { x: 0.4, y: 0.3 }, scale: 1 },
+    // date 还对不上（快照还没到）
+    { id: 'date', spot: { x: 0.1, y: 0.1 }, scale: 1 },
+  ]);
+  assert.deepEqual(confirmed.clock, undefined);
+  assert.deepEqual(confirmed.date, { x: 0.6, y: 0.7 });
+});
+
+test('没什么可摘时不产生新对象：useEffect 里 setState 不该白重渲染', () => {
+  const settling = {};
+  // 没有待确认的条目，返回的必须是同一个引用，否则每次重渲染都会再触发一次
+  assert.equal(settleConfirm(settling, [{ id: 'clock', spot: { x: 0.4, y: 0.3 }, scale: 1 }]), settling);
+  const pinned = { clock: { x: 0.4, y: 0.3 } };
+  // 对不上的那条留着，也等于没变
+  assert.equal(settleConfirm(pinned, [{ id: 'clock', spot: { x: 0.9, y: 0.9 }, scale: 1 }]), pinned);
+});
+
+test('容差之内也算对上：浮点数算出来的百分比没法逐位相等', () => {
+  const settling = { clock: { x: 0.4000001, y: 0.3000001 } };
+  const got = settleConfirm(settling, [{ id: 'clock', spot: { x: 0.4, y: 0.3 }, scale: 1 }]);
+  assert.deepEqual(got, {});
 });

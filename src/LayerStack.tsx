@@ -10,7 +10,17 @@
  * 拼贴版式的样子因此和合并前逐像素一致——那是条硬约束。
  */
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
-import { clockText, dateText, findLayer, timerText, type LayerId, type LayerList, type LayerSpot } from './layers';
+import {
+  clockText,
+  dateText,
+  findLayer,
+  settleAt,
+  settleConfirm,
+  timerText,
+  type LayerId,
+  type LayerList,
+  type SpotMap,
+} from './layers';
 import { nowLine } from './stage-text';
 import type { StageDisc, StageNow } from './TemplateStage';
 
@@ -55,30 +65,46 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
   const layer = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   // 拖到哪里先记本地，松手才写回存档：每帧写 localStorage 会卡。
-  const [live, setLive] = useState<Partial<Record<LayerId, LayerSpot>>>({});
+  const [live, setLive] = useState<SpotMap>({});
+  // 松手之后、上层确认之前，先把位置按在原地。
+  // 桌面窗是另一个进程，位置要绕一圈才回来（见 layers.ts 的 settleAt 注释），
+  // 不按住的话会先弹回原位再瞬移过去。
+  const [settling, setSettling] = useState<SpotMap>({});
+
+  // 上层把新位置送上来了，就把那几条从「等确认」里摘掉。
+  // 返回同一个引用时 setState 不会触发重渲染，所以这里可以直接每帧调。
+  useEffect(() => {
+    setSettling(current => settleConfirm(current, value));
+  }, [value]);
 
   const boxOf = useCallback(() => layer.current?.getBoundingClientRect(), []);
+
+  // 拖动中的坐标同时留一份在 ref 里。
+  // **松手那一句不能从 setLive 的 updater 里读**：updater 必须是纯函数，
+  // StrictMode 下会被调用两次，`onChange` 会跟着发两条出去（桌面窗那边就是两条命令）。
+  const liveRef = useRef<SpotMap>({});
 
   useEffect(() => {
     if (!drag) return;
     const onMove = (event: PointerEvent) => {
       const box = boxOf();
       if (!box || !box.width || !box.height) return;
-      setLive(current => ({
-        ...current,
-        [drag.id]: {
-          x: Math.min(1, Math.max(0, (event.clientX - box.left) / box.width)),
-          y: Math.min(1, Math.max(0, (event.clientY - box.top) / box.height)),
-        },
-      }));
+      const spot = {
+        x: Math.min(1, Math.max(0, (event.clientX - box.left) / box.width)),
+        y: Math.min(1, Math.max(0, (event.clientY - box.top) / box.height)),
+      };
+      liveRef.current = { ...liveRef.current, [drag.id]: spot };
+      setLive(liveRef.current);
     };
     const onUp = () => {
-      setLive(current => {
-        const spot = current[drag.id];
-        if (spot) onChange(value.map(item => (item.id === drag.id ? { ...item, spot } : item)));
-        return {};
-      });
+      const spot = liveRef.current[drag.id];
+      liveRef.current = {};
+      setLive({});
       setDrag(null);
+      if (!spot) return;
+      // 先钉住，再报上去：这一步是桌面窗「不弹回原位」的全部原因。
+      setSettling(pinned => settleAt(pinned, drag.id, spot));
+      onChange(value.map(item => (item.id === drag.id ? { ...item, spot } : item)));
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
@@ -138,7 +164,7 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
     return (
       <div className="overlay-layer" ref={layer} data-big={big ? 'true' : undefined}>
         {value.map(item => {
-          const spot = live[item.id] ?? item.spot;
+          const spot = live[item.id] ?? settling[item.id] ?? item.spot;
           return (
             <div
               key={item.id}
@@ -177,7 +203,7 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
   return (
     <div className="desktop-widgets" ref={layer} data-editable={editable ? 'true' : undefined}>
       {value.map(item => {
-        const spot = live[item.id] ?? item.spot;
+        const spot = live[item.id] ?? settling[item.id] ?? item.spot;
         const style = {
           '--wx': `${spot.x * 100}%`,
           '--wy': `${spot.y * 100}%`,

@@ -226,6 +226,40 @@ export function canAddLayer(list: LayerList, id: LayerId): boolean {
   return list.length < MAX_LAYERS && !list.some(layer => layer.id === id);
 }
 
+/**
+ * 松手之后、上层确认之前，先把它按在这里。
+ *
+ * 为什么需要这个：桌面放映窗是另一个渲染进程，拖完以后位置要绕一圈才回来——
+ * 发命令 → 主进程 200ms 轮询取走 → 主窗口落盘 → 再发快照 → 主进程再推回来。
+ * 这一整圈里桌面窗手上的还是旧位置，于是「先弹回原位、再瞬移到新位置」。
+ * 主窗口自己是同步的，不会有这个问题，但这一层不许假设上层是同步的。
+ */
+export type SpotMap = Partial<Record<LayerId, LayerSpot>>;
+
+export function settleAt(current: SpotMap, id: LayerId, spot: LayerSpot): SpotMap {
+  return { ...current, [id]: spot };
+}
+
+/**
+ * 把已经对上的那几条从「等确认」里摘掉。
+ *
+ * 返回**同一个引用**表示什么都没变——调用方是 useEffect 里的 setState，
+ * 每次都返回新对象会一直重渲染。
+ */
+export function settleConfirm(current: SpotMap, value: LayerList, epsilon = 0.001): SpotMap {
+  let changed = false;
+  const next: SpotMap = { ...current };
+  for (const layer of value) {
+    const pending = next[layer.id];
+    if (!pending) continue;
+    if (Math.abs(pending.x - layer.spot.x) <= epsilon && Math.abs(pending.y - layer.spot.y) <= epsilon) {
+      delete next[layer.id];
+      changed = true;
+    }
+  }
+  return changed ? next : current;
+}
+
 /** 时钟：24 小时制，补零。 */
 export function clockText(date: Date) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
