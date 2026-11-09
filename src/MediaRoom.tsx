@@ -43,6 +43,12 @@ type Props = {
   ambience: StageAmbience | null;
   /** 此刻真正在响的那一首，拼贴版信息条 PLAYLIST 写的是它。 */
   now: StageNow;
+  /**
+   * 在唱片上左右滑动切歌。undefined 表示现在切不了（库空、只有一首、
+   * 或外部播放器那边没有上一首），那种情况下唱片不接指针。
+   */
+  onPrevTrack?: () => void;
+  onNextTrack?: () => void;
 };
 
 /**
@@ -101,7 +107,7 @@ function VideoThumb({ src, alt }: { src: string; alt: string }) {
   return <video ref={ref} src={src} aria-label={alt} preload="metadata" muted playsInline />;
 }
 
-export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, onRescan, onForgetDir, onScanWallpapers, onForgetWallpapers, disc, ambience, now }: Props) {
+export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, onRescan, onForgetDir, onScanWallpapers, onForgetWallpapers, disc, ambience, now, onPrevTrack, onNextTrack }: Props) {
   // 只有图片和视频两档，不再有「全部」。
   // 混在一起看意义不大：两种东西的缩略图行为不同（一张解码、一段读首帧），
   // 而且用户来这儿通常心里已经知道要看哪一种。
@@ -409,6 +415,8 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               hint={toneHint(tone, palette)}
               stone={tone.stone}
               onStone={cycleStone}
+              onPrevTrack={onPrevTrack}
+              onNextTrack={onNextTrack}
               onPalette={setPalette}
             />
             <RainLayer value={rain} />

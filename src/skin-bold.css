@@ -5767,13 +5767,45 @@ body:has(.media-room.is-expanded) {
      挪到左上，然后绕着已经画出去的那个位置转——实测圆心从 82.40% 甩到 114.65%。
      拆成 `translate` + `rotate` 两个独立属性后，两者在同一个坐标系里叠加，
      旋转才真的是绕唱片自己的中心。 */
-  translate: -50% -50%;
+  translate: calc(-50% + var(--disc-drag, 0px)) -50%;
   border-radius: 50%;
   /* 面板是 clip-path 挖洞的，只裁自己、透不出下层。
      唱片必须压在面板之上（面板 z-index:2），否则看到的还是面板自己的底色。 */
   z-index: 6;
   /* 两道阴影：外圈细亮边把碟从面板上"剥"出来，外圈大阴影给厚度。 */
   box-shadow: 0 0 0 0.35cqw #ffffff1f, 0 2.2cqw 5cqw #00000052;
+}
+
+/* 能滑的时候（库里有不止一首、或外部播放器可切）才接指针。
+   父级 .tpl-disc-layer 是 pointer-events: none——那一层只是占位的画，
+   手势从唱片自己身上进来。`touch-action: none` 不能少：触屏上浏览器
+   会把横滑当成滚动/返回手势吃掉，pen 事件根本到不了这里。
+   cursor 用 grab 而不是 pointer：它不是按钮，是「可以拨动的东西」。 */
+.template-collage .tpl-disc.is-swipable {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+}
+
+.template-collage .tpl-disc.is-swiping {
+  cursor: grabbing;
+}
+
+/* 拖动时不能有 `translate` 的过渡，否则手指走一像素碟要追好几帧；
+   松手回位才需要过渡，这一段就作用在「松手之后」那一帧。 */
+.template-collage .tpl-disc.is-swipable {
+  transition: translate 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.template-collage .tpl-disc.is-swiping {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .template-collage .tpl-disc.is-swipable,
+  .template-collage .tpl-disc.is-swiping {
+    transition: none;
+  }
 }
 
 

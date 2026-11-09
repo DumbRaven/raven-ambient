@@ -14,7 +14,7 @@
  * 三套都不用外部字体、不用图片素材——全部 CSS 画，所以离线可用，
  * 也不会因为缺字体而变形。乌鸦是描出来的矢量路径（raven.ts）。
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { mediaSrc } from './media';
 import type { MediaItem } from './records';
 import { coverPalette, recordPressing, vinylPalette } from './vinyl';
@@ -26,6 +26,7 @@ import { MARBLE_FILTER_ID, marbleFilterMarkup, type StoneStyle } from './marble.
 import { timerText } from './overlays';
 import { phaseCaptions, type FocusPhase } from './focus';
 import { nowDetail, nowLine, timeOfDay, type StageNow } from './stage-text';
+import { beginSwipe, moveSwipe, swipeFollow, swipeFires } from './disc-swipe';
 
 /** 右下角那只彩胶。没在放音乐时它是空的，只留一圈盘面。 */
 
@@ -127,6 +128,15 @@ type Props = {
    * 石纹是这一块表面的性质，改它自然该在它自己身上改。
    */
   onStone?: () => void;
+  /**
+   * 在唱片上左右滑动切歌。左滑下一曲、右滑上一曲。
+   *
+   * 两个都不传时唱片只是画，不接指针——库空着、只有一首、或者外部播放器
+   * 那边根本没有「上一首」的时候，滑上去什么都不该发生，也不该出现抓手光标。
+   * 判定规则在 disc-swipe.ts，这里只负责把坐标喂进去。
+   */
+  onPrevTrack?: () => void;
+  onNextTrack?: () => void;
   /** 把取到的原始色板交出去，配色面板要拿它画可选的色块。 */
   onPalette?: (colors: string[]) => void;
 };
@@ -165,7 +175,7 @@ function Raven({ className }: { className: string }) {
   );
 }
 
-export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, now, hint, stone = 'sea', onStone, onPalette }: Props) {
+export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, now, hint, stone = 'sea', onStone, onPrevTrack, onNextTrack, onPalette }: Props) {
   const preset = findTemplate(template);
   const fromWallpaper = !!item.source;
   const title = useMemo(() => templateTitle(item.name, fromWallpaper), [item.name, fromWallpaper]);
@@ -208,6 +218,61 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
   const discPressing = useMemo(() => recordPressing(disc?.key ?? 'idle', launchSeed), [disc?.key]);
   const discPalette = useMemo(() => vinylPalette(discColors, disc?.color ?? '#9a8b78'), [discColors, disc?.color]);
 
+  /**
+   * 唱片上的左右滑动切歌。
+   *
+   * 为什么把指针事件挂在唱片自己身上：它是这块画面上「代表当前这一首」的东西，
+   * 手势落在那儿最自然；信息条已经被点过了（胶囊切石纹），控制条那边有按钮。
+   *
+   * 为什么用 pointer 而不是 touch：桌面端用鼠标拖也应该是同一个手感，
+   * 而且 pointer 事件能拿到 `pointerType` 之外的一切，不必分两条代码路径。
+   * `touch-action: none` 加在唱片上，否则触屏上浏览器会把横滑当成滚动。
+   *
+   * 跟手位移写进 CSS 变量而不是 `transform`：唱片自己挂着旋转动画
+   * （`rotate` 属性）和居中（`translate` 属性），第三个位移必须走
+   * `translate` 的增量，不然会把它们顶掉——这是旋转那一轮踩过的同一个坑。
+   */
+  const swipable = !!(onPrevTrack || onNextTrack);
+  /* 谁是「正在滑的那根手指」用 ref 记，不用 state 判断。
+     原因是状态更新是异步的：浏览器一帧内可能连发几个 pointermove，
+     React 批处理之后它们读到的还是上一次的 state，前几笔位移会被整段丢掉
+     ——手一甩就有 100px 落在同一帧里，那是能感觉到的。
+     state 只留给渲染（`is-swiping` 类、`--disc-drag` 的值），判断一律看 ref。 */
+  const swipeIdRef = useRef<number | null>(null);
+  const [swipe, setSwipe] = useState<{ id: number; dx: number } | null>(null);
+  const trackRef = useRef<ReturnType<typeof beginSwipe> | null>(null);
+  const fireRef = useRef({ onPrev: onPrevTrack, onNext: onNextTrack });
+  useEffect(() => { fireRef.current = { onPrev: onPrevTrack, onNext: onNextTrack }; });
+
+  const swipeDown = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    if (!swipable || event.button !== 0) return;
+    swipeIdRef.current = event.pointerId;
+    trackRef.current = beginSwipe({ x: event.clientX, y: event.clientY });
+    setSwipe({ id: event.pointerId, dx: 0 });
+    /* 抓住指针：手指划出唱片范围时事件还归这里，否则滑到边缘就断了。
+       但指针已经抬起（或者这只是一次合成事件）时它抛 NotFoundError，
+       那就退化成不抓——事件照常在元素上冒，功能不因此丢。 */
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* 抓不到就算了 */ }
+  };
+  const swipeMove = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    const track = trackRef.current;
+    if (!track || swipeIdRef.current !== event.pointerId) return;
+    const moved = moveSwipe(track, { x: event.clientX, y: event.clientY });
+    trackRef.current = moved;
+    setSwipe({ id: event.pointerId, dx: swipeFollow(moved) });
+  };
+  const swipeEnd = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    const track = trackRef.current;
+    if (!track || swipeIdRef.current !== event.pointerId) return;
+    const hit = swipeFires(track);
+    swipeIdRef.current = null;
+    trackRef.current = null;
+    setSwipe(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (hit === 1) fireRef.current.onNext?.();
+    else if (hit === -1) fireRef.current.onPrev?.();
+  };
+
   const style = {
     '--tpl-base': tone.base,
     '--tpl-panel': tone.panel,
@@ -224,6 +289,10 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
     '--disc-sheen': discPalette.sheen,
     '--disc-angle': `${discPressing.angle}deg`,
   } as React.CSSProperties;
+
+  /* 跟手位移走独立变量：`.tpl-disc` 身上挂着居中（`translate`）和旋转（`rotate`），
+     直接改 `transform` 会把居中的那半截顶掉，圆心就飞了。 */
+  const discDrag = { '--disc-drag': `${swipe?.dx ?? 0}px` } as React.CSSProperties;
 
   // 空条目（库还空着时的占位）没有 path，拼出来是 media://local/ 这种无效地址，
   // 直接渲染会是一个破图图标。换成一块纯 CSS 渐变，版式照常成立。
@@ -358,7 +427,14 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
               /* key 挂碟的身份：换唱片（或换外部曲目）时整块重新挂载，
                  CSS 那边的入场动画才会从头播一次。同 key 不会重播。 */
               key={disc?.key ?? 'idle'}
-              className={`tpl-disc pressing-${discPressing.style} ${discPalette.light ? 'is-light' : ''} ${disc?.spinning ? 'spinning' : ''} ${disc ? 'has-disc' : ''}`}
+              className={`tpl-disc pressing-${discPressing.style} ${discPalette.light ? 'is-light' : ''} ${disc?.spinning ? 'spinning' : ''} ${disc ? 'has-disc' : ''} ${swipable ? 'is-swipable' : ''} ${swipe ? 'is-swiping' : ''}`}
+              style={discDrag}
+              /* 唱片层整层是 pointer-events: none（它只是占位的画），
+                 手势能不能进来由这里的 is-swipable 在 CSS 里单独打开。 */
+              onPointerDown={swipable ? swipeDown : undefined}
+              onPointerMove={swipable ? swipeMove : undefined}
+              onPointerUp={swipable ? swipeEnd : undefined}
+              onPointerCancel={swipable ? swipeEnd : undefined}
               aria-hidden="true"
             >
               <span
