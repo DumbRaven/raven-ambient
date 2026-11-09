@@ -8,7 +8,7 @@
 // 摆进 4:3 的格子里会被裁掉两边，而且分辨率低。所以直接挂 <video> 读自己的第一帧。
 // 一屏最多也就九件，配合视口懒加载不会同时开一百多个文件句柄。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Droplets, FilePlus2, FolderOpen, ImageIcon, Layers, Maximize2, Minimize2, MonitorPlay, Pause, Play, RefreshCw, Sparkles, X, Palette
+import { ChevronLeft, ChevronRight, Droplets, FilePlus2, FolderOpen, ImageIcon, Layers, Maximize2, Minimize2, MonitorPlay, Pause, Play, Plus, RefreshCw, Sparkles, X, Palette
 } from 'lucide-react';
 import { mediaSrc, setDesktopStage, setWindowFullscreen } from './media';
 import { afterResize as afterResizeWait, canToggle } from './fullscreen-timing';
@@ -18,6 +18,8 @@ import { defaultTone, normaliseHex, readTone, toneGroups, toneHint, toneKey, wri
 import { nextStoneStyle } from './marble.ts';
 import OverlayLayer from './OverlayLayer';
 import RainLayer from './RainLayer';
+import DesktopWidgets from './DesktopWidgets';
+import { addWidget, readWidgets, removeWidget, widgetLimit, widgetMetas, widgetsKey, writeWidgets, type WidgetList } from './widgets';
 import { rainKey, rainModes, readRain, writeRain, type RainSetting } from './rain';
 import { readFocus } from './focus-bridge';
 import { overlays as overlayMetas, readOverlays, writeOverlays, overlaysKey, type Overlays } from './overlays';
@@ -155,6 +157,12 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   const [rain, setRain] = useState<RainSetting>(() => readRain(localStorage.getItem(rainKey)));
   const [rainMenu, setRainMenu] = useState(false);
   useEffect(() => { writeRain(rain); }, [rain]);
+  // 透明模式的组件（时间/日期/标题/番茄钟/唱片/曲目）。
+  // 跟上面几项一样存 localStorage：这是「桌面怎么摆」的偏好，不进收藏库。
+  // 位置和缩放都是用户拖出来的，换一台机器不该被同步走。
+  const [widgets, setWidgets] = useState<WidgetList>(() => readWidgets(localStorage.getItem(widgetsKey)));
+  const [widgetMenu, setWidgetMenu] = useState(false);
+  useEffect(() => { writeWidgets(widgets); }, [widgets]);
   // 番茄钟读数：跟着专注页走，自己不另起计时器（两处各算各的，暂停一次就对不上）。
   // 800ms 一刷就够——叠加上只显示到分:秒。
   // 除了剩余毫秒，还留一份完整快照：拼贴版信息条那一格要显示阶段和轮次，
@@ -408,9 +416,10 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
       title: current ? titleOf(current) : '',
       canPrev: !!onPrevTrack,
       canNext: !!onNextTrack,
+      widgets,
     };
     publishStage(snapshot);
-  }, [current, usable, template, tone, palette, disc, focusStage, ambience, now, rain, overlay, focusLeft, onPrevTrack, onNextTrack]);
+  }, [current, usable, template, tone, palette, disc, focusStage, ambience, now, rain, overlay, focusLeft, widgets, onPrevTrack, onNextTrack]);
 
   return (
     <section className={`media-room ${expanded ? 'is-expanded' : ''}`} data-chrome={chrome ? 'visible' : 'hidden'} aria-label="放映">
@@ -482,15 +491,33 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               onPrevTrack={onPrevTrack}
               onNextTrack={onNextTrack}
               onPalette={setPalette}
+              widgets={
+                template === 'desktop' ? (
+                  <DesktopWidgets
+                    value={widgets}
+                    onChange={setWidgets}
+                    remaining={focusLeft}
+                    now={now}
+                    disc={disc}
+                    title={titleOf(current)}
+                    editable
+                  />
+                ) : undefined
+              }
             />
             <RainLayer value={rain} />
-            <OverlayLayer
-              value={overlay}
-              onChange={setOverlay}
-              remaining={focusLeft}
-              title={titleOf(current)}
-              big={expanded}
-            />
+            {/* 透明模式下不画叠加层：那四件（时间/标题/日期/番茄钟）和
+                组件里同名的那几块会重着画在同一个位置，屏幕上出现两份时间。
+                透明模式的「往上加东西」只有一条路——控制条上的「＋」。 */}
+            {template !== 'desktop' && (
+              <OverlayLayer
+                value={overlay}
+                onChange={setOverlay}
+                remaining={focusLeft}
+                title={titleOf(current)}
+                big={expanded}
+              />
+            )}
           </div>
           <div className="theater-bar">
             <div className="theater-controls">
@@ -728,6 +755,48 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                 </>
               )}
             </div>
+            {/* 透明模式的组件：加一块、去掉一块。
+                只在透明版式下出现——另外两套版式没有这个层。 */}
+            {template === 'desktop' && (
+              <div className="theater-widgets">
+                <button
+                  className={`icon-button theater-widget-toggle ${widgetMenu ? 'on' : ''}`}
+                  aria-label="加组件"
+                  aria-expanded={widgetMenu}
+                  title="加组件"
+                  onClick={() => setWidgetMenu(value => !value)}
+                >
+                  <Plus size={13} />
+                </button>
+                {widgetMenu && (
+                  <>
+                    <button className="theater-widget-veil" aria-label="收起" onClick={() => setWidgetMenu(false)} />
+                    <div className="theater-widget-menu" role="menu">
+                      {widgetMetas.map(meta => {
+                        const present = widgets.some(widget => widget.id === meta.id);
+                        return (
+                          <button
+                            key={meta.id}
+                            role="menuitemcheckbox"
+                            aria-checked={present}
+                            onClick={() => setWidgets(current => (present ? removeWidget(current, meta.id) : addWidget(current, meta.id)))}
+                          >
+                            <span className={`widget-dot ${present ? 'on' : ''}`} aria-hidden="true" />
+                            <span>
+                              <b>{meta.name}</b>
+                              <small>{meta.hint}</small>
+                            </span>
+                          </button>
+                        );
+                      })}
+                      <p className="theater-widget-tip">
+                        {widgets.length >= widgetLimit ? '已经放满了。' : '加上去之后，在画面里按住它就能拖。'}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             <button
               className="icon-button theater-desktop"
               aria-label={onDesktop ? '收回桌面放映' : '放到桌面'}
@@ -758,6 +827,19 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               hint={toneHint(tone, palette)}
               stone={tone.stone}
               onStone={cycleStone}
+              widgets={
+                template === 'desktop' ? (
+                  <DesktopWidgets
+                    value={widgets}
+                    onChange={setWidgets}
+                    remaining={focusLeft}
+                    now={now}
+                    disc={disc}
+                    title=""
+                    editable
+                  />
+                ) : undefined
+              }
             />
             <RainLayer value={rain} />
             <OverlayLayer

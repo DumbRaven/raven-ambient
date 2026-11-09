@@ -96,7 +96,10 @@ class DesktopStage {
       minimizable: false,
       fullscreenable: false,
       hasShadow: false,
-      backgroundColor: '#000000',
+      // 透明：用户要的是「桌面上的场景壁纸从这块透上来」，所以窗口本身不能有底。
+      // 这也意味着 backgroundColor 必须是全透明色，写 '#000000' 会让整块变黑。
+      transparent: true,
+      backgroundColor: '#00000000',
       show: false,
       webPreferences: {
         contextIsolation: true,

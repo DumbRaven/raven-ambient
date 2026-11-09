@@ -3853,8 +3853,6 @@ body:has(.media-room.is-expanded) {
    否则 width:100% / height:auto 那套会盖过来，图按原比例缩在块中间、两侧留黑边。 */
 .media-theater .template .tpl-block-media img,
 .media-theater .template .tpl-block-media video,
-.media-theater .template .tpl-frame-media img,
-.media-theater .template .tpl-frame-media video,
 .media-theater .template .tpl-photo-media img,
 .media-theater .template .tpl-photo-media video {
   display: block;
@@ -4181,56 +4179,255 @@ body:has(.media-room.is-expanded) {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- 画框：缩成一枚卡片 ---------- */
+/* ---------- 透明：没有底，桌面壁纸就是底 ---------- */
 
-.template-frame {
+/* 这一套版式自己不画任何东西：画面、底色、裁切全部交给桌面。
+   窗口在 Electron 里是 `transparent: true`，所以 `.template` 那层
+   `background: var(--tpl-base)` 必须在这里让出来，否则整块会被一块
+   深色底盖住，壁纸根本透不上来。
+
+   注意作用域：只落在 `.template-desktop` 上。拼贴和照片两套版式
+   照旧吃那条 `--tpl-base` 兜底。 */
+.template-desktop,
+.media-theater .theater-screen > .template.template-desktop {
+  background: transparent;
+  /* 圆角和溢出裁切也不需要——没有画面块可裁 */
+  border-radius: 0;
+  overflow: visible;
+}
+
+/* 主窗口里的预览：那扇窗不透明，透明区域会露出窗口底色（`.theater-screen`
+   自己是黑的）。铺一层近黑幕布，让「这里是空的」一眼看得出来；
+   真正放到桌面时才由窗口透明性接上壁纸。
+
+   选择器必须和上面那条 transparent 一样长：两条都是 0,4,0，
+   靠「后加载的赢」分胜负。只写 `.template-desktop`（0,1,0）会被它压过去，
+   实测预览里看不到这层幕布，只有一片纯黑。 */
+.media-theater .theater-screen > .template.template-desktop {
+  background: radial-gradient(120% 90% at 50% 40%, #1b1f27 0%, #0b0e13 62%, #05070a 100%);
+}
+
+/* 放到桌面时把这块幕布也去掉——那扇窗自己透明。 */
+.desktop-stage .template-desktop,
+.desktop-stage .media-theater .theater-screen > .template.template-desktop {
+  background: transparent;
+}
+
+/* ---------- 透明模式的组件 ---------- */
+
+/* 一整层铺满，里面的组件按比例坐标定位。
+   整层不接指针（它只是画），能拖的是每块组件自己——
+   否则空白处的点击会被这层吃掉，桌面图标就点不了了。 */
+.desktop-widgets {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.desktop-widgets-empty {
   display: grid;
   place-items: center;
-  padding: 5%;
-  box-sizing: border-box;
+  pointer-events: none;
 }
 
-.tpl-frame-card {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 0;
+.desktop-widgets-empty p {
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #0000003d;
+  border: 1px solid #ffffff1f;
+  color: #ffffffb8;
+  font-size: 13px;
+  letter-spacing: 0.02em;
 }
 
-.tpl-frame-media {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  border-radius: 18px;
-  box-shadow: 0 20px 50px #0000002e;
+/* 每一块：按中心点摆（--wx/--wy 是中心的比例坐标）。
+   用 translate(-50%,-50%) 而不是给 left/top 减半宽高——
+   宽高是按内容算的，预先不知道。 */
+.dw {
+  position: absolute;
+  left: var(--wx);
+  top: var(--wy);
+  translate: -50% -50%;
+  color: #ffffff;
+  /* 压在壁纸上的字必须自带一层底：壁纸可能是白雪山也可能是黑森林，
+     单靠字色在任何一边都会有一半读不出来。
+     做法是「细描边 + 柔和阴影」而不是加背景板——背景板会遮住壁纸。 */
+  text-shadow:
+    0 0 1px #000000b8,
+    0 1px 2px #000000a6,
+    0 2px 14px #0000008f;
+  -webkit-text-stroke: 0.012em #00000059;
+  paint-order: stroke fill;
+  user-select: none;
+  opacity: 0;
+  animation: dw-enter 420ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
 }
 
-.tpl-frame-foot {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 14px;
-  color: var(--tpl-ink);
-  padding: 0 2px;
-  flex: none;
+.dw[data-editable='true'] {
+  pointer-events: auto;
+  cursor: grab;
 }
 
-.tpl-frame-foot b {
-  font-size: 11px;
+.dw.is-dragging {
+  cursor: grabbing;
+  /* 拖动时抬一点、加一层投影：手指按住的那块要「离屏幕更近」 */
+  translate: -50% -50%;
+  scale: 1.03;
+  filter: drop-shadow(0 8px 24px #00000080);
+}
+
+@keyframes dw-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 时钟：这一层最大的数字，靠字号撑主角感。 */
+.dw-clock {
+  display: block;
+  font-family: "SF Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  font-size: calc(86px * var(--wscale));
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.dw-date {
+  display: block;
+  font-size: calc(17px * var(--wscale));
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.86;
+}
+
+.dw-title {
+  display: block;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-size: calc(30px * var(--wscale));
   font-weight: 700;
+  letter-spacing: 0.004em;
+  line-height: 1.15;
+  max-width: 62vw;
+  text-align: center;
+}
+
+.dw-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "SF Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  font-size: calc(20px * var(--wscale));
+  font-variant-numeric: tabular-nums;
+}
+
+.dw-timer i {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: #ff8a5c;
+  box-shadow: 0 0 10px #ff8a5c9e;
+}
+
+.dw-now {
+  display: block;
+  font-size: calc(14px * var(--wscale));
+  letter-spacing: 0.05em;
+  opacity: 0.9;
+  max-width: 44vw;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tpl-frame-foot span {
-  flex: none;
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  color: var(--tpl-ink-soft);
-  font-variant-numeric: tabular-nums;
+/* 唱片：黑胶带彩胶质感，和放映台那枚同一套语汇，只是更简。
+   直径跟屏幕高度挂钩，缩放才跟着 --wscale 走。 */
+.dw-disc {
+  display: block;
+  width: var(--disc-size);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #0d0d0f 0 6%, #17181b 6% 8%, #0d0d0f 8% 36%, #17181b 36% 37.4%, #0d0d0f 37.4% 100%);
+  box-shadow:
+    0 0 0 1px #ffffff1f,
+    0 12px 36px #0000008a;
+  position: relative;
+  rotate: 0deg;
+  animation: dw-enter 420ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards, dw-spin 12s linear infinite paused;
+}
+
+.dw-disc.is-spinning {
+  animation-play-state: running, running;
+}
+
+.dw-disc-label {
+  position: absolute;
+  inset: 30%;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: #9a8b78;
+  box-shadow: inset 0 0 0 1px #ffffff24;
+}
+
+.dw-disc-hole {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3.2%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #0b0c0e;
+  translate: -50% -50%;
+}
+
+@keyframes dw-spin {
+  to { rotate: 360deg; }
+}
+
+/* 删除按钮：只在可编辑时出现，悬停才显形。
+   一直挂着会像图钉，压在整个桌面上太吵。 */
+.dw-kill {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #101010d9;
+  color: #ffffffcc;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  box-shadow: 0 2px 8px #00000073;
+}
+
+.dw[data-editable='true']:hover .dw-kill,
+.dw-kill:focus-visible {
+  opacity: 1;
+}
+
+.dw-kill:hover {
+  background: #b3392be6;
+  color: #ffffff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dw,
+  .dw-disc {
+    animation: none;
+    opacity: 1;
+  }
 }
 
 /* ---------- 窄屏：拼贴改上下排 ---------- */
@@ -4278,10 +4475,6 @@ body:has(.media-room.is-expanded) {
 .media-room.is-expanded .tpl-photo-list { right: 52px; bottom: 44px; gap: 8px; }
 .media-room.is-expanded .tpl-photo-list li { font-size: 17px; }
 .media-room.is-expanded .tpl-photo-list span { font-size: 13px; }
-.media-room.is-expanded .tpl-frame-foot b { font-size: 20px; }
-.media-room.is-expanded .tpl-frame-foot span { font-size: 15px; }
-.media-room.is-expanded .tpl-frame-card { gap: 16px; }
-.media-room.is-expanded .tpl-frame-media { border-radius: 28px; }
 
 @media (prefers-reduced-motion: reduce) {
   .template * {
@@ -4421,17 +4614,20 @@ body:has(.media-room.is-expanded) {
 
 /* ---------- 放映：叠加元素开关 ---------- */
 
-.theater-overlays {
+.theater-overlays,
+.theater-widgets {
   position: relative;
   display: inline-flex;
 }
 
-.theater-overlay-toggle.on {
+.theater-overlay-toggle.on,
+.theater-widget-toggle.on {
   background: #ffffff;
   color: #101010;
 }
 
-.theater-overlay-veil {
+.theater-overlay-veil,
+.theater-widget-veil {
   position: fixed;
   inset: 0;
   z-index: 70;
@@ -4441,7 +4637,8 @@ body:has(.media-room.is-expanded) {
   cursor: default;
 }
 
-.theater-overlay-menu {
+.theater-overlay-menu,
+.theater-widget-menu {
   position: absolute;
   right: 0;
   bottom: calc(100% + 10px);
@@ -4456,7 +4653,8 @@ body:has(.media-room.is-expanded) {
   box-shadow: 0 18px 44px #10101033;
 }
 
-.theater-overlay-menu > button {
+.theater-overlay-menu > button,
+.theater-widget-menu > button {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -4471,29 +4669,34 @@ body:has(.media-room.is-expanded) {
   transition: background 140ms ease;
 }
 
-.theater-overlay-menu > button:hover {
+.theater-overlay-menu > button:hover,
+.theater-widget-menu > button:hover {
   background: #f4f2ee;
 }
 
-.theater-overlay-menu > button > span:last-child {
+.theater-overlay-menu > button > span:last-child,
+.theater-widget-menu > button > span:last-child {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-.theater-overlay-menu b {
+.theater-overlay-menu b,
+.theater-widget-menu b {
   font-size: 12px;
   font-weight: 700;
 }
 
-.theater-overlay-menu small {
+.theater-overlay-menu small,
+.theater-widget-menu small {
   font-size: 10px;
   font-weight: 500;
   color: var(--bold-faint);
 }
 
 /* 开关点：关着是空心圈，开着是实心黑 */
-.overlay-dot {
+.overlay-dot,
+.widget-dot {
   flex: none;
   width: 13px;
   height: 13px;
@@ -4502,12 +4705,14 @@ body:has(.media-room.is-expanded) {
   transition: background 140ms ease, border-color 140ms ease;
 }
 
-.overlay-dot.on {
+.overlay-dot.on,
+.widget-dot.on {
   background: #101010;
   border-color: #101010;
 }
 
-.theater-overlay-tip {
+.theater-overlay-tip,
+.theater-widget-tip {
   margin: 6px 4px 2px;
   font-size: 10px;
   line-height: 1.45;
@@ -4515,7 +4720,8 @@ body:has(.media-room.is-expanded) {
 }
 
 @media (max-width: 599px) {
-  .theater-overlay-menu {
+  .theater-overlay-menu,
+  .theater-widget-menu {
     width: min(232px, calc(100vw - 48px));
   }
 }
@@ -4523,7 +4729,8 @@ body:has(.media-room.is-expanded) {
 @media (prefers-reduced-motion: reduce) {
   .overlay,
   .overlay::after,
-  .overlay-dot {
+  .overlay-dot,
+  .widget-dot {
     transition: none;
   }
 }

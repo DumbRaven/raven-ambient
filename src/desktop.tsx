@@ -18,6 +18,7 @@ import './desktop.css';
 import TemplateStage from './TemplateStage';
 import OverlayLayer from './OverlayLayer';
 import RainLayer from './RainLayer';
+import DesktopWidgets from './DesktopWidgets';
 import { installStageDrain, installStagePaint, sendStageCommand, type StageSnapshot } from './desktop-bridge';
 
 function DesktopStage() {
@@ -62,15 +63,34 @@ function DesktopStage() {
             onNextTrack={snapshot.canNext ? nextTrack : undefined}
             /* 色板由主窗口算好了传过来：这里自己取色会对 4K 视频再解一帧。 */
             colors={snapshot.palette}
+            widgets={
+              snapshot.template === 'desktop' ? (
+                /* 放到桌面时不给编辑：这个窗口没有控制条，拖坏了收不回来。
+                   摆位置、加组件都在主窗口的预览里做。 */
+                <DesktopWidgets
+                  value={snapshot.widgets}
+                  onChange={() => { /* 只读 */ }}
+                  remaining={snapshot.focusLeft}
+                  now={snapshot.now}
+                  disc={snapshot.disc}
+                  title={snapshot.title}
+                  editable={false}
+                />
+              ) : undefined
+            }
           />
           <RainLayer value={snapshot.rain} />
-          <OverlayLayer
-            value={snapshot.overlay}
-            onChange={value => sendStageCommand({ type: 'overlay', value })}
-            remaining={snapshot.focusLeft}
-            title={snapshot.title}
-            big
-          />
+          {/* 透明模式下不画叠加层：那四件和组件里同名的那几块会重着画在
+              同一个位置，屏幕上出现两份时间。主窗口那边也是这么排的。 */}
+          {snapshot.template !== 'desktop' && (
+            <OverlayLayer
+              value={snapshot.overlay}
+              onChange={value => sendStageCommand({ type: 'overlay', value })}
+              remaining={snapshot.focusLeft}
+              title={snapshot.title}
+              big
+            />
+          )}
         </div>
       </div>
     </section>

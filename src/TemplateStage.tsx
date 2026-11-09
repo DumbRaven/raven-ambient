@@ -147,6 +147,14 @@ type Props = {
    * 传几十字节过去比重新解一遍便宜得多，而且两边配色保证一样。
    */
   colors?: string[];
+  /**
+   * 透明模式的组件层。
+   *
+   * 只有 `template === 'desktop'` 才用得上：那个版式没有画面块，内容就是
+   * 用户自己加上来的几块组件。拼贴和照片两套版式忽略它。
+   * 由外面传进来（而不是这里自己管状态），因为增删改要和控制条、存档联动。
+   */
+  widgets?: React.ReactNode;
 };
 
 const BRAND = 'DumbRaven';
@@ -183,7 +191,7 @@ function Raven({ className }: { className: string }) {
   );
 }
 
-export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, now, hint, stone = 'sea', onStone, onPrevTrack, onNextTrack, onPalette, colors: given }: Props) {
+export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, now, hint, stone = 'sea', onStone, onPrevTrack, onNextTrack, onPalette, colors: given, widgets }: Props) {
   const preset = findTemplate(template);
   const fromWallpaper = !!item.source;
   const title = useMemo(() => templateTitle(item.name, fromWallpaper), [item.name, fromWallpaper]);
@@ -514,14 +522,17 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
         </>
       )}
 
-      {preset.id === 'frame' && (
-        <div className="tpl-frame-card">
-          <div className="tpl-frame-media">{media}</div>
-          <div className="tpl-frame-foot">
-            <b>{title}</b>
-            <span>{counter}</span>
-          </div>
-        </div>
+      {preset.id === 'desktop' && (
+        <>
+          {/* 透明模式：窗口本身是透明的，桌面壁纸从这块区域直接透上来。
+              所以这里**不渲染任何画面**——不画 media、不铺底色、不做裁切。
+              用户看到的「背景」是墙纸，不是我们的东西。
+
+              为什么不用 media 那段：那段（video/img/blank）是给「要展示画面」
+              的版式准备的。透明模式的画面就是桌面本身，再叠一层视频会把
+              正在跑的 Wallpaper Engine 盖掉，那就退回成屏保了。 */}
+          {widgets}
+        </>
       )}
     </div>
   );

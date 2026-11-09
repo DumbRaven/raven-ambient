@@ -20,6 +20,7 @@ import type { StoneStyle } from './marble.ts';
 import type { TemplateId } from './templates';
 import type { ToneHint } from './templates';
 import type { StageAmbience, StageDisc, StageFocus, StageNow } from './TemplateStage';
+import type { WidgetList } from './widgets';
 
 /**
  * 主窗口交给桌面窗的一整份「放映状态」。
@@ -50,6 +51,8 @@ export type StageSnapshot = {
   /** 能不能切歌，决定桌面窗里的唱片接不接指针。 */
   canPrev: boolean;
   canNext: boolean;
+  /** 透明模式的组件表。主窗口是唯一的编辑入口，桌面窗只跟着显示。 */
+  widgets: WidgetList;
 };
 
 /**

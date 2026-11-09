@@ -1,35 +1,53 @@
 /**
- * 桌面放映窗自己的样式。只写这个窗口比主窗口多出来的那一点。
+ * 桌面窗自己的样式。只写这个窗口比主窗口多出来的那一点。
  *
  * 为什么不用 media-room 那份：那份里 `.media-room` 是文档流里的一块，
  * 上下还有工具栏和格子。这里窗口里只有这一件事，所以整块钉死在视口上。
  *
  * 大部分视觉（版式、信息条、面板、唱片、胶囊）都来自 skin-bold.css 里
  * `.media-theater > .theater-screen > .template` 那套，这里不重写。
+ *
+ * 底色一律透明：这扇窗在 Electron 里是 `transparent: true`，凡是画了不透明
+ * 底的地方都会把那块桌面壁纸盖掉。真正该不透明的只有组件本身（见 `.dw` 的
+ * 描边与阴影）。
  */
 
+/* `:root` 在原版 styles.css 第一行就写死了 `background: #eae9e4`，body 继承它。
+   那扇窗是透明的，这层米色会把整块桌面糊掉——探针实测 `html` 是
+   `rgb(246,245,242)`、`.desktop-stage` 是 `rgb(0,0,0)`，壁纸一点都透不上来。
+
+   注意特异性：原版用的是 `:root`（0,1,0），写 `html`（0,0,1）比它低，
+   盖不住——第一版就是这么漏的，探针量到 `html` 仍是 `rgb(246,245,242)`。
+   所以这里必须也写 `:root`，靠「后加载的赢」压过去。 */
+:root,
 html,
 body {
   margin: 0;
   padding: 0;
-  background: #000000;
+  background: transparent;
   overflow: hidden;
 }
 
 /* 整个窗口就是舞台。用 fixed 而不是 100vh：Electron 的窗口在缩放过程中
-   viewport 可能落后一帧，fixed 会跟着可视区走，不会露出一条底色。 */
+   viewport 可能落后一帧，fixed 会跟着可视区走，不会露出一条底色。
+
+   选择器必须写成 `.media-room.desktop-stage`：skin-bold.css 里有一条
+   `.media-room.is-expanded { background: #000000 }`（两个类），
+   只写 `.desktop-stage`（一个类）特异性更低，会被它压过去——
+   实测就是这条把整块桌面变成黑的。 */
+.media-room.desktop-stage,
 .desktop-stage {
   position: fixed;
   inset: 0;
   margin: 0;
   padding: 0;
-  background: #000000;
+  background: transparent;
   overflow: hidden;
 }
 
 /* 快照还没到、或者库里一件都没有时的那块纯色。
-   不写任何占位文字——这个窗口是从主界面「放到桌面」开出来的，
+   同样不画底、不写任何占位文字——这个窗口是从主界面「放到桌面」开出来的，
    用户已经知道自己点了什么，再解释一遍是噪音。 */
 .desktop-stage-blank {
-  background: #000000;
+  background: transparent;
 }

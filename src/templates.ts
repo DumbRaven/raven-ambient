@@ -11,14 +11,17 @@
  * 不会出现「版式和画面打架」。
  */
 
-export type TemplateId = 'collage' | 'photo' | 'frame';
+export type TemplateId = 'collage' | 'photo' | 'desktop';
 
 export type Template = { id: TemplateId; name: string; hint: string };
 
 export const templates: Template[] = [
   { id: 'collage', name: '拼贴', hint: '大圆角画面、色块信息栏、右下圆形裁切——你视频里那套' },
   { id: 'photo', name: '照片', hint: '整张铺满，手写体标题压在左上，曲目列在右侧' },
-  { id: 'frame', name: '画框', hint: '画面缩成一枚卡片，四边留出底色，底部一行小字' },
+  // 这一格原先站的是「画框」（画面缩成卡片、四边留底色、底部一行小字）。
+  // 用户要的是另一件事：一个全透明的模式，桌面上的场景壁纸从窗口透上来，
+  // 自己往上加组件。它不留底、不裁画面——底就是桌面本身。
+  { id: 'desktop', name: '透明', hint: '不留底，桌面壁纸直接透过来，组件自己往上加' },
 ];
 
 export const templateIds = templates.map(template => template.id);
