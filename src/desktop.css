@@ -51,3 +51,19 @@ body {
 .desktop-stage-blank {
   background: transparent;
 }
+
+/* `.media-theater` 与 `.theater-screen` 这两层也要清掉。
+   skin-bold.css 里全屏那套给它们各写了一条 `background: #000000`
+   （`.media-room.is-expanded .media-theater` / `... .theater-screen`，都是 0,3,0）。
+   桌面窗为了复用版式的 cqw 单位，套的正是 `is-expanded` 那三层外壳，
+   于是整块画面被这两层黑底盖住——**第一版漏了这两条，用户看到的是一片黑**。
+
+   我当时的探针只量了 `html` / `body` / `.desktop-stage` / `.template-desktop`
+   四层，全绿，就以为透明做成了；中间这两层根本没进采样。教训：验「透不透」
+   要把**从窗口到内容之间的每一层**都遍历一遍，不能挑自己记得的那几层。
+
+   特异性 0,4,0，高于 skin-bold.css 的 0,3,0；desktop.css 又是最后加载的。 */
+.media-room.is-expanded.desktop-stage .media-theater,
+.media-room.is-expanded.desktop-stage .theater-screen {
+  background: transparent;
+}

@@ -81,6 +81,32 @@ const READ_TRANSPARENT = `(() => {
     const el = document.querySelector(sel);
     return el ? getComputedStyle(el).backgroundColor : null;
   };
+  /**
+   * 从「要找的那块」一路沿父节点爬到 body，逐层报背景色。
+   *
+   * 为什么不再挑几层写死：上一版只量了 html/body/.desktop-stage/.template-desktop
+   * 四层，漏掉中间的 .media-theater 与 .theater-screen——那两条在 skin-bold.css
+   * 里是全屏用的 #000000，整块画面被盖住，包里却是「全绿」。教训写在探针里。
+   */
+  const chain = el => {
+    const out = [];
+    let node = el;
+    while (node && node !== document.documentElement) {
+      const style = getComputedStyle(node);
+      out.push({
+        tag: node.tagName.toLowerCase(),
+        cls: (node.className || '').toString().trim().slice(0, 60),
+        bg: style.backgroundColor,
+        alpha: alpha(style.backgroundColor),
+        opacity: style.opacity,
+        backgroundImage: style.backgroundImage === 'none' ? '' : 'set',
+      });
+      node = node.parentElement;
+    }
+    const rootStyle = getComputedStyle(document.documentElement);
+    out.push({ tag: 'html', cls: '', bg: rootStyle.backgroundColor, alpha: alpha(rootStyle.backgroundColor), opacity: rootStyle.opacity, backgroundImage: rootStyle.backgroundImage === 'none' ? '' : 'set' });
+    return out;
+  };
   const root = document.querySelector('.template-desktop');
   const layer = document.querySelector('.desktop-widgets');
   const rect = el => {
@@ -88,12 +114,16 @@ const READ_TRANSPARENT = `(() => {
     const r = el.getBoundingClientRect();
     return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
   };
+  const stack = root ? chain(root) : [];
   return {
     hasRoot: !!root,
     rootBg: root ? getComputedStyle(root).backgroundColor : null,
     htmlBg: bg('html'),
     bodyBg: bg('body'),
     stageBg: bg('.desktop-stage'),
+    /** 从内容一路到 html 的每一层；有一层 alpha > 0 就透不过去。 */
+    stack,
+    opaqueLayers: stack.filter(step => step.alpha !== null && step.alpha > 0),
     transparentLayers: {
       html: alpha(bg('html')),
       body: alpha(bg('body')),
