@@ -4422,6 +4422,49 @@ body:has(.media-room.is-expanded) {
   color: #ffffff;
 }
 
+/* 缩放手柄：右下角一颗小圆点，往外拖变大、往里拖变小。
+   平时不显示，悬停那块才出来——六块元素各挂一颗常驻的圆点，
+   铺在桌面上就成了图钉阵。 */
+.layer-grip {
+  position: absolute;
+  right: -18px;
+  bottom: -14px;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #ffffff59;
+  border-radius: 50%;
+  background: #101010d9;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  touch-action: none;
+  box-shadow: 0 2px 8px #00000073;
+}
+
+/* 右下角那个小折角就是「这里能拖大」的图示，不用箭头省得和图钉抢眼 */
+.layer-grip::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid #ffffffcc;
+  border-bottom: 1.5px solid #ffffffcc;
+  translate: -1px -1px;
+}
+
+.overlay:hover .layer-grip,
+.dw[data-editable='true']:hover .layer-grip,
+.layer-grip:focus-visible {
+  opacity: 1;
+}
+
+.layer-grip:hover {
+  border-color: #ffffffb3;
+  background: #2a2a2ae6;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dw,
   .dw-disc {
@@ -4534,7 +4577,9 @@ body:has(.media-room.is-expanded) {
 .overlay-clock .ov-clock {
   display: block;
   font-family: "Segoe UI", Inter, system-ui, sans-serif;
-  font-size: clamp(38px, 5.2vw, 76px);
+  /* 外层那个 clamp 是「这个窗口该多大」，后面的 --oscale 是「用户自己调了多大」。
+     两者相乘：换窗口不会丢掉用户的调整，调了也不会因为换窗口被打回原样。 */
+  font-size: calc(clamp(38px, 5.2vw, 76px) * var(--oscale, 1));
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
@@ -4549,7 +4594,7 @@ body:has(.media-room.is-expanded) {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: "Segoe Script", "Bradley Hand", "Ink Free", cursive;
-  font-size: clamp(18px, 2.2vw, 34px);
+  font-size: calc(clamp(18px, 2.2vw, 34px) * var(--oscale, 1));
   font-weight: 600;
   letter-spacing: 0.01em;
   color: #ffffff;
@@ -4557,7 +4602,7 @@ body:has(.media-room.is-expanded) {
 
 .overlay-date .ov-date {
   display: block;
-  font-size: clamp(10px, 0.95vw, 13px);
+  font-size: calc(clamp(10px, 0.95vw, 13px) * var(--oscale, 1));
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -4573,7 +4618,7 @@ body:has(.media-room.is-expanded) {
   border-radius: 999px;
   background: #101010a8;
   backdrop-filter: blur(10px);
-  font-size: clamp(11px, 1.05vw, 15px);
+  font-size: calc(clamp(11px, 1.05vw, 15px) * var(--oscale, 1));
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
@@ -4594,7 +4639,7 @@ body:has(.media-room.is-expanded) {
 .overlay-disc .ov-disc {
   display: block;
   position: relative;
-  width: clamp(64px, 9vw, 148px);
+  width: calc(clamp(64px, 9vw, 148px) * var(--oscale, 1));
   aspect-ratio: 1;
   border-radius: 50%;
   background:
@@ -4637,33 +4682,38 @@ body:has(.media-room.is-expanded) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: clamp(10px, 1vw, 14px);
+  font-size: calc(clamp(10px, 1vw, 14px) * var(--oscale, 1));
   font-weight: 600;
   letter-spacing: 0.08em;
   color: #ffffffd9;
 }
 
 .overlay-layer[data-big='true'] .ov-now {
-  font-size: clamp(13px, 1.3vw, 20px);
+  font-size: calc(clamp(13px, 1.3vw, 20px) * var(--oscale, 1));
 }
 
-/* 全屏时整体放大一档：那一屏才是真拿来看的 */
+/* 全屏时整体放大一档：那一屏才是真拿来看的。
+   --oscale 也要跟着乘，否则全屏下用户调过的倍率会被这一档吃掉。 */
 .overlay-layer[data-big='true'] .ov-clock {
-  font-size: clamp(64px, 8vw, 148px);
+  font-size: calc(clamp(64px, 8vw, 148px) * var(--oscale, 1));
 }
 
 .overlay-layer[data-big='true'] .ov-title {
-  font-size: clamp(26px, 3vw, 56px);
+  font-size: calc(clamp(26px, 3vw, 56px) * var(--oscale, 1));
   max-width: 54vw;
 }
 
 .overlay-layer[data-big='true'] .ov-date {
-  font-size: clamp(12px, 1.2vw, 19px);
+  font-size: calc(clamp(12px, 1.2vw, 19px) * var(--oscale, 1));
 }
 
 .overlay-layer[data-big='true'] .ov-timer {
-  font-size: clamp(14px, 1.5vw, 24px);
+  font-size: calc(clamp(14px, 1.5vw, 24px) * var(--oscale, 1));
   padding: 10px 18px 10px 13px;
+}
+
+.overlay-layer[data-big='true'] .ov-disc {
+  width: calc(clamp(88px, 12vw, 220px) * var(--oscale, 1));
 }
 
 .overlay-layer[data-big='true'] .ov-timer i {

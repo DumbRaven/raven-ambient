@@ -514,6 +514,9 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                   title={titleOf(current)}
                   editable
                   skin={desktopMode ? 'widgets' : 'overlay'}
+                  /* 拼贴不改（用户 m11244）：那套的字号写死在 CSS 里，拖了也不会变，
+                     所以干脆不出手柄。照片与透明两套可以缩。 */
+                  scalabe={template !== 'collage'}
                   big={expanded}
                 />
               }
@@ -770,6 +773,9 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                   title=""
                   editable
                   skin={desktopMode ? 'widgets' : 'overlay'}
+                  /* 拼贴不改（用户 m11244）：那套的字号写死在 CSS 里，拖了也不会变，
+                     所以干脆不出手柄。照片与透明两套可以缩。 */
+                  scalabe={template !== 'collage'}
                   big={expanded}
                 />
               }

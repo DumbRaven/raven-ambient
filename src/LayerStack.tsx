@@ -14,11 +14,15 @@ import {
   clockText,
   dateText,
   findLayer,
+  scaleFromDrag,
   settleAt,
   settleConfirm,
+  settleScale,
+  settleScaleConfirm,
   timerText,
   type LayerId,
   type LayerList,
+  type ScaleMap,
   type SpotMap,
 } from './layers';
 import { nowLine } from './stage-text';
@@ -41,13 +45,29 @@ type Props = {
    * 组件只在编辑态可拖——放到桌面那个窗口平时是给眼睛看的，不该一点就挪。
    */
   editable: boolean;
-  /** 拼贴/照片用 overlay，透明用 widgets。 */
   skin: LayerSkin;
+  /**
+   * 能不能拖右下角那个手柄改大小。
+   *
+   * 拼贴版式传 false：那套的字号写死在 CSS 里，拖了也不会变，出个手柄反而骗人。
+   */
+  scalabe?: boolean;
   /** 全屏时叠加元素字大一号（组件皮肤自己有缩放，不看这个）。 */
   big?: boolean;
 };
 
 type Drag = { id: LayerId };
+
+type Resize = {
+  id: LayerId;
+  /** 起手时的倍率 */
+  start: number;
+  /** 起手时指针到中心的距离，作为 1 倍基准 */
+  startDistance: number;
+  /** 中心在视口里的坐标，每帧拿它算距离 */
+  cx: number;
+  cy: number;
+};
 
 /** 唱片那块在组件皮肤里的基准直径（相对屏幕高度），乘上各自的 scale。 */
 const DISC_BASE = 0.22;
@@ -61,7 +81,7 @@ const removeWords: Record<LayerId, string> = {
   now: '曲目',
 };
 
-export default function LayerStack({ value, onChange, remaining, now, disc, title, editable, skin, big = false }: Props) {
+export default function LayerStack({ value, onChange, remaining, now, disc, title, editable, skin, scalabe = false, big = false }: Props) {
   const layer = useRef<HTMLDivElement>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   // 拖到哪里先记本地，松手才写回存档：每帧写 localStorage 会卡。
@@ -70,6 +90,19 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
   // 桌面窗是另一个进程，位置要绕一圈才回来（见 layers.ts 的 settleAt 注释），
   // 不按住的话会先弹回原位再瞬移过去。
   const [settling, setSettling] = useState<SpotMap>({});
+  // 缩放同理：松手后先钉住，等上层确认的那份回来再摘。
+  const [settlingScale, setSettlingScale] = useState<ScaleMap>({});
+  // 正在拖手柄的那一块（手柄按住时元素本身不该跟着拖）
+  const [resize, setResize] = useState<Resize | null>(null);
+  // 拖动中的倍率先记本地，松手才写回存档
+  const [grow, setGrow] = useState<{ id: LayerId; scale: number } | null>(null);
+  // 松手那一句不能从 setGrow 的 updater 里读（updater 必须纯函数，StrictMode 会跑两次）
+  const resizingRef = useRef<number | null>(null);
+
+  // 上层把新倍率送上来了，就摘掉那一条。
+  useEffect(() => {
+    setSettlingScale(current => settleScaleConfirm(current, value));
+  }, [value]);
 
   // 上层把新位置送上来了，就把那几条从「等确认」里摘掉。
   // 返回同一个引用时 setState 不会触发重渲染，所以这里可以直接每帧调。
@@ -119,8 +152,9 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
   function start(event: ReactPointerEvent<HTMLDivElement>, id: LayerId) {
     // 只认主键；右键和滚轮不该把元素拖走
     if (!editable || event.button !== 0) return;
-    // 删除按钮自己会处理点击，按住它不该把整块拖走
+    // 删除按钮、缩放手柄自己会处理，按住它们不该把整块拖走
     if ((event.target as HTMLElement).closest('.dw-kill')) return;
+    if ((event.target as HTMLElement).closest('.layer-grip')) return;
     event.preventDefault();
     // 指针捕获抓不到就别抓（合成事件、或指针已经抬起时会抛 NotFoundError）。
     // **不能让这一句把后面的 setDrag 一起打断**——曾经没包 try/catch，
@@ -132,6 +166,57 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
     }
     setDrag({ id });
   }
+
+  /**
+   * 按住右下角的手柄拖：往远离中心的方向拖变大，往里拖变小。
+   *
+   * 用「到中心的距离比」而不是「拖了多少像素」，是因为元素跟着变大变小、
+   * 中心不动，比值正好是它们看到的那个东西（见 layers.ts 的 scaleFromDrag）。
+   */
+  function gripStart(event: ReactPointerEvent<HTMLButtonElement>, id: LayerId, scale: number) {
+    if (!editable || event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const box = (event.currentTarget.closest('.dw, .overlay') as HTMLElement | null)?.getBoundingClientRect();
+    if (!box) return;
+    const cx = box.left + box.width / 2;
+    const cy = box.top + box.height / 2;
+    const startDistance = Math.hypot(event.clientX - cx, event.clientY - cy);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      /* 同上：抓不到也不影响，监听绑在 window 上 */
+    }
+    setResize({ id, start: scale, startDistance, cx, cy });
+  }
+
+  useEffect(() => {
+    if (!resize) return;
+    const onMove = (event: PointerEvent) => {
+      const distance = Math.hypot(event.clientX - resize.cx, event.clientY - resize.cy);
+      const next = scaleFromDrag(resize.start, resize.startDistance, distance);
+      resizingRef.current = next;
+      setGrow({ id: resize.id, scale: next });
+    };
+    const onUp = () => {
+      const scale = resizingRef.current;
+      resizingRef.current = null;
+      setResize(null);
+      setGrow(null);
+      if (scale === null) return;
+      // 与拖动同理：先钉住，再报上去（桌面窗是另一个进程，见 layers.ts 的 settleAt）
+      setSettlingScale(current => settleScale(current, resize.id, scale));
+      onChange(value.map(item => (item.id === resize.id ? { ...item, scale } : item)));
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, [resize, onChange, value]);
 
   // 时钟每分钟跳一次就够，秒针在这里没有意义。日期跟着它跨零点。
   const [at, setAt] = useState(() => new Date());
@@ -165,11 +250,21 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
       <div className="overlay-layer" ref={layer} data-big={big ? 'true' : undefined}>
         {value.map(item => {
           const spot = live[item.id] ?? settling[item.id] ?? item.spot;
+          const scale = grow?.id === item.id ? grow.scale : (settlingScale[item.id] ?? item.scale);
           return (
             <div
               key={item.id}
               className={`overlay overlay-${item.id} ${drag?.id === item.id ? 'is-dragging' : ''}`}
-              style={{ '--ox': `${spot.x * 100}%`, '--oy': `${spot.y * 100}%` } as CSSProperties}
+              style={
+                {
+                  '--ox': `${spot.x * 100}%`,
+                  '--oy': `${spot.y * 100}%`,
+                  /* 拼贴版式永远是 1 倍：它没有手柄，用户在那里改不了，
+                     却跟着照片版式调过的倍率一起变，只会像「自己动了」。
+                     用户 m12474 的原话是「拼贴不改，照片改」。 */
+                  '--oscale': scalabe ? scale : 1,
+                } as CSSProperties
+              }
               onPointerDown={event => start(event, item.id)}
               title={findLayer(item.id) ? `拖动调整位置：${findLayer(item.id)!.name}` : undefined}
             >
@@ -192,6 +287,14 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
                   <i className="ov-disc-hole" />
                 </span>
               )}
+              {scalabe && editable && (
+                <button
+                  type="button"
+                  className="layer-grip"
+                  aria-label={`拖动改变${removeWords[item.id]}的大小`}
+                  onPointerDown={event => gripStart(event, item.id, scale)}
+                />
+              )}
             </div>
           );
         })}
@@ -204,11 +307,12 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
     <div className="desktop-widgets" ref={layer} data-editable={editable ? 'true' : undefined}>
       {value.map(item => {
         const spot = live[item.id] ?? settling[item.id] ?? item.spot;
+        const scale = grow?.id === item.id ? grow.scale : (settlingScale[item.id] ?? item.scale);
         const style = {
           '--wx': `${spot.x * 100}%`,
           '--wy': `${spot.y * 100}%`,
-          '--wscale': item.scale,
-          '--disc-size': `${DISC_BASE * item.scale * 100}vh`,
+          '--wscale': scale,
+          '--disc-size': `${DISC_BASE * scale * 100}vh`,
         } as CSSProperties;
         const dragging = drag?.id === item.id;
         return (
@@ -238,6 +342,15 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
               </span>
             )}
             {item.id === 'now' && <span className="dw-now">{text('now') || '还没在放'}</span>}
+
+            {scalabe && editable && (
+              <button
+                type="button"
+                className="layer-grip"
+                aria-label={`拖动改变${removeWords[item.id]}的大小`}
+                onPointerDown={event => gripStart(event, item.id, scale)}
+              />
+            )}
 
             {editable && (
               <button

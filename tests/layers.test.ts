@@ -25,9 +25,11 @@ import {
   removeLayer,
   SCALE_MAX,
   SCALE_MIN,
+  scaleFromDrag,
   scaleLayer,
   settleAt,
   settleConfirm,
+  settleScale,
   timerText,
   type LayerList,
 } from '../src/layers.ts';
@@ -201,4 +203,36 @@ test('容差之内也算对上：浮点数算出来的百分比没法逐位相�
   const settling = { clock: { x: 0.4000001, y: 0.3000001 } };
   const got = settleConfirm(settling, [{ id: 'clock', spot: { x: 0.4, y: 0.3 }, scale: 1 }]);
   assert.deepEqual(got, {});
+});
+
+test('拖手柄：离中心越远越大，越近越小', () => {
+  // 起手时指针离中心 40px、当前倍率 1，拖到 80px 就是 2 倍
+  assert.equal(scaleFromDrag(1, 40, 80), 2);
+  // 反过来往里拖是变小
+  assert.equal(scaleFromDrag(1, 40, 20), 0.5);
+  // 原地不动就是原倍率
+  assert.equal(scaleFromDrag(1.5, 40, 40), 1.5);
+});
+
+test('拖手柄：结果一样被钳在上下限里', () => {
+  assert.equal(scaleFromDrag(1, 40, 4000), SCALE_MAX);
+  assert.equal(scaleFromDrag(1, 40, 0.5), SCALE_MIN);
+});
+
+test('拖手柄：正好点在中心上时比值会炸，退回原倍率', () => {
+  // 起手距离为 0，若直接除会得到 Infinity 再被钳成上限——那不是用户想要的
+  assert.equal(scaleFromDrag(0.8, 0, 120), 0.8);
+});
+
+test('缩放松手先钉住：倍率立刻生效，不等上层确认', () => {
+  const pinned = settleScale({}, 'clock', 1.8);
+  assert.deepEqual(pinned, { clock: 1.8 });
+  // 别的条目不受影响
+  const both = settleScale(pinned, 'date', 0.7);
+  assert.deepEqual(both, { clock: 1.8, date: 0.7 });
+});
+
+test('缩放松手也钳位：直接传越界值不会写进存档', () => {
+  assert.deepEqual(settleScale({}, 'clock', 99), { clock: SCALE_MAX });
+  assert.deepEqual(settleScale({}, 'clock', 0.01), { clock: SCALE_MIN });
 });

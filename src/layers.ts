@@ -227,6 +227,19 @@ export function canAddLayer(list: LayerList, id: LayerId): boolean {
 }
 
 /**
+ * 拖缩放手柄时，把「指针离中心多远」换成倍率。
+ *
+ * 为什么用「到中心的距离比」而不是「拖了多少像素」：元素本身跟着变大变小，
+ * 中心不动（`translate(-50%,-50%)`），所以往外拖是变大、往里拖是变小，
+ * 手感与看到的一致。用像素差会有个说不清的基准——拖 100px 是几倍？
+ */
+export function scaleFromDrag(start: number, startDistance: number, distance: number): number {
+  // 起手正好点在中心上时比值会炸，退回原倍率
+  if (startDistance < 1) return clampScale(start);
+  return clampScale(start * (distance / startDistance));
+}
+
+/**
  * 松手之后、上层确认之前，先把它按在这里。
  *
  * 为什么需要这个：桌面放映窗是另一个渲染进程，拖完以后位置要绕一圈才回来——
@@ -253,6 +266,31 @@ export function settleConfirm(current: SpotMap, value: LayerList, epsilon = 0.00
     const pending = next[layer.id];
     if (!pending) continue;
     if (Math.abs(pending.x - layer.spot.x) <= epsilon && Math.abs(pending.y - layer.spot.y) <= epsilon) {
+      delete next[layer.id];
+      changed = true;
+    }
+  }
+  return changed ? next : current;
+}
+
+/** 缩放版的「等确认」表：id → 倍率。 */
+export type ScaleMap = Partial<Record<LayerId, number>>;
+
+export function settleScale(current: ScaleMap, id: LayerId, scale: number): ScaleMap {
+  return { ...current, [id]: clampScale(scale) };
+}
+
+/**
+ * 把已经对上的倍率从「等确认」里摘掉。与 `settleConfirm` 同一套路：
+ * 没东西可摘时返回**同一个引用**，避免 useEffect 里的 setState 白跑一轮。
+ */
+export function settleScaleConfirm(current: ScaleMap, value: LayerList, epsilon = 0.001): ScaleMap {
+  let changed = false;
+  const next: ScaleMap = { ...current };
+  for (const layer of value) {
+    const pending = next[layer.id];
+    if (pending === undefined) continue;
+    if (Math.abs(pending - layer.scale) <= epsilon) {
       delete next[layer.id];
       changed = true;
     }

@@ -534,6 +534,12 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
           {widgets}
         </>
       )}
+
+      {/* 拼贴与照片的叠加元素。它们一直挂在版式根节点这一层（坐标是相对整块
+          画面的百分比），合并成 LayerStack 之后位置不变，只是从外面并排
+          改成了从这里插。曾经漏了这一句，探针立刻量到「照片版式的叠加元素
+          整个消失」——所以这条不能再删。 */}
+      {preset.id !== 'desktop' && widgets}
     </div>
   );
 }

@@ -75,6 +75,9 @@ function DesktopStage() {
                 title={snapshot.title}
                 editable
                 skin={snapshot.template === 'desktop' ? 'widgets' : 'overlay'}
+                /* 这边没有控制条，调不了预置；就地上手柄是唯一的入口，
+                   所以除了拼贴（不改，用户 m12474）都要给。 */
+                scalabe={snapshot.template !== 'collage'}
                 big
               />
             }
