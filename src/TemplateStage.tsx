@@ -139,6 +139,14 @@ type Props = {
   onNextTrack?: () => void;
   /** 把取到的原始色板交出去，配色面板要拿它画可选的色块。 */
   onPalette?: (colors: string[]) => void;
+  /**
+   * 外面算好的色板。传了就不自己取色。
+   *
+   * 桌面放映窗用它：那个窗口是另一个渲染进程，`videoPalette` 的缓存不跨进程，
+   * 自己在那边取一次色就要**再解码一帧 4K**。主窗口已经把颜色算出来了，
+   * 传几十字节过去比重新解一遍便宜得多，而且两边配色保证一样。
+   */
+  colors?: string[];
 };
 
 const BRAND = 'DumbRaven';
@@ -175,7 +183,7 @@ function Raven({ className }: { className: string }) {
   );
 }
 
-export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, now, hint, stone = 'sea', onStone, onPrevTrack, onNextTrack, onPalette }: Props) {
+export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, now, hint, stone = 'sea', onStone, onPrevTrack, onNextTrack, onPalette, colors: given }: Props) {
   const preset = findTemplate(template);
   const fromWallpaper = !!item.source;
   const title = useMemo(() => templateTitle(item.name, fromWallpaper), [item.name, fromWallpaper]);
@@ -186,18 +194,21 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
   /* PLAYLIST 的副行：本地是「01:12 / 03:48 · 列表循环」，外部是专辑。
      空串表示这一行没内容，JSX 那边就不渲染它，不留一根空线。 */
   const detail = nowDetail(now);
-  const [colors, setColors] = useState<string[]>([]);
+  const [ownColors, setColors] = useState<string[]>([]);
+  const colors = given ?? ownColors;
   const [discColors, setDiscColors] = useState<string[]>([]);
 
   // 取色：图片读封面，视频抽一帧。两条路都按 src 缓存，翻页不重算。
   // 空条目（库里还没有东西）没有地址可读，直接跳过。
+  // 外面给了色板就不取——桌面放映窗走这条，否则 4K 要解两遍。
   useEffect(() => {
     let live = true;
+    if (given) return;
     if (!item.path) { setColors([]); return; }
     const read = item.kind === 'video' ? videoPalette : coverPalette;
     read(mediaSrc(item)).then(list => { if (live) setColors(list); });
     return () => { live = false; };
-  }, [item]);
+  }, [item, given]);
 
   // 彩胶的色从「正在听」那张封面来，不是从放映的画面上来。
   const discCover = disc?.cover ?? '';

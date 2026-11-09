@@ -108,6 +108,16 @@ export function setWindowFullscreen(on: boolean) {
 }
 
 /**
+ * 把放映台摆到桌面上，或者收回来。
+ *
+ * 这件事只能由主进程做——页面开不了窗口。窗口本身住在 electron/desktop-stage.cjs，
+ * 这里只是把请求压进 outbox。
+ */
+export function setDesktopStage(on: boolean) {
+  push({ type: 'desktop', on });
+}
+
+/**
  * 读 Wallpaper Engine 的创意工坊库。
  *
  * 不弹对话框：它的位置是固定的，主进程自己去几个常见路径找。

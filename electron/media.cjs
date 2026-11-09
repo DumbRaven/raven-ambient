@@ -12,6 +12,9 @@ const { protocol, dialog, BrowserWindow } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { mediaResponse } = require('./media-response.cjs');
+// 桌面放映窗。窗口本身住在 desktop-stage.cjs，这里只是把页面的请求转过去。
+// 两边的 require 不会成环：那边不认识 media.cjs。
+const { desktopStage } = require('./desktop-stage.cjs');
 
 const SCHEME = 'media';
 const OUTBOX = 'window.__ravenMediaOutbox';
@@ -338,6 +341,14 @@ class MediaBridge {
       return;
     }
 
+    if (type === 'desktop') {
+      // 把放映台摆到桌面上（或者收回来）。窗口的建立与销毁都在 desktop-stage.cjs，
+      // 这里只是把页面的请求转过去——页面自己开不了窗口。
+      if (action.on === true) desktopStage.show();
+      else desktopStage.hide();
+      return;
+    }
+
     if (type === 'restore') {
       // 上次记下的目录重新进白名单。只登记、不重扫：条目已经在收藏里，
       // 重扫会推一串 scan 回来又写一次盘。用户想刷新时自己点重扫。
@@ -365,8 +376,10 @@ class MediaBridge {
   }
 
   start(webContents) {
-    this.target = webContents;
+    // 已经在跑了就不再认领：媒体桥只有一个 target，后加载完的窗口抢过去，
+    // 主窗口的选文件、全屏这些动作就没人处理了。谁先跑起来谁说了算。
     if (this.timer !== undefined) return;
+    this.target = webContents;
     this.timer = setInterval(() => { void this.take(webContents); }, POLL);
     webContents.once('destroyed', () => this.stop());
   }
@@ -424,8 +437,11 @@ function attachMedia() {
   bridge = new MediaBridge();
   const { app } = require('electron');
   app.on('browser-window-created', (_event, win) => {
-    // 只挂主窗口：小组件窗口不需要媒体库，多挂一份只会白跑轮询
-    if (win.webContents.getURL().includes('mini.html')) return;
+    // 只挂主窗口：小组件和桌面放映窗都不需要媒体库，多挂一份只会白跑轮询，
+    // 更糟的是 MediaBridge 只有一个 target——谁最后加载完谁抢走，
+    // 主窗口的选文件、全屏这些动作就没人处理了。
+    const url = win.webContents.getURL();
+    if (url.includes('mini.html') || url.includes('desktop.html')) return;
     win.webContents.once('did-finish-load', () => bridge.start(win.webContents));
   });
 }

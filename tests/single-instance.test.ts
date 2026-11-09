@@ -41,6 +41,7 @@ async function boot(locked: boolean) {
       : id === 'node:path' ? path
       : id === './now-playing.cjs' ? { attachNowPlaying: () => undefined }
       : id === './focus-mini.cjs' ? { attachFocusMini: () => undefined }
+      : id === './desktop-stage.cjs' ? { attachDesktopStage: () => undefined }
       : id === './media.cjs' ? { registerMediaScheme: () => undefined, attachMedia: () => undefined }
       : { existsSync: () => false },
     process: { env: { RAVEN_DATA_DIR: 'F:/Vibe/.qa/mock-only' }, platform: 'win32', resourcesPath: 'F:/Vibe/.qa/mock-only' }, __dirname: 'F:/Vibe/electron',

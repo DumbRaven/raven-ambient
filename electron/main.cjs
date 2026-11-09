@@ -2,6 +2,7 @@ const { app, BrowserWindow, screen, session } = require('electron');
 const path = require('node:path');
 const { attachNowPlaying } = require('./now-playing.cjs');
 const { attachFocusMini } = require('./focus-mini.cjs');
+const { attachDesktopStage } = require('./desktop-stage.cjs');
 const { registerMediaScheme, attachMedia } = require('./media.cjs');
 
 if (process.env.RAVEN_DATA_DIR) app.setPath('userData', path.resolve(process.env.RAVEN_DATA_DIR));
@@ -53,6 +54,7 @@ function createWindow() {
   mainWindow = win;
   win.on('closed', () => { if (mainWindow === win) mainWindow = null; });
   attachFocusMini(win);
+  attachDesktopStage(win);
   return win;
 }
 

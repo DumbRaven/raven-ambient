@@ -8,10 +8,11 @@
 // 摆进 4:3 的格子里会被裁掉两边，而且分辨率低。所以直接挂 <video> 读自己的第一帧。
 // 一屏最多也就九件，配合视口懒加载不会同时开一百多个文件句柄。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Droplets, FilePlus2, FolderOpen, ImageIcon, Layers, Maximize2, Minimize2, Pause, Play, RefreshCw, Sparkles, X, Palette
+import { ChevronLeft, ChevronRight, Droplets, FilePlus2, FolderOpen, ImageIcon, Layers, Maximize2, Minimize2, MonitorPlay, Pause, Play, RefreshCw, Sparkles, X, Palette
 } from 'lucide-react';
-import { mediaSrc, setWindowFullscreen } from './media';
+import { mediaSrc, setDesktopStage, setWindowFullscreen } from './media';
 import { afterResize as afterResizeWait, canToggle } from './fullscreen-timing';
+import { listenStageClosed, listenStageCommand, publishStage, type StageSnapshot } from './desktop-bridge';
 import TemplateStage, { type StageAmbience, type StageDisc, type StageFocus, type StageNow } from './TemplateStage';
 import { defaultTone, normaliseHex, readTone, toneGroups, toneHint, toneKey, writeTone, type ToneSetting } from './tone-setting';
 import { nextStoneStyle } from './marble.ts';
@@ -160,6 +161,8 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   // 只拿一个数字不够。两者同一次 tick 里一起更新，不会出现一半新一半旧。
   const [focusLeft, setFocusLeft] = useState<number | null>(null);
   const [focusStage, setFocusStage] = useState<StageFocus | null>(null);
+  // 桌面放映窗开着没有。窗口真正的存亡在主进程，这里只跟它对齐一下按钮状态。
+  const [onDesktop, setOnDesktop] = useState(false);
   useEffect(() => {
     const tick = () => {
       const snapshot = readFocus();
@@ -347,6 +350,67 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   }, [expanded, toggleFullscreen]);
 
   const screenKind = current?.kind;
+
+  /**
+   * 把放映台摆到桌面上，或者收回来。
+   *
+   * 这里只发请求、记状态，窗口的存亡在主进程（electron/desktop-stage.cjs）。
+   * 不做「先检查有没有开」那种乐观更新：窗口有可能建失败（比如没有显示器），
+   * 按钮亮着而画面没出来比慢半拍更难受。关窗时主进程会回一条通知。
+   */
+  const toggleDesktop = useCallback(() => {
+    setOnDesktop(value => {
+      setDesktopStage(!value);
+      return !value;
+    });
+  }, []);
+
+  /* 桌面窗关掉了（用户 Alt+F4 或系统带走）→ 按钮回到未按下。 */
+  useEffect(() => listenStageClosed(() => setOnDesktop(false)), []);
+
+  /**
+   * 桌面窗上按下的动作。
+   *
+   * 这些事都只能在主窗口这边做：桌面窗不持有播放器、不持有收藏柜，
+   * 连 localStorage 里的叠加位置都以这边为准。
+   */
+  useEffect(() => listenStageCommand(command => {
+    if (command.type === 'stone') setTone(prev => ({ ...prev, stone: nextStoneStyle(prev.stone) }));
+    else if (command.type === 'prev') onPrevTrack?.();
+    else if (command.type === 'next') onNextTrack?.();
+    else if (command.type === 'overlay') setOverlay(command.value);
+    else if (command.type === 'rain') setRain(command.value);
+  }), [onPrevTrack, onNextTrack]);
+
+  /**
+   * 把「现在该画什么」挂到 window 上，主进程会来取给桌面窗。
+   *
+   * 每一样都要传：桌面窗是另一个渲染进程，它没有这些 React 状态，
+   * 也没有 blob: 封面地址（那个只在创建它的进程里有效）。
+   * 色板一起传过去，是为了让桌面窗别再对 4K 视频解一帧取色。
+   */
+  useEffect(() => {
+    const snapshot: StageSnapshot = {
+      item: current ?? null,
+      index: Math.max(0, usable.findIndex(item => item.id === current?.id)),
+      total: usable.length,
+      template,
+      stone: tone.stone,
+      palette,
+      hint: toneHint(tone, palette),
+      disc,
+      focus: focusStage,
+      ambience,
+      now,
+      rain,
+      overlay,
+      focusLeft,
+      title: current ? titleOf(current) : '',
+      canPrev: !!onPrevTrack,
+      canNext: !!onNextTrack,
+    };
+    publishStage(snapshot);
+  }, [current, usable, template, tone, palette, disc, focusStage, ambience, now, rain, overlay, focusLeft, onPrevTrack, onNextTrack]);
 
   return (
     <section className={`media-room ${expanded ? 'is-expanded' : ''}`} data-chrome={chrome ? 'visible' : 'hidden'} aria-label="放映">
@@ -664,6 +728,15 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                 </>
               )}
             </div>
+            <button
+              className="icon-button theater-desktop"
+              aria-label={onDesktop ? '收回桌面放映' : '放到桌面'}
+              aria-pressed={onDesktop}
+              title={onDesktop ? '收回桌面放映' : '放到桌面'}
+              onClick={toggleDesktop}
+            >
+              <MonitorPlay size={13} />
+            </button>
             <button className="icon-button theater-expand" aria-label={expanded ? '退出全屏' : '全屏'} aria-pressed={expanded} onClick={toggleFullscreen}>
               {expanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
