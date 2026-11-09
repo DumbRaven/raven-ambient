@@ -65,16 +65,17 @@ function DesktopStage() {
             colors={snapshot.palette}
             widgets={
               snapshot.template === 'desktop' ? (
-                /* 放到桌面时不给编辑：这个窗口没有控制条，拖坏了收不回来。
-                   摆位置、加组件都在主窗口的预览里做。 */
+                /* 桌面窗里也能拖、也能删——这个窗口就是用户平时看着的那块，
+                   要调整位置当然在这里调。松手后整份表回传主窗口落盘
+                   （位置和存档都以主窗口那份为准）。 */
                 <DesktopWidgets
                   value={snapshot.widgets}
-                  onChange={() => { /* 只读 */ }}
+                  onChange={value => sendStageCommand({ type: 'widgets', value })}
                   remaining={snapshot.focusLeft}
                   now={snapshot.now}
                   disc={snapshot.disc}
                   title={snapshot.title}
-                  editable={false}
+                  editable
                 />
               ) : undefined
             }

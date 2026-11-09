@@ -8,7 +8,7 @@
 // 摆进 4:3 的格子里会被裁掉两边，而且分辨率低。所以直接挂 <video> 读自己的第一帧。
 // 一屏最多也就九件，配合视口懒加载不会同时开一百多个文件句柄。
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Droplets, FilePlus2, FolderOpen, ImageIcon, Layers, Maximize2, Minimize2, MonitorPlay, Pause, Play, Plus, RefreshCw, Sparkles, X, Palette
+import { ChevronLeft, ChevronRight, Droplets, FilePlus2, FolderOpen, ImageIcon, Maximize2, Minimize2, MonitorPlay, Pause, Play, RefreshCw, Sparkles, X, Palette
 } from 'lucide-react';
 import { mediaSrc, setDesktopStage, setWindowFullscreen } from './media';
 import { afterResize as afterResizeWait, canToggle } from './fullscreen-timing';
@@ -19,10 +19,11 @@ import { nextStoneStyle } from './marble.ts';
 import OverlayLayer from './OverlayLayer';
 import RainLayer from './RainLayer';
 import DesktopWidgets from './DesktopWidgets';
-import { addWidget, readWidgets, removeWidget, widgetLimit, widgetMetas, widgetsKey, writeWidgets, type WidgetList } from './widgets';
+import TheaterLayers from './TheaterLayers';
+import { readWidgets, widgetsKey, writeWidgets, type WidgetList } from './widgets';
 import { rainKey, rainModes, readRain, writeRain, type RainSetting } from './rain';
 import { readFocus } from './focus-bridge';
-import { overlays as overlayMetas, readOverlays, writeOverlays, overlaysKey, type Overlays } from './overlays';
+import { readOverlays, writeOverlays, overlaysKey, type Overlays } from './overlays';
 import { templates, type TemplateId } from './templates';
 import type { MediaItem } from './records';
 
@@ -152,7 +153,9 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   // 叠加元素（时间/标题/日期/番茄钟）。位置是用户拖出来的，存 localStorage 而不是收藏——
   // 这是「怎么看」的偏好，不该触发一次写盘。
   const [overlay, setOverlay] = useState<Overlays>(() => readOverlays(localStorage.getItem(overlaysKey)));
-  const [overlayMenu, setOverlayMenu] = useState(false);
+  // 「叠加元素」与「加组件」合并成一颗按钮：外观一样，菜单内容跟着版式走。
+  // 为什么不再各留一个开关：合并之后只剩一个菜单，两个 state 一定会有一个忘了同步。
+  const [layersMenu, setLayersMenu] = useState(false);
   // 雨层。和叠加元素一样存 localStorage——这是「怎么看」的偏好，不该写盘。
   const [rain, setRain] = useState<RainSetting>(() => readRain(localStorage.getItem(rainKey)));
   const [rainMenu, setRainMenu] = useState(false);
@@ -161,7 +164,6 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   // 跟上面几项一样存 localStorage：这是「桌面怎么摆」的偏好，不进收藏库。
   // 位置和缩放都是用户拖出来的，换一台机器不该被同步走。
   const [widgets, setWidgets] = useState<WidgetList>(() => readWidgets(localStorage.getItem(widgetsKey)));
-  const [widgetMenu, setWidgetMenu] = useState(false);
   useEffect(() => { writeWidgets(widgets); }, [widgets]);
   // 番茄钟读数：跟着专注页走，自己不另起计时器（两处各算各的，暂停一次就对不上）。
   // 800ms 一刷就够——叠加上只显示到分:秒。
@@ -360,6 +362,15 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   const screenKind = current?.kind;
 
   /**
+   * 是不是「透明」版式。
+   *
+   * 这个布尔在前面被问了很多次（组件层、叠加层、控制条按钮），但每次都要写
+   * `template === 'desktop'` 一遍读起来太吵，给它一个名字。它只回答「现在这套版式
+   * 底是透明的」，不表示桌面放映窗开着——那件事是 onDesktop。
+   */
+  const desktopMode = template === 'desktop';
+
+  /**
    * 把放映台摆到桌面上，或者收回来。
    *
    * 这里只发请求、记状态，窗口的存亡在主进程（electron/desktop-stage.cjs）。
@@ -388,6 +399,8 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
     else if (command.type === 'next') onNextTrack?.();
     else if (command.type === 'overlay') setOverlay(command.value);
     else if (command.type === 'rain') setRain(command.value);
+    // 桌面窗里拖了组件：整份覆盖回来。那边松手才发一条，所以不会抖。
+    else if (command.type === 'widgets') setWidgets(command.value);
   }), [onPrevTrack, onNextTrack]);
 
   /**
@@ -492,7 +505,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               onNextTrack={onNextTrack}
               onPalette={setPalette}
               widgets={
-                template === 'desktop' ? (
+                desktopMode ? (
                   <DesktopWidgets
                     value={widgets}
                     onChange={setWidgets}
@@ -508,8 +521,8 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
             <RainLayer value={rain} />
             {/* 透明模式下不画叠加层：那四件（时间/标题/日期/番茄钟）和
                 组件里同名的那几块会重着画在同一个位置，屏幕上出现两份时间。
-                透明模式的「往上加东西」只有一条路——控制条上的「＋」。 */}
-            {template !== 'desktop' && (
+                透明模式的「往上加东西」只有一条路——控制条上那颗按钮。 */}
+            {!desktopMode && (
               <OverlayLayer
                 value={overlay}
                 onChange={setOverlay}
@@ -624,18 +637,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                 </>
               )}
             </div>
-            {/* 叠加元素：哪几块浮在画面上。位置在画面里直接拖。 */}
-            <div className="theater-overlays">
-              <button
-                className={`icon-button theater-overlay-toggle ${overlayMenu ? 'on' : ''}`}
-                aria-label="叠加元素"
-                aria-expanded={overlayMenu}
-                title="叠加元素"
-                onClick={() => setOverlayMenu(value => !value)}
-              >
-                <Layers size={13} />
-              </button>
-              {/* 配色：默认跟画面走，也可以指定主色或手填色值。 */}
+            {/* 配色：默认跟画面走，也可以指定主色或手填色值。 */}
             <div className="theater-tone">
               <button
                 className={`icon-button theater-tone-toggle ${toneMenu ? 'on' : ''}`}
@@ -732,83 +734,34 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                 </>
               )}
             </div>
-            {overlayMenu && (
-                <>
-                  <button className="theater-overlay-veil" aria-label="收起" onClick={() => setOverlayMenu(false)} />
-                  <div className="theater-overlay-menu" role="menu">
-                    {overlayMetas.map(meta => (
-                      <button
-                        key={meta.id}
-                        role="menuitemcheckbox"
-                        aria-checked={overlay[meta.id].on}
-                        onClick={() => setOverlay(current => ({ ...current, [meta.id]: { ...current[meta.id], on: !current[meta.id].on } }))}
-                      >
-                        <span className={`overlay-dot ${overlay[meta.id].on ? 'on' : ''}`} aria-hidden="true" />
-                        <span>
-                          <b>{meta.name}</b>
-                          <small>{meta.hint}</small>
-                        </span>
-                      </button>
-                    ))}
-                    <p className="theater-overlay-tip">打开之后，在画面里按住它拖动就能换位置。</p>
-                  </div>
-                </>
-              )}
-            </div>
-            {/* 透明模式的组件：加一块、去掉一块。
-                只在透明版式下出现——另外两套版式没有这个层。 */}
-            {template === 'desktop' && (
-              <div className="theater-widgets">
-                <button
-                  className={`icon-button theater-widget-toggle ${widgetMenu ? 'on' : ''}`}
-                  aria-label="加组件"
-                  aria-expanded={widgetMenu}
-                  title="加组件"
-                  onClick={() => setWidgetMenu(value => !value)}
-                >
-                  <Plus size={13} />
-                </button>
-                {widgetMenu && (
-                  <>
-                    <button className="theater-widget-veil" aria-label="收起" onClick={() => setWidgetMenu(false)} />
-                    <div className="theater-widget-menu" role="menu">
-                      {widgetMetas.map(meta => {
-                        const present = widgets.some(widget => widget.id === meta.id);
-                        return (
-                          <button
-                            key={meta.id}
-                            role="menuitemcheckbox"
-                            aria-checked={present}
-                            onClick={() => setWidgets(current => (present ? removeWidget(current, meta.id) : addWidget(current, meta.id)))}
-                          >
-                            <span className={`widget-dot ${present ? 'on' : ''}`} aria-hidden="true" />
-                            <span>
-                              <b>{meta.name}</b>
-                              <small>{meta.hint}</small>
-                            </span>
-                          </button>
-                        );
-                      })}
-                      <p className="theater-widget-tip">
-                        {widgets.length >= widgetLimit ? '已经放满了。' : '加上去之后，在画面里按住它就能拖。'}
-                      </p>
-                    </div>
-                  </>
-                )}
-              </div>
+            {/* 叠加元素 / 组件：同一颗按钮，菜单内容跟着版式走。 */}
+            <TheaterLayers
+              mode={desktopMode ? 'widgets' : 'overlay'}
+              overlay={overlay}
+              onOverlay={setOverlay}
+              widgets={widgets}
+              onWidgets={setWidgets}
+              open={layersMenu}
+              onOpen={setLayersMenu}
+            />
+            {/* 全屏键在透明版式下变成「放到桌面」。
+                透明模式的意义就是把画面贴回桌面上看，这时候窗口全屏没有意义——
+                两个按钮并排反而要用户自己判断该点哪个。 */}
+            {desktopMode ? (
+              <button
+                className="icon-button theater-expand"
+                aria-label={onDesktop ? '收回桌面放映' : '放到桌面'}
+                aria-pressed={onDesktop}
+                title={onDesktop ? '收回桌面放映' : '放到桌面'}
+                onClick={toggleDesktop}
+              >
+                <MonitorPlay size={13} />
+              </button>
+            ) : (
+              <button className="icon-button theater-expand" aria-label={expanded ? '退出全屏' : '全屏'} aria-pressed={expanded} onClick={toggleFullscreen}>
+                {expanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+              </button>
             )}
-            <button
-              className="icon-button theater-desktop"
-              aria-label={onDesktop ? '收回桌面放映' : '放到桌面'}
-              aria-pressed={onDesktop}
-              title={onDesktop ? '收回桌面放映' : '放到桌面'}
-              onClick={toggleDesktop}
-            >
-              <MonitorPlay size={13} />
-            </button>
-            <button className="icon-button theater-expand" aria-label={expanded ? '退出全屏' : '全屏'} aria-pressed={expanded} onClick={toggleFullscreen}>
-              {expanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-            </button>
           </div>
         </div>
       ) : (
@@ -828,7 +781,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               stone={tone.stone}
               onStone={cycleStone}
               widgets={
-                template === 'desktop' ? (
+                desktopMode ? (
                   <DesktopWidgets
                     value={widgets}
                     onChange={setWidgets}
@@ -842,13 +795,16 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               }
             />
             <RainLayer value={rain} />
-            <OverlayLayer
-              value={overlay}
-              onChange={setOverlay}
-              remaining={focusLeft}
-              title="Untitled"
-              big={expanded}
-            />
+            {/* 和主台一致：透明版式下不画叠加层，否则会和组件重着画。 */}
+            {!desktopMode && (
+              <OverlayLayer
+                value={overlay}
+                onChange={setOverlay}
+                remaining={focusLeft}
+                title="Untitled"
+                big={expanded}
+              />
+            )}
             <div className="theater-blank-hint">
               <ImageIcon size={16} strokeWidth={1.2} />
               <span>先「从本地添加」几张图片或视频</span>
@@ -948,39 +904,32 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                 </>
               )}
             </div>
-            <div className="theater-overlays">
+            <TheaterLayers
+              mode={desktopMode ? 'widgets' : 'overlay'}
+              overlay={overlay}
+              onOverlay={setOverlay}
+              widgets={widgets}
+              onWidgets={setWidgets}
+              open={layersMenu}
+              onOpen={setLayersMenu}
+            />
+            {/* 空台面也要有全屏 / 桌面键：上面那张画面已经是同一块舞台，
+                换到空库时忽然没得全屏会很怪。透明版式下这颗仍走桌面放映。 */}
+            {desktopMode ? (
               <button
-                className={`icon-button theater-overlay-toggle ${overlayMenu ? 'on' : ''}`}
-                aria-label="叠加元素"
-                aria-expanded={overlayMenu}
-                title="叠加元素"
-                onClick={() => setOverlayMenu(value => !value)}
+                className="icon-button theater-expand"
+                aria-label={onDesktop ? '收回桌面放映' : '放到桌面'}
+                aria-pressed={onDesktop}
+                title={onDesktop ? '收回桌面放映' : '放到桌面'}
+                onClick={toggleDesktop}
               >
-                <Layers size={13} />
+                <MonitorPlay size={13} />
               </button>
-              {overlayMenu && (
-                <>
-                  <button className="theater-overlay-veil" aria-label="收起" onClick={() => setOverlayMenu(false)} />
-                  <div className="theater-overlay-menu" role="menu">
-                    {overlayMetas.map(meta => (
-                      <button
-                        key={meta.id}
-                        role="menuitemcheckbox"
-                        aria-checked={overlay[meta.id].on}
-                        onClick={() => setOverlay(current => ({ ...current, [meta.id]: { ...current[meta.id], on: !current[meta.id].on } }))}
-                      >
-                        <span className={`overlay-dot ${overlay[meta.id].on ? 'on' : ''}`} aria-hidden="true" />
-                        <span>
-                          <b>{meta.name}</b>
-                          <small>{meta.hint}</small>
-                        </span>
-                      </button>
-                    ))}
-                    <p className="theater-overlay-tip">打开之后，在画面里按住它拖动就能换位置。</p>
-                  </div>
-                </>
-              )}
-            </div>
+            ) : (
+              <button className="icon-button theater-expand" aria-label={expanded ? '退出全屏' : '全屏'} aria-pressed={expanded} onClick={toggleFullscreen}>
+                {expanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+              </button>
+            )}
           </div>
         </div>
       )}

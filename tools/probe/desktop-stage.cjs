@@ -154,8 +154,8 @@ app.whenReady().then(async () => {
     const root = document.querySelector('.template-collage');
     return {
       stone: root ? root.getAttribute('data-stone') : '',
-      desktopButton: !!document.querySelector('.theater-desktop'),
-      desktopPressed: document.querySelector('.theater-desktop')?.getAttribute('aria-pressed') || '',
+      // 全屏键与「放到桌面」现在是同一颗：拼贴版式下它是全屏，透明版式下它是桌面。
+      expandLabel: document.querySelector('.theater-expand')?.getAttribute('aria-label') || '',
       templates: [...document.querySelectorAll('.theater-templates button')].map(b => b.textContent.trim()),
       windows: 1,
     };
@@ -163,9 +163,16 @@ app.whenReady().then(async () => {
 
   const display = screen.getDisplayMatching(win.getBounds());
 
-  // 点「放到桌面」
-  await run(`(() => { document.querySelector('.theater-desktop')?.click(); return 1; })()`);
-  await wait(1200);
+  // 先切到透明版式——那颗键只有在这个版式下才表示「放到桌面」
+  // （用户 m11693：切换成透明的时候，全屏就变成桌面放映）。
+  await run(`(() => {
+    [...document.querySelectorAll('.theater-templates button')]
+      .find(b => b.textContent.trim() === '透明')?.click();
+    return 1;
+  })()`);
+  await wait(900);
+  await run(`(() => { document.querySelector('.theater-expand')?.click(); return 1; })()`);
+  await wait(1400);
 
   const all = BrowserWindow.getAllWindows();
   const deskWin = all.find(w => w.webContents.getURL().includes('desktop.html')) || null;
@@ -195,15 +202,43 @@ app.whenReady().then(async () => {
     await wait(1600);
     stage = await deskWin.webContents.executeJavaScript(READ_STAGE);
 
-    // 在桌面窗上点胶囊 → 主窗口应该跟着换石纹
-    await deskWin.webContents.executeJavaScript(`(() => { document.querySelector('.tpl-tag')?.click(); return 1; })()`);
-    await wait(1200);
-    const deskAfter = await deskWin.webContents.executeJavaScript(`(() => {
-      const root = document.querySelector('.template-collage');
-      return root ? root.getAttribute('data-stone') : '';
+    // 在桌面窗里拖一块组件 → 主窗口那份存档应该跟着变。
+    // （原来是点胶囊验石纹，但透明版式下画面里没有胶囊——那颗按钮长在拼贴版式上。
+    //  透明版式里唯一能点的东西就是组件本身，正好也就是这次要验的「全屏也能拖」。）
+    const dragBefore = await run(`(() => {
+      const raw = localStorage.getItem('raven-desktop-widgets');
+      const list = raw ? JSON.parse(raw) : [];
+      const clock = list.find(w => w.id === 'clock');
+      return clock ? clock.spot : null;
     })()`);
-    stoneAfter = deskAfter;
-    pressedAfter = await run(`document.querySelector('.theater-desktop')?.getAttribute('aria-pressed') || ''`);
+    const dragResult = await deskWin.webContents.executeJavaScript(`(async () => {
+      const el = document.querySelector('.dw-clock');
+      if (!el) return { error: 'no-clock' };
+      const box = el.getBoundingClientRect();
+      const x = box.left + box.width / 2;
+      const y = box.top + box.height / 2;
+      const fire = (type, px, py) => el.dispatchEvent(new PointerEvent(type, {
+        pointerId: 7, pointerType: 'mouse', button: 0, buttons: 1,
+        clientX: px, clientY: py, bubbles: true, cancelable: true,
+      }));
+      fire('pointerdown', x, y);
+      await new Promise(r => setTimeout(r, 260));
+      fire('pointermove', x - 160, y + 80);
+      await new Promise(r => setTimeout(r, 60));
+      fire('pointerup', x - 160, y + 80);
+      await new Promise(r => setTimeout(r, 260));
+      const after = el.getBoundingClientRect();
+      return { movedX: Math.round(after.left - box.left), movedY: Math.round(after.top - box.top) };
+    })()`);
+    await wait(900);
+    const dragAfter = await run(`(() => {
+      const raw = localStorage.getItem('raven-desktop-widgets');
+      const list = raw ? JSON.parse(raw) : [];
+      const clock = list.find(w => w.id === 'clock');
+      return clock ? clock.spot : null;
+    })()`);
+    stoneAfter = { dragBefore, dragResult, dragAfter, wroteBack: JSON.stringify(dragBefore) !== JSON.stringify(dragAfter) };
+    pressedAfter = await run(`document.querySelector('.theater-expand')?.getAttribute('aria-pressed') || ''`);
 
     // 顺手截一张桌面窗（这是用户真正会看到的画面）
     const png = (await deskWin.webContents.capturePage()).toPNG();
@@ -239,15 +274,17 @@ app.whenReady().then(async () => {
   const transparentMainState = await run(READ_TRANSPARENT);
 
   // 主窗口这边有编辑入口，桌面窗只读
+  // 「叠加元素」与「加组件」合并成了一颗按钮（用户 m11693），
+  // 透明版式下它的菜单就是六项组件。
   const widgetMenu = await run(`(() => {
-    const toggle = document.querySelector('.theater-widget-toggle');
+    const toggle = document.querySelector('.theater-overlays .theater-overlay-toggle');
     if (!toggle) return { missing: true };
     toggle.click();
-    return { opened: true };
+    return { opened: true, label: toggle.getAttribute('aria-label') };
   })()`);
   await wait(400);
   const widgetItems = await run(`(() => {
-    const nodes = [...document.querySelectorAll('.theater-widget-menu button')];
+    const nodes = [...document.querySelectorAll('.theater-overlay-menu > button')];
     return nodes.map(n => ({ label: n.textContent.trim(), checked: n.getAttribute('aria-checked') }));
   })()`);
 
@@ -295,13 +332,13 @@ app.whenReady().then(async () => {
 
   // 加一块「标题」
   const addResult = await run(`(() => {
-    const toggle = document.querySelector('.theater-widget-toggle');
-    if (toggle && !document.querySelector('.theater-widget-menu')) toggle.click();
-    return { menu: !!document.querySelector('.theater-widget-menu') };
+    const toggle = document.querySelector('.theater-overlays .theater-overlay-toggle');
+    if (toggle && !document.querySelector('.theater-overlay-menu')) toggle.click();
+    return { menu: !!document.querySelector('.theater-overlay-menu') };
   })()`);
   await wait(300);
   const addClick = await run(`(() => {
-    const node = [...document.querySelectorAll('.theater-widget-menu button')].find(n => n.textContent.includes('标题'));
+    const node = [...document.querySelectorAll('.theater-overlay-menu > button')].find(n => n.textContent.includes('标题'));
     if (!node) return { missing: true };
     node.click();
     return { clicked: true };
@@ -322,12 +359,12 @@ app.whenReady().then(async () => {
 
   // 收回
   if (deskWin) {
-    await run(`(() => { document.querySelector('.theater-desktop')?.click(); return 1; })()`);
+    await run(`(() => { document.querySelector('.theater-expand')?.click(); return 1; })()`);
     await wait(900);
   }
   const closedCheck = {
     windowsLeft: BrowserWindow.getAllWindows().filter(w => !w.isDestroyed() && w.webContents.getURL().includes('desktop.html')).length,
-    pressedAfterClose: await run(`document.querySelector('.theater-desktop')?.getAttribute('aria-pressed') || ''`),
+    pressedAfterClose: await run(`document.querySelector('.theater-expand')?.getAttribute('aria-pressed') || ''`),
   };
 
   report({

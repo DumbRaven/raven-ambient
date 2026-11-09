@@ -36,7 +36,8 @@ app.whenReady().then(async () => {
   })()`);
   await wait(600);
 
-  await run(`(() => { document.querySelector('.theater-desktop')?.click(); return 1; })()`);
+  // 透明版式下那颗键就是「放到桌面」（全屏键被它顶替，见 src/MediaRoom.tsx）。
+  await run(`(() => { document.querySelector('.theater-expand')?.click(); return 1; })()`);
   await wait(1600);
 
   const deskWin = BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('desktop.html')) || null;

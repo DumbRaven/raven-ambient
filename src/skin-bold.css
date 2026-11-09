@@ -4612,22 +4612,23 @@ body:has(.media-room.is-expanded) {
   height: 8px;
 }
 
-/* ---------- 放映：叠加元素开关 ---------- */
+/* ---------- 放映：叠加元素 / 组件开关 ---------- */
 
-.theater-overlays,
-.theater-widgets {
+/* 透明版式的「组件」和另外两套版式的「叠加元素」共用这一颗按钮，
+   菜单内容由组件自己按版式决定（见 src/TheaterLayers.tsx）。
+   所以这里只有一套样式，不再分名。 */
+
+.theater-overlays {
   position: relative;
   display: inline-flex;
 }
 
-.theater-overlay-toggle.on,
-.theater-widget-toggle.on {
+.theater-overlay-toggle.on {
   background: #ffffff;
   color: #101010;
 }
 
-.theater-overlay-veil,
-.theater-widget-veil {
+.theater-overlay-veil {
   position: fixed;
   inset: 0;
   z-index: 70;
@@ -4637,8 +4638,7 @@ body:has(.media-room.is-expanded) {
   cursor: default;
 }
 
-.theater-overlay-menu,
-.theater-widget-menu {
+.theater-overlay-menu {
   position: absolute;
   right: 0;
   bottom: calc(100% + 10px);
@@ -4653,8 +4653,7 @@ body:has(.media-room.is-expanded) {
   box-shadow: 0 18px 44px #10101033;
 }
 
-.theater-overlay-menu > button,
-.theater-widget-menu > button {
+.theater-overlay-menu > button {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -4669,34 +4668,29 @@ body:has(.media-room.is-expanded) {
   transition: background 140ms ease;
 }
 
-.theater-overlay-menu > button:hover,
-.theater-widget-menu > button:hover {
+.theater-overlay-menu > button:hover {
   background: #f4f2ee;
 }
 
-.theater-overlay-menu > button > span:last-child,
-.theater-widget-menu > button > span:last-child {
+.theater-overlay-menu > button > span:last-child {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
 
-.theater-overlay-menu b,
-.theater-widget-menu b {
+.theater-overlay-menu b {
   font-size: 12px;
   font-weight: 700;
 }
 
-.theater-overlay-menu small,
-.theater-widget-menu small {
+.theater-overlay-menu small {
   font-size: 10px;
   font-weight: 500;
   color: var(--bold-faint);
 }
 
 /* 开关点：关着是空心圈，开着是实心黑 */
-.overlay-dot,
-.widget-dot {
+.overlay-dot {
   flex: none;
   width: 13px;
   height: 13px;
@@ -4705,14 +4699,12 @@ body:has(.media-room.is-expanded) {
   transition: background 140ms ease, border-color 140ms ease;
 }
 
-.overlay-dot.on,
-.widget-dot.on {
+.overlay-dot.on {
   background: #101010;
   border-color: #101010;
 }
 
-.theater-overlay-tip,
-.theater-widget-tip {
+.theater-overlay-tip {
   margin: 6px 4px 2px;
   font-size: 10px;
   line-height: 1.45;
@@ -4720,8 +4712,7 @@ body:has(.media-room.is-expanded) {
 }
 
 @media (max-width: 599px) {
-  .theater-overlay-menu,
-  .theater-widget-menu {
+  .theater-overlay-menu {
     width: min(232px, calc(100vw - 48px));
   }
 }
@@ -4729,8 +4720,7 @@ body:has(.media-room.is-expanded) {
 @media (prefers-reduced-motion: reduce) {
   .overlay,
   .overlay::after,
-  .overlay-dot,
-  .widget-dot {
+  .overlay-dot {
     transition: none;
   }
 }

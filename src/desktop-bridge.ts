@@ -51,7 +51,13 @@ export type StageSnapshot = {
   /** 能不能切歌，决定桌面窗里的唱片接不接指针。 */
   canPrev: boolean;
   canNext: boolean;
-  /** 透明模式的组件表。主窗口是唯一的编辑入口，桌面窗只跟着显示。 */
+  /**
+   * 透明模式的组件表。
+   *
+   * 主窗口与桌面窗两边都能拖、都能删——所以这份表是一个来回跑的双向状态：
+   * 主窗口改完推过去，桌面窗拖完发 {@link StageCommand} 里的 `widgets` 回来。
+   * 存档只有主窗口那份（localStorage），桌面窗那边永远是只读的副本。
+   */
   widgets: WidgetList;
 };
 
@@ -67,7 +73,15 @@ export type StageCommand =
   | { type: 'prev' }
   | { type: 'next' }
   | { type: 'overlay'; value: Overlays }
-  | { type: 'rain'; value: RainSetting };
+  | { type: 'rain'; value: RainSetting }
+  /**
+   * 桌面窗里拖了 / 删了一块组件，整份表回传。
+   *
+   * 为什么回整份而不是「哪一块挪到了哪」：位置是连续拖出来的，
+   * 一次拖动会经过几十个中间位置，只有松手那一下才该落盘——回整份就天然合并了，
+   * 主窗口直接覆盖回去，不需要在这两条线之间对账。
+   */
+  | { type: 'widgets'; value: WidgetList };
 
 type RavenWindow = Window & {
   __ravenStageSnapshot?: StageSnapshot;
