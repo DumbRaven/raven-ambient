@@ -69,7 +69,7 @@ const RUN = `(async () => {
 
   const t0 = performance.now();
   [...document.querySelectorAll('.view-tabs > button')]
-    .find(b => b.getAttribute('aria-label') === '放映')?.click();
+    .find(b => b.getAttribute('aria-label') === '相集')?.click();
 
   const mountMs = await waitFor(() => !!document.querySelector('.template-collage'));
   const video = await waitFor(() => document.querySelector('.tpl-block-media video, .tpl-block-media img'));

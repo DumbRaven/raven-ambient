@@ -106,6 +106,8 @@ type Props = {
   /** 视频要用 video 元素而不是 img；由外面持有 ref，好让控制条能暂停/续播。 */
   videoRef: React.RefObject<HTMLVideoElement | null>;
   onPlayState: (playing: boolean) => void;
+  /** 这一件在队列里排第几。相集把 TITLE 那三项撤掉之后暂时没人读了，
+   *  留着是因为信息条那边还会用到「第几件」这类计数。 */
   index: number;
   total: number;
   /** 「正在听」的那张碟。拼贴版右下角画的就是它。 */
@@ -191,7 +193,7 @@ function Raven({ className }: { className: string }) {
   );
 }
 
-export default function TemplateStage({ item, template, videoRef, onPlayState, index, total, disc, focus, ambience, now, hint, stone = 'sea', onStone, onPrevTrack, onNextTrack, onPalette, colors: given, widgets }: Props) {
+export default function TemplateStage({ item, template, videoRef, onPlayState, disc, focus, ambience, now, hint, stone = 'sea', onStone, onPrevTrack, onNextTrack, onPalette, colors: given, widgets }: Props) {
   const preset = findTemplate(template);
   const fromWallpaper = !!item.source;
   const title = useMemo(() => templateTitle(item.name, fromWallpaper), [item.name, fromWallpaper]);
@@ -231,8 +233,6 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
   const tone = useMemo(() => collageTone(colors, hint), [colors, hint]);
   // 把取到的色板交给外层：配色面板要用它画「从这里挑一个」的色块。
   useEffect(() => { onPalette?.(colors); }, [colors, onPalette]);
-
-  const counter = `${String(index + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`;
 
   const discPressing = useMemo(() => recordPressing(disc?.key ?? 'idle', launchSeed), [disc?.key]);
   const discPalette = useMemo(() => vinylPalette(discColors, disc?.color ?? '#9a8b78'), [discColors, disc?.color]);
@@ -315,12 +315,16 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
 
   // 空条目（库还空着时的占位）没有 path，拼出来是 media://local/ 这种无效地址，
   // 直接渲染会是一个破图图标。换成一块纯 CSS 渐变，版式照常成立。
+  //
+  // `key` 必须跟着 item.id 变：换件时整块重挂载，入场动画（`tpl-media-in`）
+  // 才有一次「从头播」的机会。不是每帧都会变的 key，放心用。
   const blank = !item.path;
   const media = blank ? (
     <div className="tpl-blank" aria-hidden="true" />
   ) : item.kind === 'video' ? (
     <video
       key={item.id}
+      className="tpl-media"
       ref={videoRef}
       src={mediaSrc(item)}
       loop
@@ -334,7 +338,7 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
       onPause={() => onPlayState(false)}
     />
   ) : (
-    <img key={item.id} src={mediaSrc(item)} alt={title} />
+    <img key={item.id} className="tpl-media" src={mediaSrc(item)} alt={title} />
   );
 
   return (
@@ -511,14 +515,11 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, i
 
       {preset.id === 'photo' && (
         <>
+          {/* 相集：只有照片。
+              原来这里还有手写体标题、DROPDRAVEN 署名和右下角曲目列——那是照
+              摄影集内页做的版式。用户 m12760 要的是「保持纯净，不要加文字，
+              让用户自己加组件」，所以字全部撤掉，画的挂载点留给 widgets。 */}
           <div className="tpl-photo-media">{media}</div>
-          <p className="tpl-photo-brand">{BRAND}<i>bilibili</i></p>
-          <h2 className="tpl-photo-title">{title}</h2>
-          <ul className="tpl-photo-list" aria-label="放映信息">
-            <li><span>{preset.name}</span><b>{counter}</b></li>
-            <li><span>SOURCE</span><b>{fromWallpaper ? 'WALLPAPER' : 'LOCAL'}</b></li>
-            <li><span>KIND</span><b>{item.kind === 'video' ? 'VIDEO' : 'STILL'}</b></li>
-          </ul>
         </>
       )}
 

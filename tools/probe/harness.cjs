@@ -145,7 +145,7 @@ async function launch(opts = {}) {
   // 切页靠 aria-label，不要靠按钮顺序——底栏按钮会随窗口变。
   await run(`(() => {
     [...document.querySelectorAll('.view-tabs > button')]
-      .find(b => b.getAttribute('aria-label') === '放映')?.click();
+      .find(b => b.getAttribute('aria-label') === '相集')?.click();
     return 1;
   })()`);
   await wait(1600);

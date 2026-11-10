@@ -17,11 +17,13 @@ export type Template = { id: TemplateId; name: string; hint: string };
 
 export const templates: Template[] = [
   { id: 'collage', name: '拼贴', hint: '大圆角画面、色块信息栏、右下圆形裁切——你视频里那套' },
-  { id: 'photo', name: '照片', hint: '整张铺满，手写体标题压在左上，曲目列在右侧' },
+  // 原叫「照片」，因为那版是照着一张摄影集内页做的：手写体标题、曲目列、署名。
+  // 用户 m12760 要的是另一件事——相册就该只有照片，所有字都交给用户自己加。
+  { id: 'photo', name: '相集', hint: '整张铺满，不加任何字，组件自己往上加' },
   // 这一格原先站的是「画框」（画面缩成卡片、四边留底色、底部一行小字）。
   // 用户要的是另一件事：一个全透明的模式，桌面上的场景壁纸从窗口透上来，
   // 自己往上加组件。它不留底、不裁画面——底就是桌面本身。
-  { id: 'desktop', name: '透明', hint: '不留底，桌面壁纸直接透过来，组件自己往上加' },
+  { id: 'desktop', name: '透明', hint: '不铺画面，桌面壁纸就是底，组件自己往上摆' },
 ];
 
 export const templateIds = templates.map(template => template.id);

@@ -230,7 +230,11 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
     // 「界面不加解释」允许的例外）；其余情况什么都不画。
     return editable && skin === 'widgets' ? (
       <div className="desktop-widgets desktop-widgets-empty">
-        <p>用控制条上的「＋」加一个组件</p>
+        {/* 这句曾经写的是「用控制条上的「＋」加一个组件」——那个「＋」早就没了，
+            现在加东西走「图层」那颗按钮（用户 m12760 第 4 条：「透明的界面
+            说明文字改一下，不匹配了」）。空状态的第一步是「界面不加解释」
+            允许的三类文字之一，所以留一句，但必须指着真实存在的东西。 */}
+        <p>点控制条上的「图层」，加一块组件</p>
       </div>
     ) : null;
   }

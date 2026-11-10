@@ -87,7 +87,7 @@ const MEASURE = `(() => {
 // 重载后要重新切页、重新点全屏——这两步都在 launch 内部做过一次，这里再做一遍。
 const ENTER = `(() => {
   [...document.querySelectorAll('.view-tabs > button')]
-    .find(b => b.getAttribute('aria-label') === '放映')?.click();
+    .find(b => b.getAttribute('aria-label') === '相集')?.click();
   return 1;
 })()`;
 

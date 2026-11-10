@@ -23,6 +23,7 @@ import { layersKey, legacyOverlaysKey, legacyWidgetsKey, readLayers, writeLayers
 import { rainKey, rainModes, readRain, writeRain, type RainSetting } from './rain';
 import { readFocus } from './focus-bridge';
 import { templates, type TemplateId } from './templates';
+import TheaterTemplates from './TheaterTemplates';
 import type { MediaItem } from './records';
 
 type Props = {
@@ -538,27 +539,19 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               </button>
             </div>
             <div className="theater-copy">
-              <b title={current.name}>{titleOf(current)}</b>
+              {/* 透明版式不铺画面（见 TemplateStage 里 template-desktop 那段），
+                  所以「这是第几张、是图还是视频」在这里没有意义——说「透明」
+                  两个字，跟左下角控制条上那三颗版式名对得上。 */}
+              <b title={template === 'desktop' ? '透明' : current.name}>{template === 'desktop' ? '透明' : titleOf(current)}</b>
               <small>
-                {usable.findIndex(item => item.id === current.id) + 1} / {usable.length}
-                {screenKind === 'video' ? ' · 视频' : ' · 图片'}
+                {template === 'desktop'
+                  ? '桌面就是底'
+                  : `${usable.findIndex(item => item.id === current.id) + 1} / ${usable.length}${screenKind === 'video' ? ' · 视频' : ' · 图片'}`}
               </small>
             </div>
             {/* 版式切换。三个都做得不一样，所以给文字而不是图标——
-                图标认不出「杂志内页」和「边框」的区别。 */}
-            <div className="theater-templates" role="group" aria-label="版式">
-              {templates.map(preset => (
-                <button
-                  key={preset.id}
-                  aria-pressed={template === preset.id}
-                  className={template === preset.id ? 'on' : ''}
-                  title={preset.hint}
-                  onClick={() => setTemplate(preset.id)}
-                >
-                  {preset.name}
-                </button>
-              ))}
-            </div>
+                图标认不出「相集」和「透明」的区别。滑块与量法见 TheaterTemplates。 */}
+            <TheaterTemplates value={template} onChange={setTemplate} />
 
             {/* 雨层：模式和浓淡。位置固定在右下，和水滴图标同一簇。 */}
             <div className="theater-rain">
@@ -725,8 +718,9 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                 </>
               )}
             </div>
-            {/* 图层：一颗按钮、一份菜单，六项在两个版式里都能用。 */}
-            <TheaterLayers layers={layers} onLayers={setLayers} open={layersMenu} onOpen={setLayersMenu} desktop={desktopMode} />
+            {/* 图层：一颗按钮、一份菜单，六项在两个版式里都能用。
+                只有拼贴改不了大小（用户 m11244），提示跟着这个走。 */}
+            <TheaterLayers layers={layers} onLayers={setLayers} open={layersMenu} onOpen={setLayersMenu} scalabe={template !== 'collage'} />
             {/* 全屏键在透明版式下变成「放到桌面」。
                 透明模式的意义就是把画面贴回桌面上看，这时候窗口全屏没有意义——
                 两个按钮并排反而要用户自己判断该点哪个。 */}
@@ -783,7 +777,10 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
             <RainLayer value={rain} />
             <div className="theater-blank-hint">
               <ImageIcon size={16} strokeWidth={1.2} />
-              <span>先「从本地添加」几张图片或视频</span>
+              {/* 透明版式从头到尾不用媒体：底就是桌面壁纸，画面这块本来
+                  就什么都不该铺。对它说「先添加几张图片」是在指一条
+                  走不通的路——用户 m12760 第 4 条要修的就是这类话。 */}
+              <span>{template === 'desktop' ? '点「图层」，加一块组件' : '先「从本地添加」几张图片或视频'}</span>
             </div>
           </div>
           <div className="theater-bar">
@@ -796,22 +793,12 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               </button>
             </div>
             <div className="theater-copy">
-              <b>空台面</b>
-              <small>先放点东西进来</small>
+              {/* 透明版式没有画面要放，它要的是组件。同一块位置说两句不同的话，
+                  否则切到透明之后这里还在催用户去加图片。 */}
+              <b>{template === 'desktop' ? '空白桌面' : '空台面'}</b>
+              <small>{template === 'desktop' ? '图层里挑一块加上去看看' : '先放点东西进来'}</small>
             </div>
-            <div className="theater-templates" role="group" aria-label="版式">
-              {templates.map(preset => (
-                <button
-                  key={preset.id}
-                  aria-pressed={template === preset.id}
-                  className={template === preset.id ? 'on' : ''}
-                  title={preset.hint}
-                  onClick={() => setTemplate(preset.id)}
-                >
-                  {preset.name}
-                </button>
-              ))}
-            </div>
+            <TheaterTemplates value={template} onChange={setTemplate} />
             {/* 雨层：模式和浓淡。位置固定在右下，和水滴图标同一簇。 */}
             <div className="theater-rain">
               <button
@@ -880,7 +867,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                 </>
               )}
             </div>
-            <TheaterLayers layers={layers} onLayers={setLayers} open={layersMenu} onOpen={setLayersMenu} desktop={desktopMode} />
+            <TheaterLayers layers={layers} onLayers={setLayers} open={layersMenu} onOpen={setLayersMenu} scalabe={template !== 'collage'} />
             {/* 空台面也要有全屏 / 桌面键：上面那张画面已经是同一块舞台，
                 换到空库时忽然没得全屏会很怪。透明版式下这颗仍走桌面放映。 */}
             {desktopMode ? (

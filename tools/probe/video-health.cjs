@@ -50,7 +50,7 @@ guard(async () => {
   const enterTiming = await probe.run(`(async () => {
     const t0 = performance.now();
     [...document.querySelectorAll('.view-tabs > button')]
-      .find(b => b.getAttribute('aria-label') === '放映')?.click();
+      .find(b => b.getAttribute('aria-label') === '相集')?.click();
     const t1 = performance.now();
     // 等放映页真的挂上
     for (let i = 0; i < 400; i++) {

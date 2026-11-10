@@ -66,7 +66,7 @@ guard(async () => {
 
   // 再逐页点一遍，确认每个视图的滑块都跟着按钮走
   const perView = [];
-  for (const label of ['正在听', '专注', '放映', '唱片柜']) {
+  for (const label of ['正在听', '专注', '相集', '唱片柜']) {
     await probe.run(`(() => {
       [...document.querySelectorAll('.view-tabs > button')]
         .find(b => b.getAttribute('aria-label') === ${JSON.stringify(label)})?.click();

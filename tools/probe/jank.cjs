@@ -67,7 +67,7 @@ guard(async () => {
 
     const t0 = performance.now();
     [...document.querySelectorAll('.view-tabs > button')]
-      .find(b => b.getAttribute('aria-label') === '放映')?.click();
+      .find(b => b.getAttribute('aria-label') === '相集')?.click();
     // 等到放映页出现，再多观察 2.5s 让取色/解码跑起来
     for (let i = 0; i < 200; i++) {
       if (document.querySelector('.template-collage')) break;

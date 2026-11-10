@@ -95,7 +95,7 @@ guard(async () => {
   out.collage = await run(READ_LAYERS);
 
   // ---- 2. 照片：该有手柄，拖了要变大
-  await run(PICK_TEMPLATE('照片'));
+  await run(PICK_TEMPLATE('相集'));
   await wait(900);
   out.photo = await run(READ_LAYERS);
   out.scaleBefore = await run(STORED_SCALE);

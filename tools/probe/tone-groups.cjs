@@ -84,7 +84,7 @@ guard(async () => {
   await probe.win.webContents.reload();
   await wait(2200);
   await probe.run(`(() => {
-    [...document.querySelectorAll('.view-tabs > button')].find(b => b.getAttribute('aria-label') === '放映')?.click();
+    [...document.querySelectorAll('.view-tabs > button')].find(b => b.getAttribute('aria-label') === '相集')?.click();
     return 1;
   })()`);
   await wait(1200);

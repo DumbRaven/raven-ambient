@@ -17,11 +17,21 @@ type Props = {
   onLayers: (next: LayerList) => void;
   open: boolean;
   onOpen: (open: boolean) => void;
-  /** 透明版式：菜单里说「加上去 / 放满了」，其余版式说「打开之后」。 */
-  desktop: boolean;
+  /**
+   * 当前这套版式能不能改大小。
+   *
+   * 拼贴改不了（用户 m11244：那套字号写死），所以不能对拼贴说
+   * 「右下角那点改大小」——用户 m12760 第 4 条说的「说明文字不匹配」
+   * 就是这类：话还在，能做的动作已经没了。
+   *
+   * 原来这里传的是 `desktop`，只为把提示分成「加上去之后」和「打开之后」
+   * 两种说法。但那两种说法指向同一个动作（点菜单项才加上去，没有「打开」），
+   * 分开写反而是错的。现在按「能不能改大小」分岔。
+   */
+  scalabe: boolean;
 };
 
-export default function TheaterLayers({ layers, onLayers, open, onOpen, desktop }: Props) {
+export default function TheaterLayers({ layers, onLayers, open, onOpen, scalabe }: Props) {
   return (
     <div className="theater-overlays">
       <button
@@ -59,9 +69,9 @@ export default function TheaterLayers({ layers, onLayers, open, onOpen, desktop 
             <p className="theater-overlay-tip">
               {layers.length >= layerLimit
                 ? '已经放满了。'
-                : desktop
-                  ? '加上去之后，在画面里按住它就能拖。'
-                  : '打开之后，在画面里按住它拖动就能换位置。'}
+                : scalabe
+                  ? '按住它拖换位置，右下角那点改大小。'
+                  : '按住它拖换位置。'}
             </p>
           </div>
         </>

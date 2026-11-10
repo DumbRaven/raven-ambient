@@ -3864,6 +3864,39 @@ body:has(.media-room.is-expanded) {
   object-position: center;
 }
 
+/* ---------- 换件：画面淡入 + 轻微推近 ----------
+   换图/换视频时 React 会按 `key`（item.id）整块重挂载，这条动画自然从头播一次，
+   所以不需要状态类，也不用管「什么时候移除类名」。
+
+   为什么是「淡入 + 从 1.03 推回 1」而不是滑入：画面是一整块裁好的照片，
+   横向滑进来会让人以为是列表在翻页；放大着落定才像「聚焦到这一张」。
+
+   一帧都不能从黑底开始——原来换件时旧图先卸载、新图还在解码，中间会闪一下底色。
+   淡入从 0 起，正好盖住解码那一下。 */
+@keyframes tpl-media-in {
+  from {
+    opacity: 0;
+    scale: 1.03;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+.media-theater .template .tpl-media {
+  animation: tpl-media-in 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  /* 放大那一下会超出块边界，裁掉；父级本来就有 overflow: hidden，
+     但拼贴的画面块圆角是靠父级裁的，这里不裁会在圆角外侧露出一条边。 */
+  will-change: opacity, scale;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-theater .template .tpl-media {
+    animation: none;
+  }
+}
+
 
 /* 三块内容各自钉死在自己的格子里。缝本身不画东西，露出底下的画布色。 */
 .template-collage .tpl-block {
@@ -4081,7 +4114,10 @@ body:has(.media-room.is-expanded) {
   .template-collage .tpl-disc.spinning { rotate: none; }
 }
 
-/* ---------- 照片：整张铺满 ---------- */
+/* ---------- 相集：整张铺满，一个字都没有 ----------
+   原来这里还有手写体标题、署名、右下曲目列，以及为了「白字在任何画面上都读得出来」
+   而压的一层由下往上的暗角。用户 m12760 要的是「保持纯净，不要加文字，让用户自己
+   加组件」，所以三块字全撤，暗角也跟着撤——没有字要托，再压一层就只是在弄脏照片。 */
 
 .template-photo {
   background: #0d0d0d;
@@ -4090,93 +4126,6 @@ body:has(.media-room.is-expanded) {
 .tpl-photo-media {
   position: absolute;
   inset: 0;
-}
-
-/* 压一层由下往上的暗角，保证白字在任何画面上都读得出来。
-   不做全局压暗——那会把照片压脏。 */
-.tpl-photo-media::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, #000000a8 0%, #00000000 42%),
-              linear-gradient(to bottom, #0000006b 0%, #00000000 30%);
-  pointer-events: none;
-}
-
-.tpl-photo-brand {
-  position: absolute;
-  top: 18px;
-  right: 22px;
-  margin: 0;
-  z-index: 2;
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  color: #ffffff;
-  font-family: "Segoe Script", "Bradley Hand", "Ink Free", cursive;
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.tpl-photo-brand i {
-  font-family: "Segoe UI", system-ui, sans-serif;
-  font-style: normal;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-/* 手写体大标题压在左上。原版就是这么摆的——像在照片背面写的字。 */
-.tpl-photo-title {
-  position: absolute;
-  top: 24px;
-  left: 28px;
-  margin: 0;
-  z-index: 2;
-  max-width: 56%;
-  color: #f4f1ea;
-  font-family: "Segoe Script", "Bradley Hand", "Ink Free", cursive;
-  font-size: clamp(20px, 3vw, 42px);
-  font-weight: 700;
-  line-height: 1.12;
-  text-shadow: 0 2px 18px #00000080;
-  text-wrap: balance;
-}
-
-/* 曲目列：原版是右侧一列「歌名 - 歌手」，右对齐，压在半透明上。 */
-.tpl-photo-list {
-  position: absolute;
-  right: 24px;
-  bottom: 22px;
-  z-index: 2;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 4px;
-  text-align: right;
-  color: #ffffff;
-}
-
-.tpl-photo-list li {
-  display: flex;
-  justify-content: flex-end;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 10px;
-  letter-spacing: 0.02em;
-}
-
-.tpl-photo-list span {
-  opacity: 0.6;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.tpl-photo-list b {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- 透明：没有底，桌面壁纸就是底 ---------- */
@@ -4479,23 +4428,9 @@ body:has(.media-room.is-expanded) {
    拼贴版是固定比例排版，窗口小的时候整体等比缩，不改结构；
    压成单列会让右列两轨变成 0px，面板和唱片直接不渲染。 */
 @media (max-width: 760px) {
-  .tpl-photo-title {
-    font-size: clamp(16px, 4.6vw, 28px);
-    max-width: 72%;
-  }
-
   .tpl-block-media {
     grid-column: 1;
     grid-row: 1;
-  }
-
-  .tpl-block-circle,
-  .tpl-ring,
-  
-
-  .tpl-photo-title {
-    font-size: clamp(16px, 4.6vw, 28px);
-    max-width: 72%;
   }
 }
 
@@ -4513,11 +4448,6 @@ body:has(.media-room.is-expanded) {
 .media-room.is-expanded .tpl-fields { gap: 0; }
 .media-room.is-expanded .tpl-block-bar { padding: 4% 14% 4% 3%; }
 .media-room.is-expanded .tpl-block-panel { padding: 34px 30px 38px; }
-.media-room.is-expanded .tpl-photo-title { font-size: clamp(38px, 4.4vw, 76px); left: 56px; top: 46px; }
-.media-room.is-expanded .tpl-photo-brand { font-size: 30px; top: 34px; right: 46px; }
-.media-room.is-expanded .tpl-photo-list { right: 52px; bottom: 44px; gap: 8px; }
-.media-room.is-expanded .tpl-photo-list li { font-size: 17px; }
-.media-room.is-expanded .tpl-photo-list span { font-size: 13px; }
 
 @media (prefers-reduced-motion: reduce) {
   .template * {
@@ -5099,6 +5029,7 @@ body:has(.media-room.is-expanded) {
 
 /* 版式胶囊：内联 flex，别再按 block 排 */
 .media-theater .theater-templates {
+  position: relative;
   display: inline-flex;
   align-items: center;
   flex: none;
@@ -5109,7 +5040,34 @@ body:has(.media-room.is-expanded) {
   background: #ffffff14;
 }
 
+/* 滑过去的那颗白底。位置由 TheaterTemplates 量出来写进变量。
+   为什么不用「选中的那颗自己变白」：三套版式换的是整块画面，底跟着换
+   只是换了个色块；滑过去才能把那一下和刚看到的画面变化连起来。
+   缓动带一点过冲（1.28），和唱片柜的筛选胶囊、导航条是同一套手感。 */
+.media-theater .theater-templates > .template-marker {
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  z-index: 0;
+  width: var(--marker-width, 0px);
+  transform: translateX(var(--marker-x, 0px));
+  border-radius: 999px;
+  background: #ffffff;
+  pointer-events: none;
+  transition:
+    transform 380ms cubic-bezier(0.3, 1.28, 0.48, 1),
+    width 380ms cubic-bezier(0.3, 1.28, 0.48, 1);
+}
+
+/* 第一次量完之前不许有过渡，否则滑块会从最左边飞过来 */
+.media-theater .theater-templates:not([data-ready='true']) > .template-marker {
+  transition: none;
+}
+
 .media-theater .theater-templates > button {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   height: 22px;
@@ -5123,15 +5081,17 @@ body:has(.media-room.is-expanded) {
   letter-spacing: 0;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
+  transition: color 140ms ease;
 }
 
 .media-theater .theater-templates > button:hover {
   color: #ffffff;
 }
 
+/* 底已经由滑块画了，这里只改字色。写 background 会在滑块上再盖一层，
+   两块白叠起来边缘会发灰。 */
 .media-theater .theater-templates > button.on {
-  background: #ffffff;
+  background: transparent;
   color: #101010;
 }
 
@@ -5286,12 +5246,6 @@ body:has(.media-room.is-expanded) {
 /* 窄屏第二处：拼贴压成单列——已删除。
    拼贴版是固定比例排版，窗口小的时候整体等比缩，不改结构；
    压成单列会让右列两轨变成 0px，面板和唱片直接不渲染。 */
-@media (max-width: 760px) {
-  .tpl-photo-title {
-    font-size: clamp(16px, 4.6vw, 28px);
-    max-width: 72%;
-  }
-}
 
 
 .template-collage > .tpl-block {
