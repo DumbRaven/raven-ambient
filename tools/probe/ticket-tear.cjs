@@ -131,7 +131,7 @@ guard(async () => {
 
   // ---- 拖够：烧 → 飞 → 换台
   out.longDrag = await run(DRAG(260));
-  await wait(80);
+  await wait(300);
   out.burning = await run(READ);
   const png = (await win.webContents.capturePage()).toPNG();
   fs.writeFileSync(path.join(__dirname, 'ticket-burning.png'), png);

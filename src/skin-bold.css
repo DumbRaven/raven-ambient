@@ -2917,6 +2917,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 .ticket-lift {
   --pull: 0;
   position: relative;
+  isolation: isolate;
   display: flex;
   /* 列表里的票受外壳 760px 限制只有约 680 宽，浮起来要明显大一圈才叫「放大」。
      1040 是 1920 窗口下不顶到边的上限；窄屏按 92vw 退让。 */
@@ -2924,9 +2925,23 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   aspect-ratio: 1124 / 563;
   padding: 12px;
   border-radius: 12px;
+  background: transparent;
+  animation: ticket-lift-up 320ms cubic-bezier(0.22, 0.72, 0.3, 1) both;
+}
+
+/* 纸铺在 ::before 上而不是自己身上：烧掉时要能淡出，而渐变色过渡不了，
+   opacity 可以。z-index: -1 让它垫在画面与票根下面，所以这里必须有
+   isolation: isolate —— 不然它会跑到 .ticket-lift 自己的 stacking context
+   外面去，连暗幕都可能被一起盖掉。 */
+.ticket-lift::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
   background: var(--paper-sheet);
   box-shadow: 0 0 0 1px #ded5c1, 0 34px 70px #1a140c6b;
-  animation: ticket-lift-up 320ms cubic-bezier(0.22, 0.72, 0.3, 1) both;
+  transition: opacity 520ms ease;
 }
 
 @keyframes ticket-lift-up {
@@ -3060,6 +3075,14 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   animation: ticket-burn 520ms ease forwards;
 }
 
+/* 那层纸本身也要跟着没，否则看到的是「字烧掉了、白纸还在」——
+   像把文字层删掉，不像把票烧掉。
+   纸放在 ::before 上，是因为它得能淡出：渐变色不能过渡，opacity 可以。
+   画面自己有图，不受影响，所以烧完剩下的正是用户要的那半张票。 */
+.ticket-stage:not([data-phase='idle']) .ticket-lift::before {
+  opacity: 0;
+}
+
 @keyframes ticket-burn {
   0% { filter: none; }
   40% { filter: brightness(0.62) saturate(0.6); }
@@ -3074,9 +3097,10 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   transition: transform 520ms cubic-bezier(0.3, 0.72, 0.28, 1);
 }
 
+/* 飞的时候纸已经烧完了（::before 的 opacity 归零），这里不再写 background /
+   box-shadow —— 那会盖回一层纸，把「只剩画面在飞」变成「整张票在飞」。 */
 .ticket-stage[data-phase='flying'] .ticket-lift {
   background: transparent;
-  box-shadow: none;
 }
 
 .ticket-stage[data-phase='flying'] .ticket-lift-panel,
