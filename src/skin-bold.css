@@ -749,6 +749,15 @@ input[type="range"]::-webkit-slider-thumb {
 
 /* ---------- 分页 ---------- */
 .shelf-pager { gap: 8px; margin: 20px 0 4px; }
+/* 票根的翻页条。按钮样式直接复用下面这套圆钮，这里只补排布——
+   styles.css 里 `.shelf-pager` 才带 display:flex，票根这层得自己给。 */
+.ticket-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 20px 0 4px;
+}
 .pager-arrow {
   width: 34px;
   height: 34px;
@@ -2711,63 +2720,216 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   color: #101010;
 }
 
-/* 格子。图片和视频混排，视频给一块黑底免得缩略图没出时是白板。 */
-.media-grid {
+/* 相集：票根。照 docs 里那六张参考图做的，一页八张，翻页在 MediaTickets。
+   纸是米白、左边画面四周一圈半圆齿孔、右边一条窄票根。
+
+   列数交给内容自己算：外壳只有 760 宽，写死四列的话每张票不到 160px，
+   票根里那行日期就挤成一列字（截图上真的挤成了那样）。minmax(260px)
+   让它在窄栏里落成两列，票根才读得出内容。一页八张这个数不变——
+   四列两行、两列四行，翻页的手感一样。
+
+   撕存根那一下分成两片画（.ticket-stub / .ticket-body），不靠父级背景兜底：
+   父级一旦有纸色，存根飘走之后原地还会留一张纸，看着像没撕过。 */
+.ticket-grid {
+  --ticket-min: 260px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--ticket-min)), 1fr));
+  gap: 18px 14px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.media-card {
+.ticket {
+  --paper: #efeada;
+  --paper-deep: #e4dbc7;
+  --ticket-ink: #2a2622;
+  --ticket-faint: #9c937e;
+  --paper-sheet: linear-gradient(158deg, #f5f0e3, var(--paper) 46%, var(--paper-deep));
   display: block;
   width: 100%;
   padding: 0;
   border: 0;
-  border-radius: 16px;
   background: transparent;
   text-align: left;
   cursor: pointer;
+  transition: transform 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
-.media-thumb {
-  position: relative;
+/* 存根与票面各自带纸色和投影：撕走存根时投影跟着它一起走，票面顶上露出干净的一条边。 */
+.ticket-stub,
+.ticket-body {
   display: block;
-  aspect-ratio: 4 / 3;
+  background: var(--paper-sheet);
+  box-shadow: 0 0 0 1px #ded5c1, 0 6px 14px #6b5f4524;
+  transition: box-shadow 220ms;
+}
+
+.ticket-stub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 9px 9px 0 0;
+  border-bottom: 1px dashed #cbbfa5;
+  font: 6px/1 "Consolas", "Microsoft YaHei UI", monospace;
+  letter-spacing: 0.14em;
+  color: #a79d84;
+  white-space: nowrap;
+}
+
+.ticket-body {
+  display: flex;
+  aspect-ratio: 5 / 4;
+  border-radius: 0 0 9px 9px;
+}
+
+/* 画面。四边半圆齿孔靠四层径向遮罩交出来——不能画圆点盖上去：
+   底色一变（页面白 ↔ 米白）那些点就露馅了。
+
+   右边留 7px 纸边：参考图上画面与撕线之间是有一段纸的，贴在一起看着像
+   画面被虚线框住，而不是「贴在票上的一张小照」。 */
+.ticket-shot {
+  position: relative;
+  flex: 0 0 60%;
+  min-width: 0;
+  margin: 6px 7px 6px 6px;
   overflow: hidden;
-  border-radius: 16px;
-  background: #f0efea;
-  box-shadow: 0 0 0 1px #00000008, 0 2px 10px #0000000a;
-  transition: transform 200ms cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 200ms;
+  border-radius: 2px;
+  background: #ddd6c4;
+  mask-image:
+    radial-gradient(circle 2.4px at 50% 0, #0000 2.4px, #000 2.7px),
+    radial-gradient(circle 2.4px at 50% 100%, #0000 2.4px, #000 2.7px),
+    radial-gradient(circle 2.4px at 0 50%, #0000 2.4px, #000 2.7px),
+    radial-gradient(circle 2.4px at 100% 50%, #0000 2.4px, #000 2.7px);
+  mask-size: 9px 100%, 9px 100%, 100% 9px, 100% 9px;
+  mask-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+  mask-composite: intersect;
 }
 
-.media-card[data-kind='video'] .media-thumb {
-  background: #101010;
-}
-
-.media-thumb img,
-.media-thumb video {
+.ticket-shot img,
+.ticket-shot video {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
 }
 
-/* 视频缩略图停在第一帧，不给控件也不响应指针——它只是个封面 */
-.media-thumb video {
+/* 视频封面停在第一帧，不给控件也不响应指针——它只是票面上的一小块。 */
+.ticket-shot video {
   pointer-events: none;
 }
 
+.ticket-panel {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 7px 6px 8px;
+  border-left: 1px dashed #cbbfa5;
+}
+
+.ticket-mark {
+  font: 600 6px/1.2 "Inter", "Microsoft YaHei UI", sans-serif;
+  letter-spacing: 0.14em;
+  color: var(--ticket-faint);
+  white-space: nowrap;
+}
+
+/* 片名照参考图用衬线大写。两三个词的名字占两三行，夹到三行为止。 */
+.ticket-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  font-family: Georgia, "Times New Roman", "Songti SC", serif;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.16;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+  color: var(--ticket-ink);
+}
+
+.ticket-rule {
+  display: block;
+  margin: 1px 0 2px;
+  border-top: 1px solid #cfc4ac;
+}
+
+.ticket-fields {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  font: 6.5px/1.3 "Consolas", "Microsoft YaHei UI", monospace;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: #8d8472;
+}
+
+.ticket-no {
+  font: 6.5px/1.2 "Consolas", monospace;
+  letter-spacing: 0.1em;
+  color: #a8443a;
+}
+
+/* 条码：宽度由 ticketBars 算好，这里只负责让它贴着票根底边。 */
+.ticket-bars {
+  display: flex;
+  align-items: stretch;
+  gap: 0.6px;
+  height: 12px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.ticket-bars i {
+  flex-grow: 1;
+  flex-basis: 0;
+  min-width: 0.5px;
+  background: #3d372c;
+}
+
 @media (hover: hover) and (pointer: fine) {
-  .media-card:hover .media-thumb {
+  .ticket:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 26px #00000014, 0 0 0 1px #00000010;
   }
 
-  .media-card:hover .media-zoom {
+  .ticket:hover .ticket-stub,
+  .ticket:hover .ticket-body {
+    box-shadow: 0 0 0 1px #ded5c1, 0 12px 24px #6b5f4533;
+  }
+}
+
+/* 播放台上那一张：票面压一圈黑，别靠 hover 才知道放的是谁。 */
+.ticket.is-current .ticket-body {
+  box-shadow: 0 0 0 1.5px #101010, 0 6px 14px #6b5f4533;
+}
+
+/* 撕存根。时长与 MediaTickets 的 TEAR_MS 一致，改一处要改两处。 */
+.is-tearing .ticket-stub {
+  animation: ticket-tear 300ms cubic-bezier(0.3, 0.8, 0.4, 1) forwards;
+}
+
+@keyframes ticket-tear {
+  0% {
+    transform: none;
     opacity: 1;
+  }
+
+  40% {
+    transform: translate(5px, -2px) rotate(-2.5deg);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(34px, -22px) rotate(13deg);
+    opacity: 0;
   }
 }
 
@@ -2783,44 +2945,6 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   font-weight: 700;
   letter-spacing: 0.5px;
   color: #101010;
-}
-
-.media-zoom {
-  position: absolute;
-  right: 9px;
-  top: 9px;
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: #ffffffd9;
-  color: #101010;
-  opacity: 0;
-  transition: opacity 160ms ease;
-}
-
-.media-caption {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 9px 2px 0;
-}
-
-.media-caption b {
-  font-size: 12px;
-  font-weight: 600;
-  color: #101010;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.media-caption small {
-  flex: none;
-  font-size: 10px;
-  color: var(--bold-faint);
 }
 
 /* 空态。和唱片柜的空态保持同一套呼吸：一个淡底方块，一句说明，一个黑胶囊。 */
@@ -2942,12 +3066,6 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   }
 }
 
-@media (max-width: 800px) {
-  .media-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 599px) {
   .media-sources {
     align-items: flex-start;
@@ -2960,8 +3078,9 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 }
 
 @media (max-width: 440px) {
-  .media-grid {
-    grid-template-columns: minmax(0, 1fr);
+  /* 极窄时两列会窄到票根里那行日期换行，退回一列。 */
+  .ticket-grid {
+    --ticket-min: 100%;
   }
 
   .media-empty {
@@ -2970,9 +3089,16 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .media-thumb,
-  .media-zoom {
+  .ticket,
+  .ticket-stub,
+  .ticket-body {
     transition: none;
+  }
+
+  /* 关了动效就别再飘那一下，存根直接消失——MediaTickets 那边
+     连 300ms 都不等，这里只防它原地闪一帧。 */
+  .is-tearing .ticket-stub {
+    animation-duration: 1ms;
   }
 
   .media-stage,
@@ -3016,11 +3142,6 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 .media-dir.is-wallpaper .icon-button:hover {
   background: #ffffff1f;
   color: #fff;
-}
-
-/* 只有预览图的场景壁纸：缩略图压暗一点，标题栏那格写「仅预览」。 */
-.media-card[data-kind="image"] .media-caption small {
-  white-space: nowrap;
 }
 
 @media (max-width: 599px) {
@@ -3232,15 +3353,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   color: #fff !important;
 }
 
-/* 当前在播放台上的那一格：外框压深，别靠 hover 才知道选的是谁 */
-.media-card.is-current .media-thumb {
-  box-shadow: 0 0 0 2px #101010, 0 6px 18px #0000001f;
-}
-
-.media-card.is-current .media-caption b {
-  color: #101010;
-}
-
+/* 当前在播放台上的那一张票的记号写在票根那一段（.ticket.is-current） */
 .media-badge-note {
   left: auto;
   right: 9px;
@@ -3262,12 +3375,6 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
     order: 3;
     width: 100%;
     flex-basis: 100%;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .media-card.is-current .media-thumb {
-    transition: none;
   }
 }
 
@@ -3358,7 +3465,8 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 /* 全屏时藏掉除了播放台以外的一切 */
 .media-room.is-expanded .collection-toolbar,
 .media-room.is-expanded .media-sources,
-.media-room.is-expanded .media-grid,
+.media-room.is-expanded .ticket-grid,
+.media-room.is-expanded .ticket-pager,
 .media-room.is-expanded .no-results,
 .media-room.is-expanded .media-empty {
   display: none;

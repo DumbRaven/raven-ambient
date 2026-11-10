@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Droplets, FilePlus2, FolderOpen, ImageIcon, Maximize2, Minimize2, MonitorPlay, Pause, Play, RefreshCw, Sparkles, X, Palette
 } from 'lucide-react';
-import { mediaSrc, setDesktopStage, setWindowFullscreen } from './media';
+import { setDesktopStage, setWindowFullscreen } from './media';
 import { afterResize as afterResizeWait, canToggle } from './fullscreen-timing';
 import { listenStageClosed, listenStageCommand, publishStage, type StageSnapshot } from './desktop-bridge';
 import TemplateStage, { type StageAmbience, type StageDisc, type StageFocus, type StageNow } from './TemplateStage';
@@ -18,6 +18,8 @@ import { defaultTone, normaliseHex, readTone, toneGroups, toneHint, toneKey, wri
 import { nextStoneStyle } from './marble.ts';
 import LayerStack from './LayerStack';
 import RainLayer from './RainLayer';
+import MediaTickets from './MediaTickets';
+import { titleOf } from './media-text';
 import TheaterLayers from './TheaterLayers';
 import { layersKey, legacyOverlaysKey, legacyWidgetsKey, readLayers, writeLayers, type LayerList } from './layers';
 import { rainKey, rainModes, readRain, writeRain, type RainSetting } from './rain';
@@ -68,47 +70,6 @@ const ADD_CHOICES = [
   { key: 'folder' as const, label: '选一个文件夹', hint: '把这个文件夹里的图片和视频都收进来', icon: FolderOpen },
   { key: 'file' as const, label: '选几张文件', hint: '只收点中的这几件，不动别处', icon: FilePlus2 },
 ];
-
-/** 文件名去掉扩展名，当标题用。壁纸库的条目标题本来就没有扩展名。 */
-function stem(name: string) {
-  const dot = name.lastIndexOf('.');
-  return dot > 0 ? name.slice(0, dot) : name;
-}
-
-/** 摆出来给人看的标题：普通文件去扩展名，壁纸条目用作品名。 */
-function titleOf(item: MediaItem) {
-  return item.source ? item.name : stem(item.name);
-}
-
-function sizeOf(bytes: number) {
-  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
-  if (bytes >= 1024 * 1024) return `${Math.round(bytes / 1024 / 1024)} MB`;
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
-
-/**
- * 视频封面：读元数据之后往后跳一点再画。
- *
- * 只写 preload="metadata" 的话 Chromium 只拿到时长和尺寸，不解第一帧，
- * 格子里就是一块黑。显式 seek 到 0.1 秒才会真的解码出一张画面。
- * 太短的片子退到中点，免得 0.1 秒已经越过末尾。
- */
-function VideoThumb({ src, alt }: { src: string; alt: string }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  useEffect(() => {
-    const video = ref.current;
-    if (!video) return;
-    const seek = () => {
-      const span = Number.isFinite(video.duration) ? video.duration : 0;
-      const at = span > 0.3 ? 0.1 : span / 2;
-      try { video.currentTime = Math.max(0, at); } catch { /* 还没到可以 seek 的状态，等下一次事件 */ }
-    };
-    if (video.readyState >= 1) seek();
-    else video.addEventListener('loadedmetadata', seek, { once: true });
-    return () => video.removeEventListener('loadedmetadata', seek);
-  }, [src]);
-  return <video ref={ref} src={src} aria-label={alt} preload="metadata" muted playsInline />;
-}
 
 export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, onRescan, onForgetDir, onScanWallpapers, onForgetWallpapers, disc, ambience, now, onPrevTrack, onNextTrack }: Props) {
   // 只有图片和视频两档，不再有「全部」。
@@ -205,6 +166,9 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   // 每个封面都要解一张帧；同时挂上会卡住渲染进程（实测 178 件直接把窗口拖到无响应）。
   // 所以只给滚到眼前的那批挂真实元素，其余先留空。
   const [seen, setSeen] = useState<Set<string>>(() => new Set());
+  // 票根翻到第几页。**放在 MediaRoom 而不是 MediaTickets 里**：
+  // 视口观察器的 effect 要用它当依赖重挂，翻页之后新一页的封面才会加载。
+  const [page, setPage] = useState(0);
 
   // 带 note 的是场景壁纸（它的 preview 图）。放映只放图片和视频，
   // 这类条目即使还留在旧收藏里也不再摆出来。
@@ -241,7 +205,10 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   }, [playing, current?.id]);
 
   // 用 IntersectionObserver 记下「露过面」的 id，露过一次就不再收回去——
-  // 往回滚的时候不该重新白屏一次。
+  // 翻回上一页的时候不该重新白屏一次。
+  //
+  // 票根一页只挂八张，翻页会把 DOM 换掉一批，所以 page 必须进依赖：
+  // 不重挂的话新一页的 li 没人观察，封面会一直是空的。
   useEffect(() => {
     const host = grid.current;
     if (!host || !active) return;
@@ -255,7 +222,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
     }, { rootMargin: '280px 0px' });
     for (const node of host.querySelectorAll('[data-id]')) observer.observe(node);
     return () => observer.disconnect();
-  }, [shown, active]);
+  }, [shown, active, page]);
 
   // 空格：播放台上是视频时切换播放。正在听和专注页也用空格，所以只在这一页接管。
   useEffect(() => {
@@ -939,36 +906,16 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
           </div>
 
           {shown.length ? (
-            <ul className="media-grid" ref={grid}>
-              {shown.map(item => {
-                const ready = active && seen.has(item.id);
-                const picked = current?.id === item.id;
-                return (
-                  <li key={item.id} data-id={item.id}>
-                    <button
-                      className={`media-card ${picked ? 'is-current' : ''}`}
-                      data-kind={item.kind}
-                      onClick={() => { setCurrentId(item.id); setPlaying(true); }}
-                      aria-pressed={picked}
-                      aria-label={`放映 ${titleOf(item)}`}
-                    >
-                      <span className="media-thumb">
-                        {!ready ? null : item.kind === 'image' ? (
-                          <img src={mediaSrc(item)} alt="" loading="lazy" decoding="async" />
-                        ) : (
-                          <VideoThumb src={mediaSrc(item)} alt="" />
-                        )}
-                        {item.kind === 'video' && <i className="media-badge">视频</i>}
-                      </span>
-                      <span className="media-caption">
-                        <b title={item.name}>{titleOf(item)}</b>
-                        <small>{sizeOf(item.size)}</small>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <MediaTickets
+              items={shown}
+              active={active}
+              seen={seen}
+              currentId={current?.id ?? ''}
+              listRef={grid}
+              page={page}
+              onPage={setPage}
+              onPick={id => { setCurrentId(id); setPlaying(true); }}
+            />
           ) : (
             <div className="no-results">
               <ImageIcon size={28} />
