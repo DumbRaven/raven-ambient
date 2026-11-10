@@ -1,7 +1,7 @@
 /**
  * 造一批纯色图当媒体库素材。
  *
- * 为什么要有：`harness.cjs` 的 CABINET 只放一件媒体，「一页八张」的分页
+ * 为什么要有：`harness.cjs` 的 CABINET 只放一件媒体，「一页六张」的分页
  * 永远出现不了——不补素材，票根网格的探针量到的东西全是常量。
  * 颜色按色相绕一圈，票面上一眼能分出是不同的一件；名字按字母序，
  * 翻页前后对得上 id 与标题。
@@ -19,7 +19,12 @@ const NAMES = [
   'QUIET FJORD', 'PALE EMBER', 'SLOW TIDE', 'NORTH WINDOW',
   'LOW HORIZON', 'STILL WATER', 'GLASS FERN', 'AMBER ROOM',
   'SILENT PIER', 'WINTER FIELD', 'BLUE HOLLOW', 'DUST LANE',
-  'OPEN SEA', 'LAST LIGHT',
+  'OPEN SEA', 'LAST LIGHT', 'COLD GLASS', 'WARM STONE',
+  'SPENT ASH', 'DRIFTING ICE', 'SOFT NOISE', 'HIGH WIND',
+  'LONG NIGHT', 'FIRST FROST', 'FAR SHORE', 'DEEP STILL',
+  'PALE FIELD', 'QUIET HARBOR', 'WET ASPHALT', 'EARLY TRAIN',
+  'BARE BRANCH', 'LATE TRAFFIC', 'HOT WINDOW', 'EMPTY HALL',
+  'SUNKEN ROAD', 'PAPER SKY', 'STEEL RAIN', 'FADED SIGN',
 ];
 
 /** 色相 → #rrggbb。饱和度与亮度写死成「偏暗但彼此分得开」的一档。 */

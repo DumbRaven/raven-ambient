@@ -31,7 +31,12 @@ const READ = `(() => {
   const cards = grid ? [...grid.querySelectorAll('.ticket')] : [];
   const lift = document.querySelector('.ticket-lift');
   const liftRect = lift?.getBoundingClientRect();
-  const shotRect = document.querySelector('.ticket-lift-shot')?.getBoundingClientRect();
+  const shot = document.querySelector('.ticket-lift-shot');
+  const shotRect = shot?.getBoundingClientRect();
+  const inner = document.querySelector('.ticket-lift-shot .ticket-shot');
+  const innerRect = inner?.getBoundingClientRect();
+  const firstShot = cards.length ? cards[0].querySelector('.ticket-shot') : null;
+  const firstShotRect = firstShot?.getBoundingClientRect();
   return {
     columns: grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').length : 0,
     count: cards.length,
@@ -40,14 +45,30 @@ const READ = `(() => {
     ticketAspect: cards.length
       ? +(cards[0].getBoundingClientRect().width / cards[0].getBoundingClientRect().height).toFixed(3)
       : 0,
+    // 用户 m14515 第 1 条要求画面按 16:9 完整显示：这个数应接近 1.778。
+    shotAspect: firstShotRect
+      ? +(firstShotRect.width / firstShotRect.height).toFixed(3)
+      : null,
     stage: stage ? stage.dataset.phase : null,
     pull: lift ? getComputedStyle(lift).getPropertyValue('--pull').trim() : null,
     ash: document.querySelectorAll('.ticket-ash i').length,
     lift: liftRect ? { w: Math.round(liftRect.width), h: Math.round(liftRect.height) } : null,
+    liftAspect: liftRect ? +(liftRect.width / liftRect.height).toFixed(3) : null,
+    liftShotAspect: innerRect ? +(innerRect.width / innerRect.height).toFixed(3) : null,
     shotShare: liftRect && shotRect ? +(shotRect.width / liftRect.width).toFixed(3) : null,
+    // 飞行位移：真机里这两个变量必须存在，否则画面不会动。
+    fly: lift ? {
+      x: getComputedStyle(lift).getPropertyValue('--fly-x').trim(),
+      y: getComputedStyle(lift).getPropertyValue('--fly-y').trim(),
+      scale: getComputedStyle(lift).getPropertyValue('--fly-scale').trim(),
+    } : null,
     current: document.querySelector('.ticket.is-current')?.closest('li')?.dataset.id || null,
     barTitle: document.querySelector('.theater-copy b')?.textContent || null,
-    pages: document.querySelectorAll('.ticket-pager .pager-numbers button').length,
+    // 页脚页码：用户 m14515 第 4 条要求最多摆几颗、左右切换，不能全列出来。
+    pagerCount: document.querySelectorAll('.ticket-pager .pager-numbers button').length,
+    pagerTotal: document.querySelectorAll('.ticket-pager').length
+      ? Number(document.querySelector('.ticket-pager .pager-numbers').dataset.pages || 0)
+      : 0,
   };
 })()`;
 
@@ -103,7 +124,9 @@ const DRAG_ON_SHOT = (dy) => `(async () => {
 })()`;
 
 guard(async () => {
-  const media = seedImages(18);
+  // 四十张 = 七页。用户 m14515 第 4 条要的「页码不要全列出来」只有在页数
+  // 多过五页时才看得出来——十八张只有三页，五颗窗口和全列长得一模一样。
+  const media = seedImages(40);
   // expand:false —— 全屏时网格 display:none，量到全是 0（上一版踩过）。
   const probe = await launch({
     width: 1920, height: 1080, template: 'photo', expand: false, settle: 2600,

@@ -6,9 +6,18 @@
 // 用户 m14144 定的交互：「点击，票根浮起放大，用户手撕划线部分，
 // 右侧文字部分化为灰烬消失，左侧电影票飘进放映区域」。
 
-/** 票根沿用参考图（ref-1.jpg）的比例：整张 1124×563，画面 69.2%、票根 30.6%。 */
-export const TICKET_ASPECT = 1124 / 563;
+/** 画面占整张票的宽度比例（参考图量出来的 69.2%）。 */
 export const SHOT_SHARE = 0.692;
+
+/**
+ * 票根的比例。
+ *
+ * 用户 m14515：「要不要把票根做的再细长一些……或者至少应该按 16：9 把画面展示全了」。
+ * 画面改按 16:9 完整显示之后，票的高宽各自由它撑开（CSS 里 `.ticket-shot`
+ * 有 `aspect-ratio: 16 / 9`），整张票约 2.57:1，比参考图那张 2.0 更细长。
+ * 这两个数只是给测试与文档一个参照，布局不读它们——否则改画面比例要同步改三处。
+ */
+export const TICKET_ASPECT = 16 / 9 / SHOT_SHARE;
 
 /**
  * 拖多远算撕开。
@@ -83,15 +92,67 @@ export function ashParticles(seed: string, count = 28): AshFlake[] {
   return flakes;
 }
 
-/** 把一块矩形从起点搬到终点要的 transform。用来把画面「飘」进放映台。 */
+/**
+ * 把一块矩形从起点搬到终点要的 transform。用来把画面「飘」进放映台。
+ *
+ * **用左上角差，不是中心点差**。CSS 那边是 `transform-origin: 0 0` +
+ * `translate(...) scale(...)`，缩放绕左上角做，所以左上角只受 translate 影响：
+ * `落点左上 = 起点左上 + (dx, dy)`。第一版写的中心点差，缩放一乘就把
+ * 偏移放大了——实测拼贴的落点偏左 137px（用户 m14515 第 2 条报的「位置是错的」）。
+ */
 export function flightOf(
   from: { x: number; y: number; w: number; h: number },
   to: { x: number; y: number; w: number; h: number },
 ): { dx: number; dy: number; scale: number } {
   const scale = from.w > 0 ? to.w / from.w : 1;
   return {
-    dx: (to.x + to.w / 2) - (from.x + from.w / 2),
-    dy: (to.y + to.h / 2) - (from.y + from.h / 2),
+    dx: to.x - from.x,
+    dy: to.y - from.y,
     scale,
   };
+}
+
+export type FlightRect = { x: number; y: number; w: number; h: number };
+
+/**
+ * 每种版式里，「画面」落在哪个块上。
+ *
+ * 用户 m14515 报的 bug 就是这里没有分模式：原来三种版式一律飞向
+ * `.theater-screen`（那块黑底），但拼贴的画面其实只占它左上 63%×65%，
+ * 于是非全屏时画面会飞偏、还飞大了。相集是整块铺满，透明版式压根没有画面——
+ * 那时退回 `.theater-screen` 当落点是唯一说得通的。
+ *
+ * 顺序有意义：先匹配到的就是落点。
+ */
+export const FLIGHT_SELECTORS: Readonly<Record<string, readonly string[]>> = {
+  collage: ['.tpl-block-media'],
+  photo: ['.tpl-photo-media'],
+  desktop: ['.theater-screen'],
+};
+
+/** 不知道版式时按相集处理：整个屏幕也是合理的落点。 */
+export function flightSelectors(template: string): readonly string[] {
+  return FLIGHT_SELECTORS[template] ?? ['.theater-screen'];
+}
+
+/** 两块矩形有交集时取交集，没有交集就退回外框——飞到一个不存在的缝里没有意义。 */
+export function clipRect(rect: FlightRect, bounds: FlightRect): FlightRect {
+  const x = Math.max(rect.x, bounds.x);
+  const y = Math.max(rect.y, bounds.y);
+  const right = Math.min(rect.x + rect.w, bounds.x + bounds.w);
+  const bottom = Math.min(rect.y + rect.h, bounds.y + bounds.h);
+  if (right <= x || bottom <= y) return bounds;
+  return { x, y, w: right - x, h: bottom - y };
+}
+
+/** 从一串候选里挑第一个真正有面积的，并夹进屏幕边界。都没有就退回屏幕本身。 */
+export function pickFlightRect(
+  candidates: readonly (FlightRect | null | undefined)[],
+  bounds: FlightRect,
+): FlightRect {
+  for (const rect of candidates) {
+    if (!rect || rect.w <= 0 || rect.h <= 0) continue;
+    return clipRect(rect, bounds);
+  }
+  return bounds;
 }

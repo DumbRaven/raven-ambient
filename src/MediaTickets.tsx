@@ -15,10 +15,10 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { mediaSrc } from './media';
 import { titleOf } from './media-text';
 import {
-  pageOf, slipPage, ticketBars, ticketNo, ticketSeat, ticketShowtime,
+  pageOf, pagerWindow, slipPage, ticketBars, ticketNo, ticketSeat, ticketShowtime,
 } from './ticket.ts';
 import {
-  ashParticles, flightOf, shouldTear, tearProgress,
+  ashParticles, flightOf, flightSelectors, pickFlightRect, shouldTear, tearProgress,
 } from './ticket-tear.ts';
 import type { MediaItem } from './records';
 
@@ -137,10 +137,12 @@ type Phase = 'idle' | 'burning' | 'flying';
  * 用布尔表达这三种互斥关系会写出八个组合，其中有几个不可能出现。
  */
 function TicketStage({
-  item, index, onClose, onDone,
+  item, index, template, onClose, onDone,
 }: {
   item: MediaItem;
   index: number;
+  /** 当前版式。落点按它选：拼贴的画面只占屏幕左上角一块，和相集不是同一个矩形。 */
+  template: string;
   onClose: () => void;
   onDone: (id: string) => void;
 }) {
@@ -162,13 +164,21 @@ function TicketStage({
   function burn() {
     setPhase('burning');
     timers.current.push(window.setTimeout(() => {
-      // 画面飞向放映台：从浮层里这一块的矩形，飞到放映台幕布的位置。
+      // 画面飞向放映台。落点按版式分别取：拼贴的画面块只占屏幕左上 63%×65%，
+      // 拿 `.theater-screen` 的话会飞偏、还飞大一圈（用户 m14515 报的就是这个）。
       const from = shotRef.current?.getBoundingClientRect();
-      const to = document.querySelector('.theater-screen')?.getBoundingClientRect();
-      if (from && to) {
+      const screen = document.querySelector('.theater-screen')?.getBoundingClientRect();
+      if (from && screen) {
+        const bounds = { x: screen.x, y: screen.y, w: screen.width, h: screen.height };
+        const candidates = flightSelectors(template)
+          .map(selector => document.querySelector(selector)?.getBoundingClientRect());
+        const to = pickFlightRect(
+          candidates.map(rect => (rect ? { x: rect.x, y: rect.y, w: rect.width, h: rect.height } : null)),
+          bounds,
+        );
         setFlying(flightOf(
           { x: from.x, y: from.y, w: from.width, h: from.height },
-          { x: to.x, y: to.y, w: to.width, h: to.height },
+          to,
         ));
       }
       setPhase('flying');
@@ -268,6 +278,8 @@ type Props = {
   currentId: string;
   /** 网格宿主，MediaRoom 在上面挂 IntersectionObserver。 */
   listRef: React.RefObject<HTMLUListElement | null>;
+  /** 当前版式。撕完飞向哪儿由它决定（拼贴与相集的画面块不是同一个矩形）。 */
+  template: string;
   /**
    * 翻到第几页了。
    *
@@ -279,7 +291,7 @@ type Props = {
   onPick: (id: string) => void;
 };
 
-export default function MediaTickets({ items, active, seen, currentId, listRef, page, onPage, onPick }: Props) {
+export default function MediaTickets({ items, active, seen, currentId, listRef, template, page, onPage, onPick }: Props) {
   const [openId, setOpenId] = useState('');
   const pageInfo = pageOf(items.length, page);
   const slips = slipPage(items, pageInfo.index);
@@ -323,8 +335,8 @@ export default function MediaTickets({ items, active, seen, currentId, listRef, 
           >
             <ChevronLeft size={13} />
           </button>
-          <div className="pager-numbers">
-            {Array.from({ length: pageInfo.pages }, (_, index) => (
+          <div className="pager-numbers" data-pages={pageInfo.pages}>
+            {pagerWindow(pageInfo.index, items.length).map(index => (
               <button
                 key={index}
                 className={index === pageInfo.index ? 'active' : ''}
@@ -351,6 +363,7 @@ export default function MediaTickets({ items, active, seen, currentId, listRef, 
           key={opened.id}
           item={opened}
           index={openedIndex}
+          template={template}
           onClose={() => setOpenId('')}
           onDone={id => { setOpenId(''); onPick(id); }}
         />

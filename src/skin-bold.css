@@ -2756,7 +2756,6 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   width: 100%;
   padding: 7px;
   border: 0;
-  aspect-ratio: 1124 / 563;
   border-radius: 10px;
   background: var(--paper-sheet);
   box-shadow: 0 0 0 1px #ded5c1, 0 6px 14px #6b5f4524;
@@ -2766,13 +2765,17 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 }
 
 /* 画面。四边半圆齿孔靠四层径向遮罩交出来——不能画圆点盖上去：
-   底色一变（页面白 ↔ 米白）那些点就露馅了。 */
+   底色一变（页面白 ↔ 米白）那些点就露馅了。
+
+   `aspect-ratio: 16 / 9` 在这里而不是爹身上：用户 m14515 要「按 16:9 把画面展示全了」，
+   画面的形状是定的，票根就跟着长——整张票因此变成约 2.57:1，比参考图那张 2:1 更细长。
+   反过来给 `.ticket` 定比例的话，画面会被裁掉一块。 */
 .ticket-shot {
   position: relative;
   display: block;
   flex: 0 0 69.2%;
   min-width: 0;
-  height: 100%;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: 3px;
   background: #ddd6c4;
@@ -2786,12 +2789,14 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   mask-composite: intersect;
 }
 
+/* contain 而不是 cover：裁掉的画面就不叫「展示全了」。留出来的空由底色补，
+   所以底色取纸色里最暗的一档，和票面接得上，不会看出一个黑框。 */
 .ticket-shot img,
 .ticket-shot video {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 /* 视频封面停在第一帧，不给控件也不响应指针——它只是票面上的一小块。 */
@@ -2920,9 +2925,9 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   isolation: isolate;
   display: flex;
   /* 列表里的票受外壳 760px 限制只有约 680 宽，浮起来要明显大一圈才叫「放大」。
-     1040 是 1920 窗口下不顶到边的上限；窄屏按 92vw 退让。 */
+     1040 是 1920 窗口下不顶到边的上限；窄屏按 92vw 退让。
+     高度不写死：由里面那块 16:9 的画面撑出来，跟列表里那张同一个形状。 */
   width: min(1040px, 92vw);
-  aspect-ratio: 1124 / 563;
   padding: 12px;
   border-radius: 12px;
   background: transparent;
@@ -2959,11 +2964,13 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   background: #ddd6c4;
 }
 
+/* 浮层里那张也要 16:9，否则撕开前后形状不一样、飞出去那一刻会跳一下。
+   宽度撑满就行，高度由这一层自己的 aspect-ratio 定，票根再跟着它长。 */
 .ticket-lift-shot .ticket-shot {
   display: block;
   flex: none;
   width: 100%;
-  height: 100%;
+  height: auto;
   margin: 0;
   border-radius: 4px;
 }
@@ -3687,6 +3694,8 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   flex: 1;
   min-height: 0;
   aspect-ratio: auto;
+  /* 全屏时这块就是屏幕本身，四角必须是直角，不然桌面四角会漏出别的窗口。 */
+  border-radius: 0;
   background: #000000;
 }
 
@@ -3824,6 +3833,10 @@ body:has(.media-room.is-expanded) {
    这样换帧的瞬间不会闪出一片白。 */
 .theater-screen {
   position: relative;
+  /* 软件里别的卡片都是圆角，放映台在窗口里也是「一块卡片」。
+     全屏时它不是卡片而是整块屏，下面单独把那两个角收回去。 */
+  border-radius: 16px;
+  overflow: hidden;
 }
 
 .theater-screen .theater-live {
@@ -5096,6 +5109,9 @@ body:has(.media-room.is-expanded) {
   max-height: none;
   min-height: 0;
   aspect-ratio: auto;
+  /* 窗口态给了 16px 圆角（见 .theater-screen 本体），全屏这条特异性最高，
+     所以直角也只能在这里收回——只在 0,3,0 那条写是不够的。 */
+  border-radius: 0;
 }
 
 /* 图片那条上限同理，也要一起清掉，否则图还是按窗口态封顶。 */

@@ -1,18 +1,22 @@
 // 相集的票根。
 //
-// 一页八张：参考图（docs 里那六张）是竖版单张票的构图，但用户 m13607 要「每页只展示
-// 8 个」，摊成两行正好八张，不用再往下滚。票的比例照参考图取 —— 左侧画面约六成，
-// 右侧票根约四成，中间一道齿孔撕线。
+// 一页六张：参考图（docs 里那六张）是竖版单张票的构图，但用户 m13607 要「每页只展示
+// 8 个」，后来 m14515 又收到六张——一列排下来六张正好一屏，再多就要往下找。
 //
-// 列数不在这里定。它由 CSS 的 auto-fit 决定：外壳只有 760 宽，写死四列时每张票不到
-// 160px，票根里那行日期会挤成一列字。所以「一页八张」与「一行几张」是两件事，
-// 别把它俩绑在同一个常量上（原本有个 TICKET_COLUMNS 就是这么被误当成日期用的）。
+// 票的比例照参考图取：左侧画面约六成九，右侧票根约三成，中间一道齿孔撕线。
+// 画面本身按 16:9 完整显示（用户 m14515：「至少应该按 16：9 把画面展示全了」），
+// 所以整张票的宽高比是 `16 / 9 / 0.692 ≈ 2.57`，比参考图那张 2.0 更细长。
+// 这个比例不在 JS 里算：CSS 让 `.ticket-shot` 自己拿 `aspect-ratio: 16 / 9`，
+// 票的高度自然由它撑出来，改画面比例不用同步改两处。
+//
+// 列数不在这里定。用户 m14515 定的是一列。早先试过 auto-fit 多列：外壳只有
+// 760 宽，四列时每张票不到 160px，票根里那行日期会挤成一列字。
 //
 // 这个文件只有纯算术与数组，不 import React：页数、条码纹理这些都要能直接跑测试，
 // 也不必为了验一条除法去起 Electron。
 
-/** 一页八张。参考图是单张票，八张要摊成两行才不显得空。 */
-export const TICKET_PAGE_SIZE = 8;
+/** 一页六张：一列排下来正好一屏，再多就要滚动。 */
+export const TICKET_PAGE_SIZE = 6;
 
 export type TicketPage = {
   /** 从 0 数。 */
@@ -132,8 +136,28 @@ export function ticketBars(id: string): number[] {
   return bars.map(width => (width / sum) * 100);
 }
 
-/** 一页八张够不够铺满两行？不满时补几个空位，票根网格才不会被最后一行拽歪。 */
+/** 一页六张够不够铺满？不满时补几个空位，票根网格才不会被最后一行拽歪。 */
 export function ticketBlanks(count: number): number[] {
   const filled = Math.min(TICKET_PAGE_SIZE, Math.max(0, count));
   return Array.from({ length: Math.max(0, TICKET_PAGE_SIZE - filled) }, (_, index) => index);
+}
+
+/** 页脚最多摆几个页码按钮。用户 m14515：「你看看是设置最多展示几页然后左右切换」。 */
+export const PAGER_WINDOW = 5;
+
+/**
+ * 页脚要显示哪几页。
+ *
+ * 库里 178 件时旧写法会排出三十颗按钮，把整行撑爆——而人翻页从来不会去点第 24 页，
+ * 他只在前后来回走。所以只给一扇窗：当前页尽量居中，走到两头时窗口贴边不再滑。
+ *
+ * 返回的是页码本身（从 0 数），不是窗口起点，调用方不用再换算一次。
+ */
+export function pagerWindow(current: number, total: number, size = PAGER_WINDOW): number[] {
+  const pages = pageCount(total);
+  if (pages <= size) return Array.from({ length: pages }, (_, index) => index);
+  const index = clampPage(current, total);
+  // 窗口减半后往前推，两头夹住：贴边时窗口固定，中间的页才会跟着当前页滑。
+  const start = Math.min(pages - size, Math.max(0, index - Math.floor(size / 2)));
+  return Array.from({ length: size }, (_, offset) => start + offset);
 }

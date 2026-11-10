@@ -912,6 +912,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               seen={seen}
               currentId={current?.id ?? ''}
               listRef={grid}
+              template={template}
               page={page}
               onPage={setPage}
               onPick={id => { setCurrentId(id); setPlaying(true); }}

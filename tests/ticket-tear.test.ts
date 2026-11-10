@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  ashParticles, flightOf, shouldTear, tearProgress, TEAR_TRIGGER,
+  ashParticles, clipRect, flightOf, flightSelectors, pickFlightRect, SHOT_SHARE,
+  shouldTear, tearProgress, TEAR_TRIGGER, TICKET_ASPECT,
 } from '../src/ticket-tear.ts';
 
 test('撕开进度按票根高度换算，且夹在 0~1', () => {
@@ -54,17 +55,56 @@ test('下面的灰片飘得更高、起飞更早，上面的最后散', () => {
   assert.ok(bottom.delay < top.delay, `底片 ${bottom.delay} 应比顶片 ${top.delay} 起飞早`);
 });
 
-test('飞行变换算的是中心点位移与宽度比', () => {
+test('飞行位移取左上角差，不是中心点差（缩放绕左上角做）', () => {
   const move = flightOf(
     { x: 100, y: 100, w: 200, h: 100 },
     { x: 400, y: 300, w: 600, h: 300 },
   );
-  assert.equal(move.dx, 500); // 终点中心 (400+300) - 起点中心 (100+100)
-  assert.equal(move.dy, 300); // 终点中心 (300+150) - 起点中心 (100+50)
+  // transform-origin: 0 0 + translate → scale，左上角只受 translate 影响。
+  assert.equal(move.dx, 300);
+  assert.equal(move.dy, 200);
   assert.equal(move.scale, 3);
 });
 
 test('宽度为 0 时不做缩放，免得除出 Infinity', () => {
   const move = flightOf({ x: 0, y: 0, w: 0, h: 0 }, { x: 10, y: 10, w: 20, h: 20 });
   assert.equal(move.scale, 1);
+});
+
+test('票根按 16:9 的画面撑出来，比参考图那张更细长', () => {
+  // 16:9 的画面占 69.2% 宽，整张票 = 0.692 * 9/16 高、1 宽 → 宽高比 2.57
+  assert.ok(Math.abs(TICKET_ASPECT - 16 / 9 / SHOT_SHARE) < 1e-9);
+  assert.ok(TICKET_ASPECT > 2.4, `应比参考图的 2.0 细长 ${TICKET_ASPECT}`);
+  assert.ok(TICKET_ASPECT < 2.8, `不该细到只剩一条 ${TICKET_ASPECT}`);
+});
+
+test('每种版式飞向自己的画面块，透明版式退回幕布', () => {
+  assert.deepEqual(flightSelectors('collage'), ['.tpl-block-media']);
+  assert.deepEqual(flightSelectors('photo'), ['.tpl-photo-media']);
+  assert.deepEqual(flightSelectors('desktop'), ['.theater-screen']);
+  // 认不出的版式也得有个落点，不能返回空数组让调用方飞不起来。
+  assert.deepEqual(flightSelectors('没见过'), ['.theater-screen']);
+});
+
+test('落点被夹进幕布里，完全不相交时退回幕布', () => {
+  const bounds = { x: 100, y: 100, w: 400, h: 300 };
+  // 右边超出 50px：只截掉超出那部分，不整块作废。
+  assert.deepEqual(clipRect({ x: 300, y: 200, w: 200, h: 100 }, bounds), {
+    x: 300, y: 200, w: 200, h: 100,
+  });
+  assert.deepEqual(clipRect({ x: 400, y: 300, w: 400, h: 300 }, bounds), {
+    x: 400, y: 300, w: 100, h: 100,
+  });
+  // 完全在幕布外面（拼贴画面滚出视口时会发生），飞进一条缝没有意义。
+  assert.deepEqual(clipRect({ x: 900, y: 900, w: 50, h: 50 }, bounds), bounds);
+});
+
+test('挑落点时跳过没面积的那几个，全都没有就用幕布', () => {
+  const bounds = { x: 0, y: 0, w: 800, h: 450 };
+  const good = { x: 10, y: 10, w: 400, h: 225 };
+  assert.deepEqual(pickFlightRect([null, { x: 0, y: 0, w: 0, h: 0 }, good], bounds), good);
+  assert.deepEqual(pickFlightRect([null, undefined], bounds), bounds);
+  assert.deepEqual(pickFlightRect([], bounds), bounds);
+  // 有面积但整块在幕布外，退回幕布而不是返回那个矩形。
+  assert.deepEqual(pickFlightRect([{ x: 900, y: 900, w: 50, h: 50 }], bounds), bounds);
 });
