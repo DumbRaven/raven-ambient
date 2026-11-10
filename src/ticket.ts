@@ -114,6 +114,63 @@ export function ticketShowtime(id: string): { date: string; time: string } {
 }
 
 /**
+ * 票根的版式。
+ *
+ * 用户 m14823 给了六张参考图，右侧票根的文字排版各不相同，要求「每次打开每张
+ * 是随机排版的」。注意是**看起来随机**，不是真随机：同一个文件每次重渲染都得
+ * 是同一款，否则翻页回来票面变样、眼睛立刻知道是假的。所以照旧走 id 散列。
+ *
+ * 四种取的是参考图里差别最大的四种骨架：
+ * - `classic`   ref-1 / ref-2：标记、ADMIT ONE、片名、两组两栏字段、票号、条码
+ * - `arc`       ref-3 / ref-4：居中标题、星级 ADMIT ONE、带竖分隔的两栏、方框座位
+ * - `stack`     ref-5：纵排的「标签在上、值在下」三组，票号用红色大字
+ * - `editorial` ref-6：顶部一行小字、大号两行片名、细字说明，条码下压一行影院名
+ */
+export type TicketLayout = 'classic' | 'arc' | 'stack' | 'editorial';
+
+export const ticketLayouts: readonly TicketLayout[] = ['classic', 'arc', 'stack', 'editorial'];
+
+export function ticketLayout(id: string): TicketLayout {
+  return ticketLayouts[ticketHash(id) % ticketLayouts.length];
+}
+
+/**
+ * 票面上的几组字，按 id 定死。
+ *
+ * 和 `ticketShowtime` 分开是因为不同版式要不同的粒度：`classic` 用带前缀的
+ * 整行（`DATE: 08 / 08`），`stack` 要把标签和值分两行排，`editorial` 又只要
+ * 一行细字。都给出来，谁用谁取。
+ */
+export function ticketStamp(id: string): {
+  date: string;
+  time: string;
+  seat: string;
+  row: string;
+  code: string;
+  venue: string;
+  fine: string;
+} {
+  const hash = ticketHash(id);
+  const month = String(4 + (hash % 9)).padStart(2, '0');
+  const day = String(1 + (Math.floor(hash / 9) % 12)).padStart(2, '0');
+  const hour = String(10 + (Math.floor(hash / 108) % 12)).padStart(2, '0');
+  const minute = String(Math.floor(hash / 1296) % 60).padStart(2, '0');
+  // 影院名与细字也从池子里挑，同一张票每次一样。
+  const venues = ['LUMIÈRE CINÉMA', 'NORDIC LIGHTS STUDIOS', 'MONET ART CINEMA', 'THE GRAND ODEON'];
+  const codes = ['ONE ADMISSION ONLY', 'NON-REFUNDABLE', 'NO RE-ENTRY AFTER START', 'PLEASE KEEP THIS STUB'];
+  const code = `${String(hash % 10000000).padStart(7, '0')}${'ABCDEFGH'[Math.floor(hash / 7) % 8]}`;
+  return {
+    date: `2024.${month}.${day}`,
+    time: `${hour}:${minute}`,
+    seat: `A ${String(1 + (hash % 24)).padStart(2, '0')}`,
+    row: String((Math.floor(hash / 24) % 12) + 1).padStart(2, '0'),
+    code,
+    venue: venues[Math.floor(hash / 100000) % venues.length],
+    fine: codes[Math.floor(hash / 200000) % codes.length],
+  };
+}
+
+/**
  * 条码的条纹宽度（相对单位，加起来是 100）。
  *
  * 真条码有校验位、编码规则，这里不需要能被扫出来 —— 它承担的是「一张票」的形状。

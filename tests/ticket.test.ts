@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   clampPage, pageCount, pageOf, pagerWindow, slipPage, ticketBars, ticketBlanks, ticketHash,
-  ticketNo, ticketSeat, ticketShowtime, TICKET_PAGE_SIZE,
+  ticketLayout, ticketLayouts, ticketNo, ticketSeat, ticketShowtime, ticketStamp,
+  TICKET_PAGE_SIZE,
 } from '../src/ticket.ts';
 
 test('一页六张：0 件也算一页，6 件整一页，7 件两页', () => {
@@ -108,4 +109,44 @@ test('页脚只摆五颗页码，当前页尽量居中、两头贴边不空转',
   assert.deepEqual(pagerWindow(99, 60), [5, 6, 7, 8, 9]);
   // 空库只有一页
   assert.deepEqual(pagerWindow(0, 0), [0]);
+});
+
+test('版式由 id 定死：同一个文件永远是同一款，翻页回来不变', () => {
+  const ids = ['a.png', 'b.png', 'c.png', 'ocean.png', 'tokyo.mp4', 'snow.jpg'];
+  for (const id of ids) {
+    assert.equal(ticketLayout(id), ticketLayout(id));
+    assert.ok(ticketLayouts.includes(ticketLayout(id)));
+  }
+});
+
+test('四种版式都会出现，且不是按列表顺序轮流发', () => {
+  const ids = Array.from({ length: 80 }, (_, index) => `media/${index}.png`);
+  const seen = new Set(ids.map(ticketLayout));
+  // 四种都得有：少一种说明取模那一步写死了或者散列塌了。
+  assert.equal(seen.size, ticketLayouts.length);
+  // 顺序里必须出现相邻两张同版式——那才说明不是「第 n 张发第 n%4 款」。
+  const layouts = ids.map(ticketLayout);
+  assert.ok(layouts.some((layout, index) => index > 0 && layout === layouts[index - 1]));
+});
+
+test('票面那几组字也从 id 来，格式合法', () => {
+  const stamp = ticketStamp('D:\\media\\ocean.png');
+  assert.deepEqual(stamp, ticketStamp('D:\\media\\ocean.png'));
+  assert.match(stamp.date, /^2024\.\d{2}\.\d{2}$/);
+  assert.match(stamp.time, /^\d{2}:\d{2}$/);
+  assert.match(stamp.seat, /^A \d{2}$/);
+  assert.match(stamp.row, /^\d{2}$/);
+  assert.match(stamp.code, /^\d{7}[A-H]$/);
+  assert.ok(stamp.venue.length > 4);
+  assert.ok(stamp.fine.length > 4);
+
+  // 月 4~12、日 1~12（避开「2 / 30」这类不存在的日子），时 10~21。
+  for (const id of ['a.png', 'b.png', 'tokyo.mp4']) {
+    const { date, time } = ticketStamp(id);
+    const [, month, day] = date.match(/^2024\.(\d{2})\.(\d{2})$/)!;
+    assert.ok(Number(month) >= 4 && Number(month) <= 12, `month ${month}`);
+    assert.ok(Number(day) >= 1 && Number(day) <= 12, `day ${day}`);
+    const [, hour] = time.match(/^(\d{2}):/)!;
+    assert.ok(Number(hour) >= 10 && Number(hour) <= 21, `hour ${hour}`);
+  }
 });

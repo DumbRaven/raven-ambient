@@ -15,11 +15,13 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { mediaSrc } from './media';
 import { titleOf } from './media-text';
 import {
-  pageOf, pagerWindow, slipPage, ticketBars, ticketNo, ticketSeat, ticketShowtime,
+  pageOf, pagerWindow, slipPage, ticketBars, ticketLayout, ticketNo, ticketSeat,
+  ticketShowtime, ticketStamp,
 } from './ticket.ts';
 import {
   ashParticles, flightOf, flightSelectors, pickFlightRect, shouldTear, tearProgress,
 } from './ticket-tear.ts';
+import { PAPER_FILTER_ID, paperFilterMarkup } from './paper.ts';
 import type { MediaItem } from './records';
 
 /** 灰烬全部飘散要多久。和 CSS 里 ticket-ash 的关键帧长度一致，改一处要改两处。 */
@@ -62,17 +64,79 @@ function Barcode({ id }: { id: string }) {
   );
 }
 
-/** 票面文字那半边。列表与浮层共用，免得两处排版漂开。 */
+/**
+ * 票面文字那半边。列表与浮层共用，免得两处排版漂开。
+ *
+ * 四种骨架照用户给的六张参考图归纳（见 `src/ticket.ts` 的 `TicketLayout`）。
+ * 版式由文件 id 定死，不是每次渲染随机的——翻页回来票面变了，一眼就假。
+ */
 function TicketFace({ item, index }: { item: MediaItem; index: number }) {
   const seat = ticketSeat(item.id);
   // 场次由 id 决定：同一个文件永远是同一场，翻页回来不会变。
   const show = ticketShowtime(item.id);
+  const stamp = ticketStamp(item.id);
+  const layout = ticketLayout(item.id);
+  const name = <b className="ticket-name" title={item.name}>{titleOf(item)}</b>;
+  const barcode = <Barcode id={item.id} />;
+
+  if (layout === 'arc') {
+    return (
+      <span className="ticket-panel" data-layout="arc">
+        <span className="ticket-mark">CINEMA TICKET</span>
+        <span className="ticket-admit">★ ADMIT ONE ★</span>
+        {name}
+        <span className="ticket-split">
+          <span><span className="ticket-label">DATE</span><span className="ticket-value">{stamp.date}</span></span>
+          <span><span className="ticket-label">TIME</span><span className="ticket-value">{stamp.time}</span></span>
+        </span>
+        <span className="ticket-box">
+          <span className="ticket-label">SEAT</span>
+          <span className="ticket-value">{stamp.seat}</span>
+        </span>
+        <span className="ticket-no">{ticketNo(index)}</span>
+        {barcode}
+      </span>
+    );
+  }
+
+  if (layout === 'stack') {
+    return (
+      <span className="ticket-panel" data-layout="stack">
+        <span className="ticket-mark">CINEMA TICKET</span>
+        <span className="ticket-admit">★ ADMIT ONE ★</span>
+        {name}
+        <span className="ticket-stack">
+          <span><span className="ticket-label">DATE</span><span className="ticket-value">{stamp.date}</span></span>
+          <span><span className="ticket-label">TIME</span><span className="ticket-value">{stamp.time}</span></span>
+          <span><span className="ticket-label">THEATER</span><span className="ticket-value">{stamp.row}</span></span>
+        </span>
+        <span className="ticket-code">{stamp.code}</span>
+        {barcode}
+        <span className="ticket-venue">{stamp.venue}</span>
+      </span>
+    );
+  }
+
+  if (layout === 'editorial') {
+    return (
+      <span className="ticket-panel" data-layout="editorial">
+        <span className="ticket-mark">THE ART OF LIGHT &amp; COLOR</span>
+        {name}
+        <span className="ticket-admit">★ ADMIT ONE ★</span>
+        <span className="ticket-fine">{stamp.fine}</span>
+        <span className="ticket-no">{ticketNo(index)}</span>
+        {barcode}
+        <span className="ticket-venue">{stamp.venue}</span>
+      </span>
+    );
+  }
+
   return (
-    <span className="ticket-panel">
-      <span className="ticket-mark">CINEMA TICKET</span>
+    <span className="ticket-panel" data-layout="classic">
+      <span className="ticket-mark">✦ CINEMA TICKET ✦</span>
       <span className="ticket-admit">ADMIT ONE</span>
       <span className="ticket-rule" />
-      <b className="ticket-name" title={item.name}>{titleOf(item)}</b>
+      {name}
       <span className="ticket-rule" />
       <span className="ticket-fields">
         <span>{show.date}</span>
@@ -83,7 +147,7 @@ function TicketFace({ item, index }: { item: MediaItem; index: number }) {
         <span>{seat.row}</span>
       </span>
       <span className="ticket-no">{ticketNo(index)}</span>
-      <Barcode id={item.id} />
+      {barcode}
     </span>
   );
 }
@@ -293,6 +357,19 @@ type Props = {
 
 export default function MediaTickets({ items, active, seen, currentId, listRef, template, page, onPage, onPick }: Props) {
   const [openId, setOpenId] = useState('');
+
+  // 纸纹滤镜只需要一份，抹在整个列表与浮层的票根上（CSS 里 filter: url(#id)）。
+  // 插在 <body> 上而不是某个票根里：被 mask 裁过的容器里引用滤镜，
+  // Chromium 会判它失效、静默退回 none——大理石那轮就是这么空转的。
+  useEffect(() => {
+    if (document.getElementById(PAPER_FILTER_ID)) return;
+    const host = document.createElement('div');
+    host.setAttribute('aria-hidden', 'true');
+    host.setAttribute('data-tpl-paper', '');
+    host.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none';
+    host.innerHTML = paperFilterMarkup();
+    document.body.appendChild(host);
+  }, []);
   const pageInfo = pageOf(items.length, page);
   const slips = slipPage(items, pageInfo.index);
   const opened = openId ? items.find(item => item.id === openId) : undefined;

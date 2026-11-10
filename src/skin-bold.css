@@ -2738,38 +2738,51 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   list-style: none;
 }
 
-/* 纸色令牌挂在两个宿主上：列表里的票，和浮起来的那一张。
+/* 纸色令牌挂在三个宿主上：列表里的票、浮起来的那一张、以及纸本身。
    浮层不是 .ticket 的后代，只写在 .ticket 上会让 .ticket-lift 的
    `background: var(--paper-sheet)` 解析失败退回透明 —— 整张票变成
    一块透出暗幕的灰玻璃，字还压在暗底上。 */
 .ticket,
-.ticket-lift {
+.ticket-lift,
+.ticket-panel,
+.ticket-lift-panel {
   --paper: #efeada;
   --paper-deep: #e4dbc7;
   --ticket-ink: #2a2622;
   --ticket-faint: #9c937e;
+  --edge-radius: 3.2px;
+  --edge-step: 13px;
   --paper-sheet: linear-gradient(158deg, #f5f0e3, var(--paper) 46%, var(--paper-deep));
 }
 
+/* 一张票是**两块纸**，不是一整块。
+   参考图上照片块与票根块各自成形、中间留一道缝，撕线就在那道缝里；
+   做成一整块的话，齿孔无论怎么挖都只是「一张纸上的花纹」。
+
+   所以外层透明、不画纸，阴影也用 filter 而不是 box-shadow ——
+   下面两层都带 mask，box-shadow 会被 mask 一起裁掉，只剩一圈没有阴影的硬边。 */
 .ticket {
   display: flex;
+  gap: 3px;
   width: 100%;
-  padding: 7px;
+  padding: 0;
   border: 0;
-  border-radius: 10px;
-  background: var(--paper-sheet);
-  box-shadow: 0 0 0 1px #ded5c1, 0 6px 14px #6b5f4524;
+  background: transparent;
   text-align: left;
   cursor: pointer;
-  transition: transform 220ms cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 220ms;
+  filter: drop-shadow(0 4px 10px #6b5f4524);
+  transition: transform 220ms cubic-bezier(0.2, 0.7, 0.3, 1), filter 220ms;
 }
 
-/* 画面。四边半圆齿孔靠四层径向遮罩交出来——不能画圆点盖上去：
+/* 画面。半圆齿孔靠两层径向遮罩交出来——不能画圆点盖上去：
    底色一变（页面白 ↔ 米白）那些点就露馅了。
 
+   **只有左右两条边有齿孔，上下是直的。** 用户 m14823 原话：「图案部分上下
+   应该是直的没有锯齿这种意思」。原来四边各挖一排，上下那两排其实是把照片
+   切成了邮票；参考图里它只是一张贴上去的画，齿只在撕线那一侧和外侧。
+
    `aspect-ratio: 16 / 9` 在这里而不是爹身上：用户 m14515 要「按 16:9 把画面展示全了」，
-   画面的形状是定的，票根就跟着长——整张票因此变成约 2.57:1，比参考图那张 2:1 更细长。
-   反过来给 `.ticket` 定比例的话，画面会被裁掉一块。 */
+   画面的形状是定的，票根就跟着长。反过来给 `.ticket` 定比例的话，画面会被裁掉一块。 */
 .ticket-shot {
   position: relative;
   display: block;
@@ -2777,15 +2790,12 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   min-width: 0;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  border-radius: 3px;
   background: #ddd6c4;
   mask-image:
-    radial-gradient(circle 3.2px at 50% 0, #0000 3.2px, #000 3.6px),
-    radial-gradient(circle 3.2px at 50% 100%, #0000 3.2px, #000 3.6px),
-    radial-gradient(circle 3.2px at 0 50%, #0000 3.2px, #000 3.6px),
-    radial-gradient(circle 3.2px at 100% 50%, #0000 3.2px, #000 3.6px);
-  mask-size: 12px 100%, 12px 100%, 100% 12px, 100% 12px;
-  mask-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
+    radial-gradient(circle var(--edge-radius) at 0 50%, #0000 var(--edge-radius), #000 calc(var(--edge-radius) + 0.4px)),
+    radial-gradient(circle var(--edge-radius) at 100% 50%, #0000 var(--edge-radius), #000 calc(var(--edge-radius) + 0.4px));
+  mask-size: 100% var(--edge-step), 100% var(--edge-step);
+  mask-repeat: repeat-y, repeat-y;
   mask-composite: intersect;
 }
 
@@ -2804,7 +2814,14 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   pointer-events: none;
 }
 
-/* 票面那半边。左边一道虚线就是撕线：用户按住这里往上拖，拖够就撕开。 */
+/* 票根那半边。它自己就是一张纸，右边缘是一串向外鼓的半圆 ——
+   参考图（.tools/edge-right.png）放大看得很清楚：纸的边界是波浪，
+   凸出去，不是挖进来的缺口。上下仍是直边。
+
+   遮罩用两层合成：一层矩形占满「纸面」的宽度，另一层是一列圆，
+   圆心正好落在纸面的右边界上，只留右半边露在元素里（所以元素得比
+   纸面宽出一个半径，那个宽度就是波浪鼓出去的量）。
+   两层是**并集**（mask-composite: add），缺一层就只剩纸或者只剩圆点。 */
 .ticket-panel {
   position: relative;
   display: flex;
@@ -2812,8 +2829,18 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   min-width: 0;
   flex-direction: column;
   gap: 5px;
-  padding: 14px 12px 12px 16px;
-  border-left: 1px dashed #cbbfa5;
+  padding: 14px calc(12px + var(--edge-radius)) 12px 14px;
+  background: var(--paper-sheet);
+  /* 纸纹：滤镜在 src/paper.ts 生成，宿主由 MediaTickets 挂在 <body> 上。
+     只作用在这块纸上，不碰画面（画面自己有图，压一层灰反而脏）。 */
+  filter: url(#tpl-ticket-paper);
+  mask-image:
+    linear-gradient(#000 0 0),
+    radial-gradient(circle var(--edge-radius) at var(--edge-radius) 50%, #000 var(--edge-radius), #0000 calc(var(--edge-radius) + 0.4px));
+  mask-size: calc(100% - var(--edge-radius)) 100%, calc(var(--edge-radius) * 2) var(--edge-step);
+  mask-position: left top, calc(100% - var(--edge-radius) * 2) top;
+  mask-repeat: no-repeat, repeat-y;
+  mask-composite: add;
 }
 
 .ticket-mark {
@@ -2847,6 +2874,14 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   color: var(--ticket-ink);
 }
 
+/* editorial 那版片名是大小混排的衬线标题，别被通用规则大写掉。 */
+.ticket-panel[data-layout='editorial'] .ticket-name {
+  font-size: 22px;
+  line-height: 1.12;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 .ticket-rule {
   display: block;
   margin: 2px 0 3px;
@@ -2861,6 +2896,110 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   letter-spacing: 0.06em;
   white-space: nowrap;
   color: #8d8472;
+}
+
+/* ── 四种版式的碎件 ─────────────────────────────────────────────
+   用户 m14823 给的六张参考图里，右侧票根的文字骨架差别很大，要求「每次打开每张
+   是随机排版的」。版式由文件 id 定死（src/ticket.ts 的 ticketLayout），
+   这里只负责四种骨架各自的排法。
+
+   标签与值是两层：参考图上很多处是「DATE 一行小字、值一大字在下」，
+   也有「DATE 与值同一行」——同一对元素，靠父级决定怎么摆，不必在 JSX 里分两套。 */
+.ticket-label {
+  display: block;
+  font: 7px/1.2 "Inter", "Microsoft YaHei UI", sans-serif;
+  letter-spacing: 0.16em;
+  color: var(--ticket-faint);
+  white-space: nowrap;
+}
+
+.ticket-value {
+  display: block;
+  font: 9px/1.35 "Consolas", "Microsoft YaHei UI", monospace;
+  letter-spacing: 0.06em;
+  color: #6f6757;
+  white-space: nowrap;
+}
+
+/* arc：左右两栏，中间一道竖线（参考图 ref-3 / ref-4 的 DATE | TIME 那一行）。 */
+.ticket-split {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  margin-top: 2px;
+}
+
+.ticket-split > span {
+  flex: 1;
+  min-width: 0;
+  padding-right: 8px;
+}
+
+.ticket-split > span + span {
+  padding-right: 0;
+  padding-left: 8px;
+  border-left: 1px solid #cfc4ac;
+}
+
+/* arc：座位用方框圈起来，参考图上就是一个小矩形。 */
+.ticket-box {
+  display: block;
+  margin-top: 2px;
+  padding: 4px 6px 5px;
+  border: 1px solid #bfb39a;
+  border-radius: 2px;
+  text-align: center;
+}
+
+.ticket-box .ticket-value {
+  font-size: 12px;
+  color: var(--ticket-ink);
+}
+
+/* stack：三组纵排，每组之间一道细线（参考图 ref-5 的下半部分）。 */
+.ticket-stack {
+  display: flex;
+  flex-direction: column;
+  margin-top: 2px;
+}
+
+.ticket-stack > span {
+  padding: 3px 0;
+}
+
+.ticket-stack > span + span {
+  border-top: 1px solid #d8cdb6;
+}
+
+/* stack 的红字大号票号：比 classic 那行更显眼，参考图上它几乎和片名同宽。 */
+.ticket-code {
+  display: block;
+  margin-top: 2px;
+  font: 700 11px/1.2 "Consolas", "Microsoft YaHei UI", monospace;
+  letter-spacing: 0.1em;
+  color: #a8443a;
+}
+
+/* editorial：一行压得很轻的说明字，参考图 ref-6 里写成两行小字。 */
+.ticket-fine {
+  display: block;
+  font: 6.5px/1.4 "Inter", "Microsoft YaHei UI", sans-serif;
+  letter-spacing: 0.1em;
+  color: var(--ticket-faint);
+  white-space: normal;
+}
+
+/* 条码下面那一行影院名。classic 版没有，另外三版有。 */
+.ticket-venue {
+  display: block;
+  margin-top: 3px;
+  font: 6.5px/1.2 "Inter", "Microsoft YaHei UI", sans-serif;
+  letter-spacing: 0.18em;
+  text-align: center;
+  color: var(--ticket-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ticket-no {
@@ -2889,13 +3028,15 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 @media (hover: hover) and (pointer: fine) {
   .ticket:hover {
     transform: translateY(-2px);
-    box-shadow: 0 0 0 1px #ded5c1, 0 14px 26px #6b5f4533;
+    filter: drop-shadow(0 12px 22px #6b5f4533);
   }
 }
 
-/* 播放台上那一张：压一圈黑，别靠 hover 才知道放的是谁。 */
-.ticket.is-current {
-  box-shadow: 0 0 0 1.5px #101010, 0 8px 18px #6b5f4533;
+/* 播放台上那一张：压一圈黑，别靠 hover 才知道放的是谁。
+   两块都带 mask，外描边会被裁掉，所以走 inset 内描边。 */
+.ticket.is-current .ticket-shot,
+.ticket.is-current .ticket-panel {
+  box-shadow: inset 0 0 0 2px #101010;
 }
 
 /* ── 浮起来的那一张 ─────────────────────────────────────────────
@@ -2922,31 +3063,17 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 .ticket-lift {
   --pull: 0;
   position: relative;
-  isolation: isolate;
-  display: flex;
   /* 列表里的票受外壳 760px 限制只有约 680 宽，浮起来要明显大一圈才叫「放大」。
      1040 是 1920 窗口下不顶到边的上限；窄屏按 92vw 退让。
      高度不写死：由里面那块 16:9 的画面撑出来，跟列表里那张同一个形状。 */
+  display: flex;
+  gap: 4px;
   width: min(1040px, 92vw);
-  padding: 12px;
-  border-radius: 12px;
+  padding: 0;
   background: transparent;
+  /* 两块都带 mask，box-shadow 会被 mask 裁掉，阴影走 filter。 */
+  filter: drop-shadow(0 24px 54px #1a140c6b);
   animation: ticket-lift-up 320ms cubic-bezier(0.22, 0.72, 0.3, 1) both;
-}
-
-/* 纸铺在 ::before 上而不是自己身上：烧掉时要能淡出，而渐变色过渡不了，
-   opacity 可以。z-index: -1 让它垫在画面与票根下面，所以这里必须有
-   isolation: isolate —— 不然它会跑到 .ticket-lift 自己的 stacking context
-   外面去，连暗幕都可能被一起盖掉。 */
-.ticket-lift::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  background: var(--paper-sheet);
-  box-shadow: 0 0 0 1px #ded5c1, 0 34px 70px #1a140c6b;
-  transition: opacity 520ms ease;
 }
 
 @keyframes ticket-lift-up {
@@ -2960,8 +3087,9 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   flex: 0 0 69.2%;
   min-width: 0;
   overflow: hidden;
-  border-radius: 4px;
   background: #ddd6c4;
+  --edge-radius: 5px;
+  --edge-step: 20px;
 }
 
 /* 浮层里那张也要 16:9，否则撕开前后形状不一样、飞出去那一刻会跳一下。
@@ -2972,7 +3100,6 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   width: 100%;
   height: auto;
   margin: 0;
-  border-radius: 4px;
 }
 
 /* 撕开时票面那半边跟着手上走。用 --pull 一个数驱动位移、旋转、透明度，
@@ -2995,11 +3122,11 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 
 .ticket-lift-panel .ticket-panel {
   flex: 1;
-  /* 内容照参考图从顶上往下堆，空出来的那段留在 NO. 与条码之间
-     （条码的 margin-top:auto 会把空白全部吃掉）。
-     用 space-between 摊开反而会让每组之间都裂开一道缝，像被拉长过。 */
-  gap: 7px;
-  padding: 22px 20px 18px 24px;
+  /* 浮层里票根比列表里那张高得多（画面按 16:9 撑），间距还按列表的 7px 的话，
+     内容全挤在上半、空白全堆在条码上方。间距跟着浮层高度走，空白就摊到各组之间了。
+     仍然不用 space-between：那会让每组之间都裂开一道等宽的缝，像被拉长过。 */
+  gap: clamp(9px, 1.7vh, 20px);
+  padding: 26px 22px 20px 26px;
 }
 
 /* 浮起来比列表里那张大一半，字号得跟着长——不然同一张票放大之后
@@ -3082,13 +3209,10 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   animation: ticket-burn 520ms ease forwards;
 }
 
-/* 那层纸本身也要跟着没，否则看到的是「字烧掉了、白纸还在」——
-   像把文字层删掉，不像把票烧掉。
-   纸放在 ::before 上，是因为它得能淡出：渐变色不能过渡，opacity 可以。
-   画面自己有图，不受影响，所以烧完剩下的正是用户要的那半张票。 */
-.ticket-stage:not([data-phase='idle']) .ticket-lift::before {
-  opacity: 0;
-}
+/* 纸跟着字一起没。纸现在长在票根块自己身上（不再是一层垫底的伪元素），
+   所以 ticket-burn 把那一块整体淡出就够了——不然看到的是
+   「字烧掉了、白纸还在」，像把文字层删掉而不像把票烧掉。
+   画面自己有图、不受影响，烧完剩下的正是用户要的那半张。 */
 
 @keyframes ticket-burn {
   0% { filter: none; }
