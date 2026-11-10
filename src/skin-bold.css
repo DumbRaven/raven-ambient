@@ -3123,10 +3123,20 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 .ticket-lift-panel .ticket-panel {
   flex: 1;
   /* 浮层里票根比列表里那张高得多（画面按 16:9 撑），间距还按列表的 7px 的话，
-     内容全挤在上半、空白全堆在条码上方。间距跟着浮层高度走，空白就摊到各组之间了。
-     仍然不用 space-between：那会让每组之间都裂开一道等宽的缝，像被拉长过。 */
+     内容全挤在上半、空白全堆在条码上方。两件事一起做：
+     ① 间距跟着浮层高度走；② 让空白均摊到各组之间。
+     只靠 gap 不够——条码上的 margin-top:auto 会把剩下的空白一口吃掉，
+     全堆在中间那一段，看起来像漏排。所以浮层里改成 space-between，
+     并把条码的 auto 撤掉（auto 外边距的优先级高于 space-between）。 */
   gap: clamp(9px, 1.7vh, 20px);
   padding: 26px 22px 20px 26px;
+  justify-content: space-between;
+}
+
+.ticket-lift-panel .ticket-bars {
+  height: 26px;
+  padding-top: 8px;
+  margin-top: 0;
 }
 
 /* 浮起来比列表里那张大一半，字号得跟着长——不然同一张票放大之后
@@ -3137,7 +3147,6 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 .ticket-lift-panel .ticket-rule { margin: 4px 0 6px; }
 .ticket-lift-panel .ticket-fields { font-size: 12px; }
 .ticket-lift-panel .ticket-no { font-size: 12px; }
-.ticket-lift-panel .ticket-bars { height: 26px; padding-top: 8px; }
 
 /* 提示挂在浮层上、不挂在会动的票根上：票根跟着手走（--pull 驱动
    translate/rotate），提示跟着一起转就会「晃」，而且它压在条码上读不出来。 */
