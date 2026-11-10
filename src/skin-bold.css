@@ -2720,91 +2720,68 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   color: #101010;
 }
 
-/* 相集：票根。照 docs 里那六张参考图做的，一页八张，翻页在 MediaTickets。
-   纸是米白、左边画面四周一圈半圆齿孔、右边一条窄票根。
+/* 相集：票根。
+   照 `.tools/ref-ticket/ref-1.jpg` 做：米白纸、左侧画面四周一圈半圆齿孔、
+   右侧一条窄票根。比例直接取自那张图（1124×563，画面 69.2%、票根 30.6%），
+   量法见 `.tools/ticket-props.cjs`。
 
-   列数交给内容自己算：外壳只有 760 宽，写死四列的话每张票不到 160px，
-   票根里那行日期就挤成一列字（截图上真的挤成了那样）。minmax(260px)
-   让它在窄栏里落成两列，票根才读得出内容。一页八张这个数不变——
-   四列两行、两列四行，翻页的手感一样。
-
-   撕存根那一下分成两片画（.ticket-stub / .ticket-body），不靠父级背景兜底：
-   父级一旦有纸色，存根飘走之后原地还会留一张纸，看着像没撕过。 */
+   一列。早先试过 auto-fit 多列：外壳只有 760 宽，四列时每张票不到 160px，
+   票根里那行日期挤成一列字；两列能读，但票根的主题（一张票要有票根的样子）
+   就没了。用户 m14144 定的是一列——一张票占满宽度，才有票的分量。
+   一页八张这个数不变，翻页照旧。 */
 .ticket-grid {
-  --ticket-min: 260px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--ticket-min)), 1fr));
-  gap: 18px 14px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.ticket {
+/* 纸色令牌挂在两个宿主上：列表里的票，和浮起来的那一张。
+   浮层不是 .ticket 的后代，只写在 .ticket 上会让 .ticket-lift 的
+   `background: var(--paper-sheet)` 解析失败退回透明 —— 整张票变成
+   一块透出暗幕的灰玻璃，字还压在暗底上。 */
+.ticket,
+.ticket-lift {
   --paper: #efeada;
   --paper-deep: #e4dbc7;
   --ticket-ink: #2a2622;
   --ticket-faint: #9c937e;
   --paper-sheet: linear-gradient(158deg, #f5f0e3, var(--paper) 46%, var(--paper-deep));
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  transition: transform 220ms cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
-/* 存根与票面各自带纸色和投影：撕走存根时投影跟着它一起走，票面顶上露出干净的一条边。 */
-.ticket-stub,
-.ticket-body {
-  display: block;
+.ticket {
+  display: flex;
+  width: 100%;
+  padding: 7px;
+  border: 0;
+  aspect-ratio: 1124 / 563;
+  border-radius: 10px;
   background: var(--paper-sheet);
   box-shadow: 0 0 0 1px #ded5c1, 0 6px 14px #6b5f4524;
-  transition: box-shadow 220ms;
-}
-
-.ticket-stub {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  height: 20px;
-  padding: 0 8px;
-  border-radius: 9px 9px 0 0;
-  border-bottom: 1px dashed #cbbfa5;
-  font: 6px/1 "Consolas", "Microsoft YaHei UI", monospace;
-  letter-spacing: 0.14em;
-  color: #a79d84;
-  white-space: nowrap;
-}
-
-.ticket-body {
-  display: flex;
-  aspect-ratio: 5 / 4;
-  border-radius: 0 0 9px 9px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 220ms cubic-bezier(0.2, 0.7, 0.3, 1), box-shadow 220ms;
 }
 
 /* 画面。四边半圆齿孔靠四层径向遮罩交出来——不能画圆点盖上去：
-   底色一变（页面白 ↔ 米白）那些点就露馅了。
-
-   右边留 7px 纸边：参考图上画面与撕线之间是有一段纸的，贴在一起看着像
-   画面被虚线框住，而不是「贴在票上的一张小照」。 */
+   底色一变（页面白 ↔ 米白）那些点就露馅了。 */
 .ticket-shot {
   position: relative;
-  flex: 0 0 60%;
+  display: block;
+  flex: 0 0 69.2%;
   min-width: 0;
-  margin: 6px 7px 6px 6px;
+  height: 100%;
   overflow: hidden;
-  border-radius: 2px;
+  border-radius: 3px;
   background: #ddd6c4;
   mask-image:
-    radial-gradient(circle 2.4px at 50% 0, #0000 2.4px, #000 2.7px),
-    radial-gradient(circle 2.4px at 50% 100%, #0000 2.4px, #000 2.7px),
-    radial-gradient(circle 2.4px at 0 50%, #0000 2.4px, #000 2.7px),
-    radial-gradient(circle 2.4px at 100% 50%, #0000 2.4px, #000 2.7px);
-  mask-size: 9px 100%, 9px 100%, 100% 9px, 100% 9px;
+    radial-gradient(circle 3.2px at 50% 0, #0000 3.2px, #000 3.6px),
+    radial-gradient(circle 3.2px at 50% 100%, #0000 3.2px, #000 3.6px),
+    radial-gradient(circle 3.2px at 0 50%, #0000 3.2px, #000 3.6px),
+    radial-gradient(circle 3.2px at 100% 50%, #0000 3.2px, #000 3.6px);
+  mask-size: 12px 100%, 12px 100%, 100% 12px, 100% 12px;
   mask-repeat: repeat-x, repeat-x, repeat-y, repeat-y;
   mask-composite: intersect;
 }
@@ -2822,21 +2799,30 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   pointer-events: none;
 }
 
+/* 票面那半边。左边一道虚线就是撕线：用户按住这里往上拖，拖够就撕开。 */
 .ticket-panel {
   position: relative;
+  display: flex;
   flex: 1;
   min-width: 0;
-  display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 7px 7px 6px 8px;
+  gap: 5px;
+  padding: 14px 12px 12px 16px;
   border-left: 1px dashed #cbbfa5;
 }
 
 .ticket-mark {
-  font: 600 6px/1.2 "Inter", "Microsoft YaHei UI", sans-serif;
-  letter-spacing: 0.14em;
+  font: 600 8px/1.2 "Inter", "Microsoft YaHei UI", sans-serif;
+  letter-spacing: 0.18em;
   color: var(--ticket-faint);
+  white-space: nowrap;
+}
+
+/* ADMIT ONE 在参考图里是票根顶部第二行，字号比 CINEMA TICKET 略大、居中。 */
+.ticket-admit {
+  font: 600 9px/1.2 "Inter", "Microsoft YaHei UI", sans-serif;
+  letter-spacing: 0.12em;
+  color: #6f6757;
   white-space: nowrap;
 }
 
@@ -2847,10 +2833,10 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   -webkit-line-clamp: 3;
   overflow: hidden;
   font-family: Georgia, "Times New Roman", "Songti SC", serif;
-  font-size: 11.5px;
+  font-size: 20px;
   font-weight: 700;
-  line-height: 1.16;
-  letter-spacing: 0.01em;
+  line-height: 1.18;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
   overflow-wrap: anywhere;
   color: var(--ticket-ink);
@@ -2858,23 +2844,23 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 
 .ticket-rule {
   display: block;
-  margin: 1px 0 2px;
+  margin: 2px 0 3px;
   border-top: 1px solid #cfc4ac;
 }
 
 .ticket-fields {
   display: flex;
   justify-content: space-between;
-  gap: 4px;
-  font: 6.5px/1.3 "Consolas", "Microsoft YaHei UI", monospace;
-  letter-spacing: 0.04em;
+  gap: 6px;
+  font: 9px/1.35 "Consolas", "Microsoft YaHei UI", monospace;
+  letter-spacing: 0.06em;
   white-space: nowrap;
   color: #8d8472;
 }
 
 .ticket-no {
-  font: 6.5px/1.2 "Consolas", monospace;
-  letter-spacing: 0.1em;
+  font: 9px/1.2 "Consolas", monospace;
+  letter-spacing: 0.12em;
   color: #a8443a;
 }
 
@@ -2882,54 +2868,245 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 .ticket-bars {
   display: flex;
   align-items: stretch;
-  gap: 0.6px;
-  height: 12px;
+  gap: 0.8px;
+  height: 18px;
   margin-top: auto;
-  padding-top: 4px;
+  padding-top: 5px;
 }
 
 .ticket-bars i {
   flex-grow: 1;
   flex-basis: 0;
-  min-width: 0.5px;
+  min-width: 0.6px;
   background: #3d372c;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .ticket:hover {
     transform: translateY(-2px);
-  }
-
-  .ticket:hover .ticket-stub,
-  .ticket:hover .ticket-body {
-    box-shadow: 0 0 0 1px #ded5c1, 0 12px 24px #6b5f4533;
+    box-shadow: 0 0 0 1px #ded5c1, 0 14px 26px #6b5f4533;
   }
 }
 
-/* 播放台上那一张：票面压一圈黑，别靠 hover 才知道放的是谁。 */
-.ticket.is-current .ticket-body {
-  box-shadow: 0 0 0 1.5px #101010, 0 6px 14px #6b5f4533;
+/* 播放台上那一张：压一圈黑，别靠 hover 才知道放的是谁。 */
+.ticket.is-current {
+  box-shadow: 0 0 0 1.5px #101010, 0 8px 18px #6b5f4533;
 }
 
-/* 撕存根。时长与 MediaTickets 的 TEAR_MS 一致，改一处要改两处。 */
-.is-tearing .ticket-stub {
-  animation: ticket-tear 300ms cubic-bezier(0.3, 0.8, 0.4, 1) forwards;
+/* ── 浮起来的那一张 ─────────────────────────────────────────────
+   点击之后票从中缝对折处抬起来，铺在页面中间放大；撕开才继续。
+   底下压一层磨砂暗幕：不压暗的话票与背后的票挤在一起，看不出「浮起来」。
+   层级 72 高于控制条（14）与信息条（8），低于桌面窗的 90。 */
+.ticket-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 72;
+  display: grid;
+  place-items: center;
+  padding: 6vh 4vw;
+  background: #0b0f14a8;
+  backdrop-filter: blur(14px) saturate(1.1);
+  animation: ticket-veil 240ms ease both;
 }
 
-@keyframes ticket-tear {
+@keyframes ticket-veil {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ticket-lift {
+  --pull: 0;
+  position: relative;
+  display: flex;
+  /* 列表里的票受外壳 760px 限制只有约 680 宽，浮起来要明显大一圈才叫「放大」。
+     1040 是 1920 窗口下不顶到边的上限；窄屏按 92vw 退让。 */
+  width: min(1040px, 92vw);
+  aspect-ratio: 1124 / 563;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--paper-sheet);
+  box-shadow: 0 0 0 1px #ded5c1, 0 34px 70px #1a140c6b;
+  animation: ticket-lift-up 320ms cubic-bezier(0.22, 0.72, 0.3, 1) both;
+}
+
+@keyframes ticket-lift-up {
+  from { transform: translateY(22px) scale(0.94); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.ticket-lift-shot {
+  position: relative;
+  display: block;
+  flex: 0 0 69.2%;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #ddd6c4;
+}
+
+.ticket-lift-shot .ticket-shot {
+  display: block;
+  flex: none;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: 4px;
+}
+
+/* 撕开时票面那半边跟着手上走。用 --pull 一个数驱动位移、旋转、透明度，
+   三者同源才不会各走各的。 */
+.ticket-lift-panel {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  touch-action: none;
+  cursor: grab;
+  transform: translateY(calc(var(--pull) * -30%)) rotate(calc(var(--pull) * -1.4deg));
+  transform-origin: 0 100%;
+  opacity: calc(1 - var(--pull) * 0.18);
+}
+
+.ticket-lift-panel:active {
+  cursor: grabbing;
+}
+
+.ticket-lift-panel .ticket-panel {
+  flex: 1;
+  /* 内容照参考图从顶上往下堆，空出来的那段留在 NO. 与条码之间
+     （条码的 margin-top:auto 会把空白全部吃掉）。
+     用 space-between 摊开反而会让每组之间都裂开一道缝，像被拉长过。 */
+  gap: 7px;
+  padding: 22px 20px 18px 24px;
+}
+
+/* 浮起来比列表里那张大一半，字号得跟着长——不然同一张票放大之后
+   像被拉伸过：框变大、字还是原来那么大，比例就散了。 */
+.ticket-lift-panel .ticket-mark { font-size: 10px; }
+.ticket-lift-panel .ticket-admit { font-size: 12px; }
+.ticket-lift-panel .ticket-name { font-size: clamp(22px, 2.4vw, 34px); }
+.ticket-lift-panel .ticket-rule { margin: 4px 0 6px; }
+.ticket-lift-panel .ticket-fields { font-size: 12px; }
+.ticket-lift-panel .ticket-no { font-size: 12px; }
+.ticket-lift-panel .ticket-bars { height: 26px; padding-top: 8px; }
+
+/* 提示挂在浮层上、不挂在会动的票根上：票根跟着手走（--pull 驱动
+   translate/rotate），提示跟着一起转就会「晃」，而且它压在条码上读不出来。 */
+.ticket-tip {
+  position: absolute;
+  left: 50%;
+  bottom: -26px;
+  translate: -50% 0;
+  font: 500 11px/1 "Inter", "Microsoft YaHei UI", sans-serif;
+  letter-spacing: 0.1em;
+  color: #efeada;
+  white-space: nowrap;
+  text-shadow: 0 1px 6px #0b0f14cc;
+  animation: ticket-tip 2.4s ease-in-out 600ms infinite;
+}
+
+@keyframes ticket-tip {
+  0%, 100% { opacity: 0.35; translate: -50% 0; }
+  50% { opacity: 0.9; translate: -50% -3px; }
+}
+
+/* ── 灰烬 ───────────────────────────────────────────────────────
+   票根碎成一把灰往上飘。粒子位置与轨迹由 ashParticles 算好（纯函数，
+   有测试），这里只把 --ash-x / --ash-y / --ash-rot 三个数接上关键帧。 */
+.ticket-ash {
+  position: absolute;
+  inset: 0 0 0 69.2%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ticket-ash i {
+  position: absolute;
+  border-radius: 1px;
+  background: #4a443a;
+  opacity: 0;
+  animation: ticket-ash 900ms cubic-bezier(0.3, 0.1, 0.5, 1) forwards;
+}
+
+@keyframes ticket-ash {
   0% {
-    transform: none;
-    opacity: 1;
+    opacity: 0;
+    translate: 0 0;
+    rotate: 0deg;
+    background: #4a443a;
   }
 
-  40% {
-    transform: translate(5px, -2px) rotate(-2.5deg);
-    opacity: 1;
+  12% {
+    opacity: 0.95;
+    background: #6a6153;
+  }
+
+  55% {
+    opacity: 0.7;
+    background: #8d8478;
   }
 
   100% {
-    transform: translate(34px, -22px) rotate(13deg);
     opacity: 0;
+    translate: var(--ash-x) var(--ash-y);
+    rotate: var(--ash-rot);
+    background: #b6ad9d;
+  }
+}
+
+/* 撕开的票根本体在灰烬起来的同时淡出去，两件事叠着看才像烧掉，
+   而不是「纸先消失、灰再出现」。 */
+.ticket-stage:not([data-phase='idle']) .ticket-lift-panel {
+  animation: ticket-burn 520ms ease forwards;
+}
+
+@keyframes ticket-burn {
+  0% { filter: none; }
+  40% { filter: brightness(0.62) saturate(0.6); }
+  100% { opacity: 0; filter: brightness(0.3) saturate(0); }
+}
+
+/* 剩下左半边画面往放映台飞。落点由 flightOf 算（浮层里这一块的矩形 →
+   幕布的矩形），这里只负责把三个数接上。 */
+.ticket-stage[data-phase='flying'] .ticket-lift-shot {
+  transform: translate(var(--fly-x, 0), var(--fly-y, 0)) scale(var(--fly-scale, 1));
+  transform-origin: 0 0;
+  transition: transform 520ms cubic-bezier(0.3, 0.72, 0.28, 1);
+}
+
+.ticket-stage[data-phase='flying'] .ticket-lift {
+  background: transparent;
+  box-shadow: none;
+}
+
+.ticket-stage[data-phase='flying'] .ticket-lift-panel,
+.ticket-stage[data-phase='flying'] .ticket-ash {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticket,
+  .ticket-stage,
+  .ticket-lift {
+    animation: none;
+    transition: none;
+  }
+
+  .ticket-tip {
+    animation: none;
+    opacity: 0.6;
+  }
+
+  .ticket-ash i {
+    animation-duration: 1ms;
+  }
+
+  .ticket-stage:not([data-phase='idle']) .ticket-lift-panel {
+    animation-duration: 1ms;
+  }
+
+  .ticket-stage[data-phase='flying'] .ticket-lift-shot {
+    transition-duration: 1ms;
   }
 }
 
