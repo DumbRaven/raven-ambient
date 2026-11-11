@@ -53,6 +53,29 @@ function VideoThumb({ src, alt }: { src: string; alt: string }) {
   return <video ref={ref} src={src} aria-label={alt} preload="metadata" muted playsInline />;
 }
 
+/**
+ * 票根的抬头。
+ *
+ * 参考图里这个抬头有两种排法：ref-1 / ref-3 是**沿弧线**排的（两端低、中间高，
+ * 每个字母朝外微微转开），两端还各有一个花饰；ref-2 / ref-4 / ref-5 是平平的
+ * 两行。弧线版本用逐字 span + CSS transform 做——`text` 沿弧不是纯 CSS 能办的，
+ * 而 SVG textPath 又要自己算字号，跟 cqw 那套比例对不上。
+ *
+ * 每个字母的角度与下沉量按二次曲线给：中间那个不转也不沉，越往两端转得越开
+ * 沉得越多。数字序列写在 CSS 的 nth-child 里，这组件只负责拆字。
+ */
+function TicketMark({ arc = false }: { arc?: boolean }) {
+  const text = 'CINEMA TICKET';
+  if (!arc) return <span className="ticket-mark">CINEMA TICKET</span>;
+  return (
+    <span className="ticket-mark ticket-mark-arc" aria-label={text}>
+      {[...text].map((char, index) => (
+        <span key={index}>{char === ' ' ? '\u00a0' : char}</span>
+      ))}
+    </span>
+  );
+}
+
 /** 条码。宽度百分比由 ticketBars 算好，这里只负责排。 */
 function Barcode({ id }: { id: string }) {
   return (
@@ -131,21 +154,29 @@ function TicketFace({ item, index }: { item: MediaItem; index: number }) {
     );
   }
 
+  // classic 照 ref-1 那张排：拱形抬头、ADMIT ONE、规则线、两三行大衬线片名、
+  // 制片两行、规则线、DATE / TIME 各占一行、规则线、SEAT 与 ROW 同一行
+  // 分列左右、规则线、砖红票号、条码。参考图上每一段之间都有那道细线，
+  // 少了它整块会糊成一片字。
   return (
     <span className="ticket-panel" data-layout="classic">
-      <span className="ticket-mark">✦ CINEMA TICKET ✦</span>
-      <span className="ticket-admit">ADMIT ONE</span>
+      <TicketMark arc />
+      <span className="ticket-admit">★ ADMIT ONE ★</span>
       <span className="ticket-rule" />
       {name}
+      <span className="ticket-credit">A FILM BY</span>
+      <span className="ticket-credit">{stamp.venue}</span>
       <span className="ticket-rule" />
-      <span className="ticket-fields">
+      <span className="ticket-lines">
         <span>{show.date}</span>
         <span>{show.time}</span>
       </span>
+      <span className="ticket-rule" />
       <span className="ticket-fields">
         <span>{seat.seat}</span>
         <span>{seat.row}</span>
       </span>
+      <span className="ticket-rule" />
       <span className="ticket-no">{ticketNo(index)}</span>
       {barcode}
     </span>

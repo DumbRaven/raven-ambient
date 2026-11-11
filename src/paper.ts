@@ -25,8 +25,18 @@ export const PAPER_FILTER_ID = 'tpl-ticket-paper';
  *   再靠 `feBlend mode="multiply"` 乘到纸色上。直接乘原噪声会是满幅黑白噪点，
  *   纸上那是一层灰。
  *
+ * slope 0.12 / intercept 0.94 → 输出落在 0.94~1.06，即 ±6% 的明暗起伏。
+ * 早先写的 0.34 / 0.83 是 ±17%，放大到浮层里能看见一片砂砾，参考图的纸面
+ * 几乎是平的，只在光下透出一点点颗粒。这条曲线是纸纹唯一的强度旋钮。
+ *
  * 频率 0.9：纸纹的周期要在 1px 上下才有「颗粒」而不「花色」。每元素尺寸是
  * 300×300，0.9 对应的周期约 1.1px，正是印刷纸的目数。
+ *
+ * 最后一步 `feComposite operator="in"` 不能省。`feFuncA slope="0" intercept="1"`
+ * 把输出 alpha 钉死成 1，于是元素**边界那 1~2px 的半透明抗锯齿像素**也被涂成
+ * 不透明的灰——实测在票根左缘（贴着撕口）露出一条 2px 宽、rgb(97,97,97) 的
+ * 中性灰硬边，既不暖也不是任何一层的颜色。用 SourceAlpha 裁一刀，滤镜只在
+ * 原本不透明的区域生效。
  */
 export function paperFilterMarkup(id = PAPER_FILTER_ID): string {
   return [
@@ -35,12 +45,13 @@ export function paperFilterMarkup(id = PAPER_FILTER_ID): string {
     `<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="17" stitchTiles="stitch" result="n"/>`,
     `<feColorMatrix in="n" type="saturate" values="0" result="g"/>`,
     `<feComponentTransfer in="g" result="t">`,
-    `<feFuncR type="linear" slope="0.34" intercept="0.83"/>`,
-    `<feFuncG type="linear" slope="0.34" intercept="0.83"/>`,
-    `<feFuncB type="linear" slope="0.34" intercept="0.83"/>`,
+    `<feFuncR type="linear" slope="0.12" intercept="0.94"/>`,
+    `<feFuncG type="linear" slope="0.12" intercept="0.94"/>`,
+    `<feFuncB type="linear" slope="0.12" intercept="0.94"/>`,
     `<feFuncA type="linear" slope="0" intercept="1"/>`,
     `</feComponentTransfer>`,
-    `<feBlend in="SourceGraphic" in2="t" mode="multiply"/>`,
+    `<feBlend in="SourceGraphic" in2="t" mode="multiply" result="b"/>`,
+    `<feComposite in="b" in2="SourceAlpha" operator="in"/>`,
     `</filter>`,
     `</svg>`,
   ].join('');

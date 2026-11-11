@@ -71,11 +71,17 @@ test('宽度为 0 时不做缩放，免得除出 Infinity', () => {
   assert.equal(move.scale, 1);
 });
 
-test('票根按 16:9 的画面撑出来，比参考图那张更细长', () => {
-  // 16:9 的画面占 69.2% 宽，整张票 = 0.692 * 9/16 高、1 宽 → 宽高比 2.57
-  assert.ok(Math.abs(TICKET_ASPECT - 16 / 9 / SHOT_SHARE) < 1e-9);
-  assert.ok(TICKET_ASPECT > 2.4, `应比参考图的 2.0 细长 ${TICKET_ASPECT}`);
-  assert.ok(TICKET_ASPECT < 2.8, `不该细到只剩一条 ${TICKET_ASPECT}`);
+test('票根比例照参考图取 1.95:1，不再是 16:9 撑出来的 2.57', () => {
+  // 整票 1098×562。别再乘 1/SHOT_SHARE——画面块已经改成 1.39:1，
+  // 整票比例就是它本身，乘一次会算成 2.57，正是要丢掉的那个旧值。
+  assert.ok(Math.abs(TICKET_ASPECT - 1098 / 562) < 1e-9);
+  // 参考图上量到的就是 1098×562，允许一点点取整误差。
+  assert.ok(TICKET_ASPECT > 1.9, `应贴合参考图的 1.95 ${TICKET_ASPECT}`);
+  assert.ok(TICKET_ASPECT < 2.0, `不该比参考图更细长 ${TICKET_ASPECT}`);
+  // 16:9 的素材放进 1.39:1 的框里靠 contain 完整显示，所以画面块自己
+  // 必须比 16:9 高——矮了就变成裁掉两头。
+  assert.ok(779 / 562 > 1, '画面块的宽高比');
+  assert.ok(16 / 9 > 779 / 562, '16:9 比画面块更宽，才会上下留边而不是左右留边');
 });
 
 test('每种版式飞向自己的画面块，透明版式退回幕布', () => {
