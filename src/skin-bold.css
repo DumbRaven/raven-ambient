@@ -2954,66 +2954,45 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
    画面在 x867 结束，之后 179→215→228 一路升到纸面，是纸色的柔和过渡，
    不是阴影。暗的只有画面自身的右缘（另见 .ticket-shot::after）。 */
 .ticket {
-  /* 相册页的纸色，从两块纸之间那道缝里透出来。
-     留空的话缝里是页面底色（纯白 255），而参考图是 228 上下的纸色
-     （.qa/final-check2.py 的 ref 剖面 y=1200 x855..890）。 */
-  background-color: var(--paper);
-  /* 三档齿孔的洞底颜色：外缘中齿与接缝细齿各一层，全部垫在纸下面，
-     由两侧 mask 挖出来后露出来。 */
+  /* 不铺底色：两块纸在接缝上咬合（gap: 0），没有缝要填；
+     齿孔挖空之后该透出底下那层（相册页纸色），票自己不去画它。 */
+      /* 三档齿孔：孔里**不填颜色**——票底下是相册页，挖掉就该露出它。
+     早先给孔垫不透明浅色圆盘（与页同色，看得见的只剩外圈深色，读成
+     「深色描边围着一块纸色」），又试过垫深色（两侧深浅不同，拼起来像
+     两块不同材质的饼）。现在只留孔沿一圈很淡的厚度影，孔芯透明。
+     tile 按 70.9% / 29.1% 切开、圆心压在 tile 边界上，圆被切掉一半，
+     接缝两侧各得半孔，不会出现跨缝的一颗圆珠。 */
   background-image:
-    /* 接缝两端的大齿：**芯填相册页色 + 靠边一圈影**。
-       缺口是「纸被切掉」，缺口里看到的就是相册页本身，所以芯必须是不透明的
-       --album-page（比票面 --paper 暗 6 级，缺口因此读得出来）。
-       芯若透明，底下「接缝细齿」层在大孔范围内画的深点会透上来，
-       整个大圆变成带两个孔的纽扣（ticket-edge.png 目视取证过）。
-       这两个 radial 必须排在最上层（background-image 列表第一项在最上面），
-       相册页色的芯才有机会盖住底下所有层。 */
-    radial-gradient(circle var(--big-arc) at 70.9% calc(0% + var(--big-arc)),
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    radial-gradient(circle var(--big-arc) at 70.9% calc(100% - var(--big-arc)),
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    /* 四角大孔同款垫色：芯是相册页色，靠边一圈影。 */
-    radial-gradient(circle var(--big-arc) at 0% 0%,
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    radial-gradient(circle var(--big-arc) at 0% 100%,
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    radial-gradient(circle var(--big-arc) at 100% 0%,
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    radial-gradient(circle var(--big-arc) at 100% 100%,
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    /* 画面块左外缘的中齿：孔里也要是深色，否则露出 background-color 的米色，
-       看上去是一列白点凸在蓝块外面（票根右缘是深灰，两侧不对称）。 */
     radial-gradient(circle var(--edge-arc) at calc(0% - var(--edge-off)) 50%,
-      #241d1266 var(--edge-arc), #241d1200 calc(var(--edge-arc) + 0.5px)),
-    radial-gradient(circle var(--seam-arc) at 70.9% 50%,
-      #241d12a6 var(--seam-arc), #241d1200 calc(var(--seam-arc) + 0.5px)),
+      #241d1200 0, #241d1200 calc(var(--edge-arc) * 0.72), #241d12b8 calc(var(--edge-arc) * 0.93), #241d1200 var(--edge-arc)),
+    radial-gradient(circle var(--seam-arc) at calc(100% + var(--seam-off)) 50%,
+      #241d1200 0, #241d1200 calc(var(--seam-arc) * 0.72), #241d12b8 calc(var(--seam-arc) * 0.93), #241d1200 var(--seam-arc)),
+    radial-gradient(circle var(--big-arc) at calc(100% + var(--seam-off)) 0%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d12b8 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at calc(100% + var(--seam-off)) 100%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d12b8 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at 0% 0%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d12b8 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at 0% 100%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d12b8 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc)),
+    radial-gradient(circle var(--seam-arc) at calc(0% - var(--seam-off)) 50%,
+      #241d1200 0, #241d1200 calc(var(--seam-arc) * 0.72), #241d1252 calc(var(--seam-arc) * 0.93), #241d1200 var(--seam-arc)),
+    radial-gradient(circle var(--big-arc) at calc(0% - var(--seam-off)) 0%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d1252 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at calc(0% - var(--seam-off)) 100%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d1252 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc)),
     radial-gradient(circle var(--edge-arc) at calc(100% + var(--edge-off)) 50%,
-      #241d1266 var(--edge-arc), #241d1200 calc(var(--edge-arc) + 0.5px));
-  /* 接缝那层的圆心必须落在 70.9%（画面块占宽），tile 也必须是全宽——
-     早先写 50% + background-size 50%，圆心实际落在整票的 25% 处，
-     两块纸的接缝细齿孔里透出的仍是 var(--paper)，与纸面同色，看不见孔。
-     画面块右缘与票根左缘的孔在同一个 x 上，一层就够两边用。 */
-  background-size: 100% 100%, 100% 100%,
-    100% 100%, 100% 100%, 100% 100%, 100% 100%,
-    100% var(--edge-step), 100% var(--seam-step), 100% var(--edge-step);
-  /* 必须 0 0，与 mask 的默认相位一致。写 center 时元素高 246.8、图案高
-     19.8，图案顶落在 113.5px，与 mask 的孔错开 14.5px（近一整个周期），
-     孔里透出的是 background-color 的纸色而不是垫色（逐像素取证过）。 */
-  background-position: 0 0, 0 0, 0 0;
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat,
-    no-repeat, repeat-y, repeat-y, repeat-y;
+      #241d1200 0, #241d1200 calc(var(--edge-arc) * 0.72), #241d1252 calc(var(--edge-arc) * 0.93), #241d1200 var(--edge-arc)),
+    radial-gradient(circle var(--big-arc) at 100% 0%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d1252 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at 100% 100%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d1252 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc));
+  background-size: 70.9% 100%, 70.9% 100%, 70.9% 100%, 70.9% 100%, 70.9% 100%, 70.9% 100%,
+    29.1% 100%, 29.1% 100%, 29.1% 100%, 29.1% 100%, 29.1% 100%, 29.1% 100%;
+  background-position: left top, left top, left top, left top, left top, left top,
+    right top, right top, right top, right top, right top, right top;
+  background-repeat: no-repeat;
+  background-repeat: no-repeat;
 }
 
 /* 画面。四条边都是直的，只有外缘（左）两角是圆的，跟票根同款。
@@ -3049,9 +3028,9 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
     radial-gradient(circle var(--seam-arc) at calc(100% + var(--seam-off)) 50%,
       #0000 var(--seam-arc), #000 calc(var(--seam-arc) + 0.4px)),
     /* 接缝上端、下端各咬掉一大块（圆心离边一个半径，贴边半个圆）。 */
-    radial-gradient(circle var(--big-arc) at calc(100% - 0px) calc(0% + var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at 100% 0%,
       #0000 var(--big-arc), #000 calc(var(--big-arc) + 0.4px)),
-    radial-gradient(circle var(--big-arc) at calc(100% - 0px) calc(100% - var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at 100% 100%,
       #0000 var(--big-arc), #000 calc(var(--big-arc) + 0.4px)),
     /* 左两角各挖掉 1/4 圆。右两角由上面那两个贴边半圆负责，
        接缝两端本来就是跨两块纸的大孔。 */
@@ -3155,9 +3134,9 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
       #0000 var(--seam-arc), #000 calc(var(--seam-arc) + 0.4px)),
     radial-gradient(circle var(--edge-arc) at calc(100% + var(--edge-off)) 50%,
       #0000 var(--edge-arc), #000 calc(var(--edge-arc) + 0.4px)),
-    radial-gradient(circle var(--big-arc) at calc(0% + 0px) calc(0% + var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at 0% 0%,
       #0000 var(--big-arc), #000 calc(var(--big-arc) + 0.4px)),
-    radial-gradient(circle var(--big-arc) at calc(0% + 0px) calc(100% - var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at 0% 100%,
       #0000 var(--big-arc), #000 calc(var(--big-arc) + 0.4px)),
     /* 右两角各挖掉 1/4 圆（左两角由贴边半圆负责）。 */
     radial-gradient(circle var(--big-arc) at 100% 0%,
@@ -3720,40 +3699,24 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   flex: 0 0 70.9%;
   min-width: 0;
   height: 100%;
-  /* 不能给整块纸色底（那会盖住暗幕），但**齿孔里必须垫色**：
-     不给的话孔里透出的是模糊后的暗幕，接缝两端那两个大孔在浮层里
-     变成两个深灰圆点，很扎眼（ticket-lift.png 目视取证）。
-     列表里这层垫色挂在 .ticket 上（它横跨两块纸，一张图能盖住全部孔），
-     浮层没有那种外层，只能左右两块纸各画自己那半边——
-     位置用百分比（相对自己），半径用 cqw（相对整票宽），两种坐标恰好各管一半。 */
-  background-image: radial-gradient(circle var(--big-arc) at 0% 0%,
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    radial-gradient(circle var(--big-arc) at 0% 100%,
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    radial-gradient(circle var(--big-arc) at 100% calc(0% + var(--big-arc)),
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    radial-gradient(circle var(--big-arc) at 100% 100%,
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
+      /* 洞内只留孔沿影，与 .ticket 的画面那半边同源；这块纸本来就独立，tile 占满。 */
+  background-image:
     radial-gradient(circle var(--edge-arc) at calc(0% - var(--edge-off)) 50%,
-      var(--album-page, #e7decd) calc(var(--edge-arc) * 0.78),
-      #241d12a6 calc(var(--edge-arc) * 0.96),
-      #241d12c4 var(--edge-arc), #241d1200 calc(var(--edge-arc) + 0.6px)),
+      #241d1200 0, #241d1200 calc(var(--edge-arc) * 0.72), #241d12b8 calc(var(--edge-arc) * 0.93), #241d1200 var(--edge-arc)),
     radial-gradient(circle var(--seam-arc) at calc(100% + var(--seam-off)) 50%,
-      var(--album-page, #e7decd) calc(var(--seam-arc) * 0.78),
-      #241d12a6 calc(var(--seam-arc) * 0.96),
-      #241d12c4 var(--seam-arc), #241d1200 calc(var(--seam-arc) + 0.6px));
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat-y, repeat-y;
-  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%,
-    100% var(--edge-step), 100% var(--seam-step);
+      #241d1200 0, #241d1200 calc(var(--seam-arc) * 0.72), #241d12b8 calc(var(--seam-arc) * 0.93), #241d1200 var(--seam-arc)),
+    radial-gradient(circle var(--big-arc) at calc(100% + var(--seam-off)) 0%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d12b8 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at calc(100% + var(--seam-off)) 100%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d12b8 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at 0% 0%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d12b8 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at 0% 100%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d12b8 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc));
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
   background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
+  background-repeat: no-repeat;
+  background-repeat: no-repeat;
 }
 
 /* 浮层里那张也要同一个比例，否则撕开前后形状不一样、飞出去那一刻会跳一下。
@@ -3773,40 +3736,24 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   display: flex;
   flex: 1;
   min-width: 0;
-  /* 孔里的垫色，与 .ticket-lift-shot 成对（那半边画在那边）。见那里的注释。 */
-  background-image: radial-gradient(circle var(--big-arc) at 0% calc(0% + var(--big-arc)),
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    radial-gradient(circle var(--big-arc) at 0% calc(100% - var(--big-arc)),
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    radial-gradient(circle var(--big-arc) at 100% 0%,
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    radial-gradient(circle var(--big-arc) at 100% 100%,
-      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
-      #241d12a6 calc(var(--big-arc) * 0.96),
-      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
+      /* 洞内只留孔沿影，与 .ticket 的票根那半边同源；tile 占满这块纸。 */
+  background-image:
     radial-gradient(circle var(--seam-arc) at calc(0% - var(--seam-off)) 50%,
-      var(--album-page, #e7decd) calc(var(--seam-arc) * 0.78),
-      #241d12a6 calc(var(--seam-arc) * 0.96),
-      #241d12c4 var(--seam-arc), #241d1200 calc(var(--seam-arc) + 0.6px)),
+      #241d1200 0, #241d1200 calc(var(--seam-arc) * 0.72), #241d1252 calc(var(--seam-arc) * 0.93), #241d1200 var(--seam-arc)),
+    radial-gradient(circle var(--big-arc) at calc(0% - var(--seam-off)) 0%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d1252 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at calc(0% - var(--seam-off)) 100%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d1252 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc)),
     radial-gradient(circle var(--edge-arc) at calc(100% + var(--edge-off)) 50%,
-      var(--album-page, #e7decd) calc(var(--edge-arc) * 0.78),
-      #241d12a6 calc(var(--edge-arc) * 0.96),
-      #241d12c4 var(--edge-arc), #241d1200 calc(var(--edge-arc) + 0.6px));
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat-y, repeat-y;
-  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%,
-    100% var(--seam-step), 100% var(--edge-step);
+      #241d1200 0, #241d1200 calc(var(--edge-arc) * 0.72), #241d1252 calc(var(--edge-arc) * 0.93), #241d1200 var(--edge-arc)),
+    radial-gradient(circle var(--big-arc) at 100% 0%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d1252 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc)),
+    radial-gradient(circle var(--big-arc) at 100% 100%,
+      #241d1200 0, #241d1200 calc(var(--big-arc) * 0.72), #241d1252 calc(var(--big-arc) * 0.93), #241d1200 var(--big-arc));
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
   background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
-  touch-action: none;
-  cursor: grab;
-  transform: translateY(calc(var(--pull) * -30%)) rotate(calc(var(--pull) * -1.4deg));
-  transform-origin: 0 100%;
-  opacity: calc(1 - var(--pull) * 0.18);
+  background-repeat: no-repeat;
+  background-repeat: no-repeat;
 }
 
 .ticket-lift-panel:active {
