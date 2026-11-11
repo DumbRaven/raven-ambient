@@ -3242,11 +3242,13 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
      票底                        → 47.9
    除掉元素本身，剩下约 18cqw 由 12 个间隙均摊 → gap 1.55cqw。 */
 .ticket-mark {
-  /* 2.3cqw 是按票高比例反推的：参考图抬头的暗带高 33px / 票高 561 = 5.88%，
-     按我这版票高 348 折算要 20.5px 的带；扣掉拱的 1.1cqw 位移，字形约占
-     13px，Georgia 大写约 0.75em → font 15.6px = 2.3cqw。
-     早先 1.75cqw（11.9px）渲出的带只有 16px，并排看小一号。 */
-  font: 600 clamp(6.5px, 2.3cqw, 46px) / 1.3 Georgia, "Times New Roman", "Songti SC", serif;
+  /* 1.95cqw，上限是被横向预算卡死的，不是审美选择：
+     票根内容宽 = panel 180.1px − 2×28.47px padding = 123px ≈ 19.9cqw。
+     Georgia 600 的大写约 0.62em 宽，加 0.08em 字距 → 每字 0.70em；
+     13 个字符要 9.1em，9.1 × 1.95 = 17.7cqw，留 2cqw 余量。
+     早先按票高比例反推到 2.3cqw（9.1 × 2.3 = 20.9cqw）超了 1cqw，
+     stack/arc 两版的抬头被 overflow: hidden 截成「CINEMA TICKI」。 */
+  font: 600 clamp(6.5px, 1.95cqw, 40px) / 1.3 Georgia, "Times New Roman", "Songti SC", serif;
   /* 字距 0.08 是量出来的：13 个字符要落进 20.7cqw 的内容宽。
      0.18 那版在窄屏上正好撑破，截成「CINEMA TIC」。 */
   letter-spacing: 0.08em;
@@ -3732,7 +3734,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
       var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
       #241d12a6 calc(var(--big-arc) * 0.96),
       #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    radial-gradient(circle var(--big-arc) at 100% 0%,
+    radial-gradient(circle var(--big-arc) at 100% calc(0% + var(--big-arc)),
       var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
       #241d12a6 calc(var(--big-arc) * 0.96),
       #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
@@ -3772,11 +3774,11 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   flex: 1;
   min-width: 0;
   /* 孔里的垫色，与 .ticket-lift-shot 成对（那半边画在那边）。见那里的注释。 */
-  background-image: radial-gradient(circle var(--big-arc) at 0% 0%,
+  background-image: radial-gradient(circle var(--big-arc) at 0% calc(0% + var(--big-arc)),
       var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
       #241d12a6 calc(var(--big-arc) * 0.96),
       #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
-    radial-gradient(circle var(--big-arc) at 0% 100%,
+    radial-gradient(circle var(--big-arc) at 0% calc(100% - var(--big-arc)),
       var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
       #241d12a6 calc(var(--big-arc) * 0.96),
       #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
