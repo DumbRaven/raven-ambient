@@ -3718,10 +3718,40 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   flex: 0 0 70.9%;
   min-width: 0;
   height: 100%;
-  /* 不能给纸色底：两块纸的 mask 会在左右两侧挖出孔，孔里透出来的
-     必须是外层暗幕（票被举起来了），不是纸色。列表里那张由 .ticket 的
-     background-image 垫色层负责，浮层没有那层。 */
-  background: transparent;
+  /* 不能给整块纸色底（那会盖住暗幕），但**齿孔里必须垫色**：
+     不给的话孔里透出的是模糊后的暗幕，接缝两端那两个大孔在浮层里
+     变成两个深灰圆点，很扎眼（ticket-lift.png 目视取证）。
+     列表里这层垫色挂在 .ticket 上（它横跨两块纸，一张图能盖住全部孔），
+     浮层没有那种外层，只能左右两块纸各画自己那半边——
+     位置用百分比（相对自己），半径用 cqw（相对整票宽），两种坐标恰好各管一半。 */
+  background-image: radial-gradient(circle var(--big-arc) at 0% 0%,
+      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
+      #241d12a6 calc(var(--big-arc) * 0.96),
+      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
+    radial-gradient(circle var(--big-arc) at 0% 100%,
+      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
+      #241d12a6 calc(var(--big-arc) * 0.96),
+      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
+    radial-gradient(circle var(--big-arc) at 100% 0%,
+      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
+      #241d12a6 calc(var(--big-arc) * 0.96),
+      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
+    radial-gradient(circle var(--big-arc) at 100% 100%,
+      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
+      #241d12a6 calc(var(--big-arc) * 0.96),
+      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
+    radial-gradient(circle var(--edge-arc) at calc(0% - var(--edge-off)) 50%,
+      var(--album-page, #e7decd) calc(var(--edge-arc) * 0.78),
+      #241d12a6 calc(var(--edge-arc) * 0.96),
+      #241d12c4 var(--edge-arc), #241d1200 calc(var(--edge-arc) + 0.6px)),
+    radial-gradient(circle var(--seam-arc) at calc(100% + var(--seam-off)) 50%,
+      var(--album-page, #e7decd) calc(var(--seam-arc) * 0.78),
+      #241d12a6 calc(var(--seam-arc) * 0.96),
+      #241d12c4 var(--seam-arc), #241d1200 calc(var(--seam-arc) + 0.6px));
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat-y, repeat-y;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%,
+    100% var(--edge-step), 100% var(--seam-step);
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
 }
 
 /* 浮层里那张也要同一个比例，否则撕开前后形状不一样、飞出去那一刻会跳一下。
@@ -3741,6 +3771,35 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   display: flex;
   flex: 1;
   min-width: 0;
+  /* 孔里的垫色，与 .ticket-lift-shot 成对（那半边画在那边）。见那里的注释。 */
+  background-image: radial-gradient(circle var(--big-arc) at 0% 0%,
+      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
+      #241d12a6 calc(var(--big-arc) * 0.96),
+      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
+    radial-gradient(circle var(--big-arc) at 0% 100%,
+      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
+      #241d12a6 calc(var(--big-arc) * 0.96),
+      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
+    radial-gradient(circle var(--big-arc) at 100% 0%,
+      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
+      #241d12a6 calc(var(--big-arc) * 0.96),
+      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
+    radial-gradient(circle var(--big-arc) at 100% 100%,
+      var(--album-page, #e7decd) calc(var(--big-arc) * 0.78),
+      #241d12a6 calc(var(--big-arc) * 0.96),
+      #241d12c4 var(--big-arc), #241d1200 calc(var(--big-arc) + 0.6px)),
+    radial-gradient(circle var(--seam-arc) at calc(0% - var(--seam-off)) 50%,
+      var(--album-page, #e7decd) calc(var(--seam-arc) * 0.78),
+      #241d12a6 calc(var(--seam-arc) * 0.96),
+      #241d12c4 var(--seam-arc), #241d1200 calc(var(--seam-arc) + 0.6px)),
+    radial-gradient(circle var(--edge-arc) at calc(100% + var(--edge-off)) 50%,
+      var(--album-page, #e7decd) calc(var(--edge-arc) * 0.78),
+      #241d12a6 calc(var(--edge-arc) * 0.96),
+      #241d12c4 var(--edge-arc), #241d1200 calc(var(--edge-arc) + 0.6px));
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat-y, repeat-y;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%,
+    100% var(--seam-step), 100% var(--edge-step);
+  background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 0 0;
   touch-action: none;
   cursor: grab;
   transform: translateY(calc(var(--pull) * -30%)) rotate(calc(var(--pull) * -1.4deg));
