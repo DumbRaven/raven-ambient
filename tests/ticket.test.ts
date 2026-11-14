@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   clampPage, pageCount, pageOf, pagerWindow, slipPage, ticketBars, ticketBlanks, ticketHash,
-  ticketLayout, ticketLayouts, ticketNo, ticketSeat, ticketShowtime, ticketStamp,
+  ticketCode, ticketLayout, ticketLayouts, ticketNo, ticketSeat, ticketShape, ticketShapes,
+  ticketShowtime, ticketStamp,
   TICKET_PAGE_SIZE,
 } from '../src/ticket.ts';
 
@@ -46,12 +47,17 @@ test('票号是列表里的位次，补零到六位', () => {
   assert.equal(ticketNo(-4), 'NO. 000001');
 });
 
-test('同一个 id 的座位与条码固定不变', () => {
-  const first = ticketSeat('D:\\media\\ocean.png');
-  const again = ticketSeat('D:\\media\\ocean.png');
-  assert.deepEqual(first, again);
-  assert.match(first.row, /^ROW: \d{2}$/);
-  assert.match(first.seat, /^SEAT: [A-H]\d{2}$/);
+test('座位与行号是列表位置：本页第几张、第几页', () => {
+  assert.deepEqual(ticketSeat(0), { row: 'ROW: 01', seat: 'SEAT: A01', page: '01', place: 'A01' });
+  assert.deepEqual(ticketSeat(5), { row: 'ROW: 01', seat: 'SEAT: A06', page: '01', place: 'A06' });
+  // 翻到第二页：行号变 02，座位从 A01 重新数
+  assert.deepEqual(ticketSeat(6), { row: 'ROW: 02', seat: 'SEAT: A01', page: '02', place: 'A01' });
+  // 负序号夹到 0，不出现 ROW: 00
+  assert.equal(ticketSeat(-3).row, 'ROW: 01');
+  // 一页里六个位置各不相同
+  const places = Array.from({ length: 6 }, (_, i) => ticketSeat(i).place);
+  assert.equal(new Set(places).size, 6);
+
 
   const bars = ticketBars('D:\\media\\ocean.png');
   assert.deepEqual(bars, ticketBars('D:\\media\\ocean.png'));
@@ -62,7 +68,7 @@ test('同一个 id 的座位与条码固定不变', () => {
   for (const width of bars) assert.ok(width > 0);
 });
 
-test('不同的 id 得到不同的条纹与座位（不会整页一个样）', () => {
+test('不同的 id 得到不同的条纹（不会整页一个样）', () => {
   const a = ticketBars('a.png');
   const b = ticketBars('b.png');
   assert.notDeepEqual(a, b);
@@ -89,6 +95,25 @@ test('场次由 id 决定，日期合法且翻页不变', () => {
 
   // 不同文件的场次不该整页一个样。
   assert.notDeepEqual(ticketShowtime('a.png'), ticketShowtime('b.png'));
+});
+
+test('有文件修改时间时，票面印的就是文件时间（本地时区）', () => {
+  // 用本地时间构造，再按本地时区格式化回来，换台机器也不会因时区挂掉。
+  const at = new Date(2023, 7, 21, 14, 5).getTime();
+  assert.deepEqual(ticketStamp('a.png', at), {
+    date: '2023.08.21',
+    time: '14:05',
+    // 那行细字仍是 id 决定的氛围文案，跟时间无关。
+    fine: ticketStamp('a.png').fine,
+  });
+  assert.deepEqual(ticketShowtime('a.png', at), { date: 'DATE: 08 / 21', time: 'TIME: 14:05' });
+  // 两个函数读的是同一个时刻：classic 与 stack 印出来不能互相打架。
+  assert.equal(ticketShowtime('a.png', at).time, `TIME: ${ticketStamp('a.png', at).time}`);
+
+  // 缺失 / 0 / NaN 都回落到散列，绝不会印出 1970 年。
+  for (const bad of [undefined, 0, Number.NaN]) {
+    assert.equal(ticketStamp('a.png', bad).date, ticketStamp('a.png').date);
+  }
 });
 
 test('空位补到六个，满页不补', () => {
@@ -129,16 +154,15 @@ test('四种版式都会出现，且不是按列表顺序轮流发', () => {
   assert.ok(layouts.some((layout, index) => index > 0 && layout === layouts[index - 1]));
 });
 
-test('票面那几组字也从 id 来，格式合法', () => {
+test('没有文件时间时，日期、时间与细字由 id 定死（回落的装饰值）', () => {
   const stamp = ticketStamp('D:\\media\\ocean.png');
   assert.deepEqual(stamp, ticketStamp('D:\\media\\ocean.png'));
   assert.match(stamp.date, /^2024\.\d{2}\.\d{2}$/);
   assert.match(stamp.time, /^\d{2}:\d{2}$/);
-  assert.match(stamp.seat, /^A \d{2}$/);
-  assert.match(stamp.row, /^\d{2}$/);
-  assert.match(stamp.code, /^\d{7}[A-H]$/);
-  assert.ok(stamp.venue.length > 4);
   assert.ok(stamp.fine.length > 4);
+  // 这三样不该再出现旧的散列字段
+  assert.equal('seat' in stamp, false);
+  assert.equal('venue' in stamp, false);
 
   // 月 4~12、日 1~12（避开「2 / 30」这类不存在的日子），时 10~21。
   for (const id of ['a.png', 'b.png', 'tokyo.mp4']) {
@@ -149,4 +173,19 @@ test('票面那几组字也从 id 来，格式合法', () => {
     const [, hour] = time.match(/^(\d{2}):/)!;
     assert.ok(Number(hour) >= 10 && Number(hour) <= 21, `hour ${hour}`);
   }
+});
+
+test('票形由 id 定死：两种都有，且不跟版式绑死', () => {
+  const ids = Array.from({ length: 80 }, (_, index) => `media/${index}.png`);
+  for (const id of ids) assert.equal(ticketShape(id), ticketShape(id));
+  assert.equal(new Set(ids.map(ticketShape)).size, ticketShapes.length);
+  // 版式 %4 的散列如果直接 %2，形状会跟版式完全同向；加后缀再散列就不会。
+  const paired = ids.filter(id => ticketShape(id) === 'retro').map(ticketLayout);
+  assert.ok(new Set(paired).size > 1);
+});
+
+test('编码是媒体类型加列表位次', () => {
+  assert.equal(ticketCode('image', 0), 'IMG 000001');
+  assert.equal(ticketCode('video', 41), 'MOV 000042');
+  assert.equal(ticketCode('image', -2), 'IMG 000001');
 });

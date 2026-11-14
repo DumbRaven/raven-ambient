@@ -159,3 +159,23 @@ test('单独导入的文件不在任何目录里，重启时要单独补进白�
   const near = toMediaItem(file('F:\\素材二\\别的.png'));
   assert.deepEqual(looseMedia([near], dirs), ['F:\\素材二\\别的.png']);
 });
+
+test('重扫后新条目覆盖旧条目，修改时间跟着换新', () => {
+  const old = toMediaItem({ ...file('F:\\素材\\海边.png'), mtime: 1000 });
+  const fresh = toMediaItem({ ...file('F:\\素材\\海边.png'), mtime: 2000 });
+  const merged = mergeMedia([old], [fresh]);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].mtime, 2000, '重扫拿到的新时间要盖掉存档里的旧值');
+});
+
+test('扫描带的修改时间会一路留到票面：扫描 → 条目 → 存档 → 读回', () => {
+  const at = new Date(2023, 7, 21, 14, 5).getTime();
+  const item = toMediaItem({ ...file('F:\\素材\\海边.png'), mtime: at });
+  assert.equal(item.mtime, at, 'toMediaItem 要把 mtime 带上');
+
+  // 存档里没有 mtime 的老条目读回来仍是 undefined——不能补 0，
+  // 0 会被票面印成 1970。
+  const saved = sanitizeCabinet({ media: [item, toMediaItem(file('F:\\素材\\旧.png'))] });
+  assert.equal(saved.media[0].mtime, at);
+  assert.equal(saved.media[1].mtime, undefined);
+});

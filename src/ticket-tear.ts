@@ -38,10 +38,139 @@ export const TICKET_ASPECT = 1098 / 562;
  */
 export const TEAR_TRIGGER = 0.42;
 
+/**
+ * 掀开角度的上限（度）。
+ *
+ * 12 度是在 1040×498 的浮层上试出来的：绕接缝底端转，顶端横向让开
+ * 498 × sin(12°) ≈ 103px，刚好是一道看得清的 V 形。再大就像整块牌子被掀翻，
+ * 不像纸。
+ *
+ * **注意**：自从右半改成多段卷曲（见 CURL_* 常量）之后，这条只给
+ * `prefers-reduced-motion` 的降级态用——那时不切开、不做 3D，退回整块绕底端转。
+ */
+export const TEAR_HINGE_DEG = 12;
+
+/**
+ * 折痕：从右下角掀起一块三角狗耳，翻过折痕压在纸上、露出纸背。
+ *
+ * 用户 m04030 的原话是「这个不应该是从右下角掀起来然后折叠着往上撕吗」，m04023
+ * 补了一句「这是一个柔软的东西明白吗，这是一种折叠」。
+ *
+ * 为什么是狗耳而不是「一条横贯的折痕」：折痕横贯整块面板时，折起来的是
+ * 面板的 60%，翻过去必然戳出票面之外；探针截图里那块纸整个飞出了票根。
+ * 狗耳折的是右下角一个等腰直角三角形，翻过 180 度之后正好落在折痕另一侧，
+ * 仍然在纸面之内。
+ *
+ * 之前两条路都不对，记在这里免得再走一遍：
+ * - 整块绕轴转（铰链、skew、绕斜轴 rotate3d）：硬板味道，用户连着否了两次；
+ * - 把右半切成 8 条横带各自转：相邻两条的边不再共线，接缝裂成阶梯（探针
+ *   maxSeam 从 1.04 涨到 6.21）。
+ *
+ * 一个折痕、一次旋转就不可能裂——这也是用户 m04075 要的「简单办法」。
+ */
+
+/** 折满时的折叠角（度）。180 是纸对折贴平；留一点角度，翻起来那块还立着。 */
+export const TEAR_FOLD_DEG = 176;
+
+/**
+ * 折满时那个角有多大：折痕吃掉的直角边长，占面板宽的比例。
+ *
+ * 0.42 是「看得出来是掀了一个角」与「不至于把半张票撕走」之间的取舍。
+ * 拉到 1（等于整条下边缘）时折痕横到左边缘，翻起来的是面板下半部整整一半，
+ * 读起来像票根缺了一块，而不是掀角。
+ */
+export const TEAR_FOLD_EDGE = 0.42;
+
+/**
+ * 右半面板的宽 / 高比。
+ *
+ * 面板宽占整票 28%（CSS `.ticket-lift-shot { flex: 0 0 72% }` 的剩下那块），
+ * 票的高占宽的 47.85%（CSS `.ticket-lift { aspect-ratio: 100 / 47.85 }`），
+ * 所以宽高比 = 0.28 / 0.4785 ≈ 0.585。这两个数在 CSS 里是写死的，改那边要同步这里。
+ * 早先按 `(1 - SHOT_SHARE) * TICKET_ASPECT` 算是 0.568，和实际差 4%，
+ * 折痕右端因此偏离旋转轴 7.6px（探针 hingeShift 测出来的）。
+ */
+export const TEAR_PANEL_RATIO = 0.28 / 0.4785;
+
+/**
+ * 折痕的形状：一个从右下角掀起的三角狗耳。
+ *
+ * 坐标都是 0~1 的比值，由 CSS 乘上面板尺寸。
+ */
+export type FoldShape = {
+  /** 折痕已经吃掉多少（0~TEAR_FOLD_EDGE，按面板宽算）。0 = 什么都没折。 */
+  edge: number;
+  /** 折痕在下边缘的落点（x 比值）。1 = 就在右下角。 */
+  x1: number;
+  /** 折痕在右边缘的落点（y 比值）。1 = 就在右下角。 */
+  y1: number;
+  /** 绕折痕转的轴，平面内单位向量。 */
+  ax: number;
+  ay: number;
+  /** 折叠角（度），0 = 平铺。 */
+  deg: number;
+};
+
+/**
+ * 算这条狗耳折痕该长什么样。
+ *
+ * `bend` 是**已经过成曲线的**形变进度（tearEase 的输出），不是手位移。
+ *
+ * 几何是一张纸被捏住右下角、沿一条 45° 的折痕翻起来：
+ * 折痕从下边缘的 (x1, 1) 连到右边缘的 (1, y1)，两条直角边等长，
+ * 于是被折的那块正好是等腰直角三角形。180 度翻过去之后它盖在折痕另一侧，
+ * **仍然落在纸面之内**——这是狗耳与「整块翻」的根本区别：整块翻会飞出纸外。
+ * 角的大小由 TEAR_FOLD_EDGE 封顶，不让它长到把半张票掀走。
+ *
+ * 轴恒为 45°（像素空间里 ax = -ay），不随进度变：折痕自己就是那条 45° 线，
+ * 变的是它离右下角多远。这样旋转过程中折痕那条边一个像素都不动。
+ */
+export function foldShape(bend: number): FoldShape {
+  const shape = Number.isFinite(bend) ? Math.max(0, Math.min(1, bend)) : 0;
+  // 直角边长占面板宽的比例：0 → TEAR_FOLD_EDGE，折满时那个角掀到最大。
+  const edge = TEAR_FOLD_EDGE * shape;
+  // 折痕两端。右下角是 (1, 1)，沿两条边各退 edge 个「面板宽」。
+  const x1 = 1 - edge;
+  // 右边缘那端竖着退同样长的像素，所以要乘面板宽高比换算成比值。
+  const y1 = 1 - edge * TEAR_PANEL_RATIO;
+  // 轴就是 45° 那条线：两端在**像素**空间里横向与纵向走一样多
+  // （(1-x1)·W = edge·W，(y1-1)·H = -edge·W，因为 H = W / TEAR_PANEL_RATIO）。
+  // rotate3d 的轴是像素坐标系里的方向，所以这里直接写 1/√2，不看宽高比。
+  const k = Math.SQRT1_2;
+  return {
+    edge,
+    x1,
+    y1,
+    ax: k,
+    ay: -k,
+    deg: TEAR_FOLD_DEG * shape,
+  };
+}
+
 /** 拖拽位移换算成 0~1 的撕开进度。 */
 export function tearProgress(dy: number, panelHeight: number): number {
   if (!Number.isFinite(dy) || dy <= 0 || !Number.isFinite(panelHeight) || panelHeight <= 0) return 0;
   return Math.min(1, dy / panelHeight);
+}
+
+/**
+ * 把匀速的撕开进度过成「前段绷住、后段加速」的曲线。
+ *
+ * 为什么不直接用 --pull：手匀速往上拖，纸是按同样的比例在动，读起来就是
+ * 机械的匀速位移。真纸不是这样——一开始纤维还连着，几乎不动，越过
+ * 临界点之后突然顺着撕线跑开。1.6 次幂恰好是这个味道：手拖到一半，形变
+ * 只走三分之一；到断的那一刻才走满。
+ *
+ * 归一化到 TEAR_TRIGGER 而不是 1：撕到 42% 就断了，1 永远走不到。以 1 为
+ * 分母的话，阈值那一刻形变只有 0.43^1.6 ≈ 0.26，掀开角不到 4 度，拖了一路
+ * 看起来纹丝不动（实测 m02809 就是 3.16 度）。以「断开点」为 1，手到阈值
+ * 才刚好把这一下撕满，中途的滞后感也还在。
+ */
+export function tearEase(progress: number, trigger = TEAR_TRIGGER): number {
+  if (!Number.isFinite(progress) || progress <= 0) return 0;
+  const reach = Number.isFinite(trigger) && trigger > 0 ? trigger : TEAR_TRIGGER;
+  const t = Math.min(1, progress / reach);
+  return t ** 1.6;
 }
 
 /** 松手时是否算撕开。 */

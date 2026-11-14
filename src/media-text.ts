@@ -20,3 +20,14 @@ export function sizeOf(bytes: number) {
   if (bytes >= 1024 * 1024) return `${Math.round(bytes / 1024 / 1024)} MB`;
   return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
+
+/**
+ * 文件所在的目录名。票根上「FROM」那一行印的就是它：这份素材从哪个相册来。
+ *
+ * 壁纸库的条目调用方应该优先传 `source`（作品目录），普通文件传 `path`。
+ * 只取倒数第二段：最后一段是文件名，再往上拼整条路径票根里放不下。
+ */
+export function folderOf(path: string) {
+  const parts = path.split(/[\\/]+/).filter(Boolean);
+  return parts.length >= 2 ? parts[parts.length - 2] : '';
+}

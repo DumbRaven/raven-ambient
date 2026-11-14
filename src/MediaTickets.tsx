@@ -13,13 +13,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { mediaSrc } from './media';
-import { titleOf } from './media-text';
+import { folderOf, titleOf } from './media-text';
 import {
-  pageOf, pagerWindow, slipPage, ticketBars, ticketLayout, ticketNo, ticketSeat,
-  ticketShowtime, ticketStamp,
+  pageOf, pagerWindow, slipPage, ticketBars, ticketCode, ticketLayout, ticketNo, ticketSeat,
+  ticketShape, ticketShowtime, ticketStamp,
 } from './ticket.ts';
 import {
-  ashParticles, flightOf, flightSelectors, pickFlightRect, shouldTear, tearProgress,
+  ashParticles, flightOf, flightSelectors, foldShape, pickFlightRect,
+  shouldTear, TEAR_HINGE_DEG, tearEase, tearProgress,
 } from './ticket-tear.ts';
 import { PAPER_FILTER_ID, paperFilterMarkup } from './paper.ts';
 import type { MediaItem } from './records';
@@ -94,11 +95,18 @@ function Barcode({ id }: { id: string }) {
  * 版式由文件 id 定死，不是每次渲染随机的——翻页回来票面变了，一眼就假。
  */
 function TicketFace({ item, index }: { item: MediaItem; index: number }) {
-  const seat = ticketSeat(item.id);
-  // 场次由 id 决定：同一个文件永远是同一场，翻页回来不会变。
-  const show = ticketShowtime(item.id);
-  const stamp = ticketStamp(item.id);
+  // 座位与行号是真的：本页第几张、第几页（见 ticketSeat 的注释）。
+  const seat = ticketSeat(index);
+  // 日期与时间也印真的：文件的修改时间（扫描时带上来）。老库里没有 mtime
+  // 的条目会回落到 id 散列，不会出现 1970 年。
+  const show = ticketShowtime(item.id, item.mtime);
+  const stamp = ticketStamp(item.id, item.mtime);
   const layout = ticketLayout(item.id);
+  const code = ticketCode(item.kind, index);
+  // 来源也是真的：壁纸库用作品目录，普通文件用它所在的文件夹。
+  // 拿不到目录时退回一句兜底，不让票根上「FROM」后面空着。
+  const folder = item.source ? folderOf(item.source) : folderOf(item.path);
+  const venue = folder || 'LOCAL LIBRARY';
   const name = <b className="ticket-name" title={item.name}>{titleOf(item)}</b>;
   const barcode = <Barcode id={item.id} />;
 
@@ -114,7 +122,7 @@ function TicketFace({ item, index }: { item: MediaItem; index: number }) {
         </span>
         <span className="ticket-box">
           <span className="ticket-label">SEAT</span>
-          <span className="ticket-value">{stamp.seat}</span>
+          <span className="ticket-value">{seat.place}</span>
         </span>
         <span className="ticket-no">{ticketNo(index)}</span>
         {barcode}
@@ -131,11 +139,11 @@ function TicketFace({ item, index }: { item: MediaItem; index: number }) {
         <span className="ticket-stack">
           <span><span className="ticket-label">DATE</span><span className="ticket-value">{stamp.date}</span></span>
           <span><span className="ticket-label">TIME</span><span className="ticket-value">{stamp.time}</span></span>
-          <span><span className="ticket-label">THEATER</span><span className="ticket-value">{stamp.row}</span></span>
+          <span><span className="ticket-label">PAGE</span><span className="ticket-value">{seat.page}</span></span>
         </span>
-        <span className="ticket-code">{stamp.code}</span>
+        <span className="ticket-code">{code}</span>
         {barcode}
-        <span className="ticket-venue">{stamp.venue}</span>
+        <span className="ticket-venue">{venue}</span>
       </span>
     );
   }
@@ -149,7 +157,7 @@ function TicketFace({ item, index }: { item: MediaItem; index: number }) {
         <span className="ticket-fine">{stamp.fine}</span>
         <span className="ticket-no">{ticketNo(index)}</span>
         {barcode}
-        <span className="ticket-venue">{stamp.venue}</span>
+        <span className="ticket-venue">{venue}</span>
       </span>
     );
   }
@@ -164,8 +172,8 @@ function TicketFace({ item, index }: { item: MediaItem; index: number }) {
       <span className="ticket-admit">★ ADMIT ONE ★</span>
       <span className="ticket-rule" />
       {name}
-      <span className="ticket-credit">A FILM BY</span>
-      <span className="ticket-credit">{stamp.venue}</span>
+      <span className="ticket-credit">FROM</span>
+      <span className="ticket-credit">{venue}</span>
       <span className="ticket-rule" />
       <span className="ticket-lines">
         <span>{show.date}</span>
@@ -192,7 +200,6 @@ function TicketShot({ item, playing }: { item: MediaItem; playing: boolean }) {
       ) : (
         <VideoThumb src={mediaSrc(item)} alt="" />
       )}
-      {item.kind === 'video' && <i className="media-badge">视频</i>}
     </span>
   );
 }
@@ -212,6 +219,7 @@ function Ticket({
       <button
         className={`ticket ${picked ? 'is-current' : ''}`}
         data-kind={item.kind}
+        data-shape={ticketShape(item.id)}
         onClick={onOpen}
         aria-pressed={picked}
         aria-label={`放映 ${titleOf(item)}`}
@@ -243,6 +251,10 @@ function TicketStage({
 }) {
   const [phase, setPhase] = useState<Phase>('idle');
   const [pull, setPull] = useState(0); // 0~1 的撕开进度
+  // 按住期间不能有过渡，否则纸会追在手指后面漂；松手才放开回弹。
+  const [holding, setHolding] = useState(false);
+  // 已经拖过阈值：松手就断。只用来换视觉提示，不参与判定。
+  const [tearable, setTearable] = useState(false);
   const [flying, setFlying] = useState<{ dx: number; dy: number; scale: number } | null>(null);
   const drag = useRef<{ id: number; startY: number; height: number } | null>(null);
   const timers = useRef<number[]>([]);
@@ -283,32 +295,66 @@ function TicketStage({
 
   function down(event: React.PointerEvent) {
     if (phase !== 'idle' || event.button !== 0) return;
+    // 开始撕之前先掐掉浏览器的默认手势：默认会拖选文字、把图片拖成幽灵图。
+    // CSS 那边也写了 user-select: none，但预防一次更保险——鼠标按下时
+    // 默认行为一旦启动，事后再改就晚了（拖到一半满屏蓝底白字）。
+    event.preventDefault();
     const panel = (event.currentTarget as HTMLElement).getBoundingClientRect();
     drag.current = { id: event.pointerId, startY: event.clientY, height: panel.height };
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    setHolding(true);
   }
 
   function move(event: React.PointerEvent) {
     const state = drag.current;
     if (!state || state.id !== event.pointerId) return;
-    setPull(tearProgress(state.startY - event.clientY, state.height));
+    const dy = state.startY - event.clientY;
+    setPull(tearProgress(dy, state.height));
+    setTearable(shouldTear(dy, state.height));
   }
 
   function up(event: React.PointerEvent) {
     const state = drag.current;
     if (!state || state.id !== event.pointerId) return;
     drag.current = null;
+    setHolding(false);
     const dy = state.startY - event.clientY;
     if (shouldTear(dy, state.height)) {
+      // 撕开了：进度钉在满值，卷曲就此停住，交给燃烧与飞行。
       setPull(1);
+      setTearable(false);
       burn();
     } else {
-      setPull(0); // 没拖够就弹回去，不撕
+      // 没拖够：进度归零，由 CSS 的过渡带一点过冲把纸摊回平面。
+      setPull(0);
+      setTearable(false);
     }
   }
 
+  // 形变进度只算一次：折痕的形状与票面淡化都读它。
+  const bend = tearEase(pull);
+  // 一只从右下角翻起来的狗耳该怎么摆、绕哪个轴转多少度，全部由纯函数算好，
+  // CSS 只负责把这几个数贴到 clip-path 与 transform 上——折多少只改
+  // ticket-tear.ts 一处。
+  const fold = foldShape(bend);
+
   const style = {
-    '--pull': pull.toFixed(3),
+    // --bend 0~1：撕开已经被过成「前段绷住、后段加速」的形变进度，
+    // 折叠角与票面淡化都读它，两处同源才不会各走各的。
+    '--bend': bend.toFixed(3),
+    // 折痕在下边缘的落点（0~1 比值）。1 = 就在右下角，即什么都没折；
+    // 越折越小，折满时到 0（折痕横到左边缘）。
+    '--fold-x1': fold.x1.toFixed(5),
+    // 折痕在右边缘的落点（0~1 比值）。同样从 1 往 0 退。
+    '--fold-y1': fold.y1.toFixed(5),
+    // 折痕的方向向量与折叠角：CSS 用 rotate3d 绕这条**真实的折痕线**转，
+    // 一整块纸一次旋转，所以接缝不可能裂开。
+    '--fold-ax': fold.ax.toFixed(5),
+    '--fold-ay': fold.ay.toFixed(5),
+    '--fold-deg': `${fold.deg.toFixed(3)}deg`,
+    // --hinge：只有 prefers-reduced-motion 的降级态读它（那时不做 3D 折叠，
+    // 退回整块绕底端掀开）。
+    '--hinge': `${TEAR_HINGE_DEG}deg`,
     ...(flying
       ? {
         '--fly-x': `${flying.dx.toFixed(1)}px`,
@@ -324,8 +370,15 @@ function TicketStage({
       data-phase={phase}
       ref={stageRef}
       onClick={event => { if (event.target === stageRef.current) onClose(); }}
+      onDragStart={event => event.preventDefault()}
     >
-      <div className="ticket-lift" style={style}>
+      <div
+        className="ticket-lift"
+        style={style}
+        data-shape={ticketShape(item.id)}
+        data-holding={holding ? 'true' : 'false'}
+        data-tearable={tearable ? 'true' : 'false'}
+      >
         <span className="ticket-lift-shot" ref={shotRef}>
           <TicketShot item={item} playing />
         </span>
@@ -336,7 +389,14 @@ function TicketStage({
           onPointerUp={up}
           onPointerCancel={up}
         >
-          <TicketFace item={item} index={index} />
+          {/* 两份票面：折痕上面那份原样留着，下面那份沿折痕翻过来。
+              都是同一张票面、同一套纸色纸纹撕线孔，不用真去把票切开。 */}
+          <span className="ticket-fold" data-side="under" aria-hidden="true">
+            <TicketFace item={item} index={index} />
+          </span>
+          <span className="ticket-fold" data-side="over" aria-hidden="true">
+            <TicketFace item={item} index={index} />
+          </span>
         </span>
         {phase === 'idle' && <span className="ticket-tip">按住票根往上撕</span>}
         {phase !== 'idle' && (

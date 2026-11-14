@@ -27,6 +27,8 @@ export type ScannedFile = {
   name: string;
   kind: MediaKind;
   size: number;
+  /** 修改时间（毫秒）。扫描时和 size 同一次 statSync 拿的，票面日期用它。 */
+  mtime?: number;
   src: string;
 };
 
@@ -167,6 +169,7 @@ export function toMediaItem(file: ScannedFile): MediaItem {
     path: file.path,
     name: file.name,
     size: file.size,
+    mtime: file.mtime,
   };
 }
 
@@ -183,6 +186,7 @@ export function toWallpaperItem(file: WallpaperFile): MediaItem {
     path: file.path,
     name: file.name,
     size: file.size,
+    mtime: file.mtime,
     source: file.key,
     note: file.note || undefined,
   };

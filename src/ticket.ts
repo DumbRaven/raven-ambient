@@ -85,32 +85,102 @@ export function ticketNo(index: number): string {
   return `NO. ${String(Math.max(0, Math.trunc(index)) + 1).padStart(6, '0')}`;
 }
 
-/** 池子里的行号与座位。纯装饰，用 id 散列固定下来，同一个文件永远是同一个座。 */
-export function ticketSeat(id: string): { row: string; seat: string } {
-  const hash = ticketHash(id);
-  const row = `ROW: ${String((hash % 12) + 1).padStart(2, '0')}`;
-  const letter = 'ABCDEFGH'[Math.floor(hash / 12) % 8];
-  const seat = `SEAT: ${letter}${String(Math.floor(hash / 96) % 24 + 1).padStart(2, '0')}`;
-  return { row, seat };
+/**
+ * 票的外形。用户 m00941 说两种都好看、都要，每张票固定一种。
+ *
+ * - `modern` 现代电影票：横平竖直的直角矩形，只有中间那列撕线孔。
+ * - `retro`  复古票：外缘一圈细密半圆齿 + 四角小圆角，撕线孔照旧。
+ *
+ * 用 `id:shape` 再散列一次，不直接拿 id 的散列取模：版式已经占了 `% 4`，
+ * 同一份散列再 `% 2` 会让形状和版式完全绑死（版式 0/2 永远是同一种形状）。
+ *
+ * 散列完再搅一次：`image:0:shape`、`image:1:shape` 只差一个字符，FNV 的
+ * bit0 会正好一替一个，六张连号票就成了 retro/modern/retro/…，看着像
+ * 按序号排的。异或高位 + 乘一个奇数常数把低位打散（实测前 24 个 id
+ * 的分布是 010110001011100011011111）。
+ */
+export type TicketShape = 'modern' | 'retro';
+
+export const ticketShapes: readonly TicketShape[] = ['modern', 'retro'];
+
+export function ticketShape(id: string): TicketShape {
+  let hash = ticketHash(`${id}:shape`);
+  hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b) >>> 0;
+  return ticketShapes[(hash >>> 16) % ticketShapes.length];
 }
 
 /**
- * 场次日期与时间。
+ * 座位与行号。两项都是真的：座位是**这一页里的第几张**（A01..A06），
+ * 行号是**第几页** —— 和票根上的 NO.（整表里的位次）互相印证，
+ * 翻到第几页、坐在这一页第几个，都能对上。
  *
- * 票根上原本印的是「文件大小」和「第几张 / 每页几张」——前一个是字节数，
- * 后一个是布局常量，两样都不该出现在一张电影票上。这里换成由 id 散列出来的
- * 月日与时刻：同一个文件永远是同一场，翻页回来不会变。
- *
- * 日期取 4 月到 12 月（避开 1、2 月，那两个月在 31 号上容易凑出「2 / 30」这种
- * 不存在的日子），日用 12 的模，保证不论哪个月都是合法日期。
+ * 早先这里用 id 散列编一组假座位，用户 m00941 问「这些信息有意义吗」，
+ * 于是换成列表位置。同一个文件不动位置时座位就不变，翻页回来也一样。
  */
-export function ticketShowtime(id: string): { date: string; time: string } {
+export function ticketSeat(index: number, perPage = TICKET_PAGE_SIZE): {
+  /** `ROW: 01`，classic 那行整行印。 */
+  row: string;
+  /** `SEAT: A01`，classic 那行整行印。 */
+  seat: string;
+  /** 只写页码，stack 版「PAGE」那一行的值。 */
+  page: string;
+  /** 只写座位，arc 版方框里的值（参考图方框里是 `A 08`，不带前缀）。 */
+  place: string;
+} {
+  const at = Math.max(0, Math.trunc(index));
+  const page = Math.floor(at / perPage) + 1;
+  const place = `A${String((at % perPage) + 1).padStart(2, '0')}`;
+  return {
+    row: `ROW: ${String(page).padStart(2, '0')}`,
+    seat: `SEAT: ${place}`,
+    page: String(page).padStart(2, '0'),
+    place,
+  };
+}
+
+/**
+ * 票面上的那一刻。
+ *
+ * 有文件修改时间就用真的——用户 m01248 让扫描器把 `mtime` 一起带上来，
+ * 票面上的 DATE / TIME 现在印的是这张图最后一次被改动的时刻，能和文件对上。
+ *
+ * 没有 mtime 的（老版本存下来的库、壁纸库条目、测试里的假数据）才回落到
+ * id 散列：宁可印一个看起来正常的假日期，也别出现 1970 年或空白。
+ * 用本地时区格式化——用户看的是自己电脑上的时间，不是 UTC。
+ */
+function ticketClock(id: string, mtime?: number): {
+  year: string; month: string; day: string; hour: string; minute: string;
+} {
+  if (typeof mtime === 'number' && Number.isFinite(mtime) && mtime > 0) {
+    const at = new Date(mtime);
+    if (!Number.isNaN(at.getTime())) {
+      return {
+        year: String(at.getFullYear()),
+        month: String(at.getMonth() + 1).padStart(2, '0'),
+        day: String(at.getDate()).padStart(2, '0'),
+        hour: String(at.getHours()).padStart(2, '0'),
+        minute: String(at.getMinutes()).padStart(2, '0'),
+      };
+    }
+  }
   const hash = ticketHash(id);
-  const month = String(4 + (hash % 9)).padStart(2, '0');
-  const day = String(1 + (Math.floor(hash / 9) % 12)).padStart(2, '0');
-  const hour = String(10 + (Math.floor(hash / 108) % 12)).padStart(2, '0');
-  const minute = String(Math.floor(hash / 1296) % 60).padStart(2, '0');
-  return { date: `DATE: ${month} / ${day}`, time: `TIME: ${hour}:${minute}` };
+  return {
+    year: '2024',
+    month: String(4 + (hash % 9)).padStart(2, '0'),
+    day: String(1 + (Math.floor(hash / 9) % 12)).padStart(2, '0'),
+    hour: String(10 + (Math.floor(hash / 108) % 12)).padStart(2, '0'),
+    minute: String(Math.floor(hash / 1296) % 60).padStart(2, '0'),
+  };
+}
+
+/**
+ * 场次日期与时间（classic 版的整行）。
+ *
+ * 早先这两行是由 id 散列出来的月日与时刻，纯编的；现在优先印文件的修改时间。
+ */
+export function ticketShowtime(id: string, mtime?: number): { date: string; time: string } {
+  const clock = ticketClock(id, mtime);
+  return { date: `DATE: ${clock.month} / ${clock.day}`, time: `TIME: ${clock.hour}:${clock.minute}` };
 }
 
 /**
@@ -135,39 +205,36 @@ export function ticketLayout(id: string): TicketLayout {
 }
 
 /**
- * 票面上的几组字，按 id 定死。
+ * 票面上的日期、时间与那行细字。
+ *
+ * 日期与时间现在来自文件的 mtime（见 `ticketClock`）——真的；那行细字仍然
+ * 是从池子里挑的氛围文案（参考图上也是这么印的），没有事实含义。
  *
  * 和 `ticketShowtime` 分开是因为不同版式要不同的粒度：`classic` 用带前缀的
  * 整行（`DATE: 08 / 08`），`stack` 要把标签和值分两行排，`editorial` 又只要
  * 一行细字。都给出来，谁用谁取。
  */
-export function ticketStamp(id: string): {
-  date: string;
-  time: string;
-  seat: string;
-  row: string;
-  code: string;
-  venue: string;
-  fine: string;
-} {
+export function ticketStamp(id: string, mtime?: number): { date: string; time: string; fine: string } {
+  const clock = ticketClock(id, mtime);
   const hash = ticketHash(id);
-  const month = String(4 + (hash % 9)).padStart(2, '0');
-  const day = String(1 + (Math.floor(hash / 9) % 12)).padStart(2, '0');
-  const hour = String(10 + (Math.floor(hash / 108) % 12)).padStart(2, '0');
-  const minute = String(Math.floor(hash / 1296) % 60).padStart(2, '0');
-  // 影院名与细字也从池子里挑，同一张票每次一样。
-  const venues = ['LUMIÈRE CINÉMA', 'NORDIC LIGHTS STUDIOS', 'MONET ART CINEMA', 'THE GRAND ODEON'];
+  // 说明文字也从池子里挑，同一张票每次一样。纯氛围，参考图上也是这么印的。
   const codes = ['ONE ADMISSION ONLY', 'NON-REFUNDABLE', 'NO RE-ENTRY AFTER START', 'PLEASE KEEP THIS STUB'];
-  const code = `${String(hash % 10000000).padStart(7, '0')}${'ABCDEFGH'[Math.floor(hash / 7) % 8]}`;
   return {
-    date: `2024.${month}.${day}`,
-    time: `${hour}:${minute}`,
-    seat: `A ${String(1 + (hash % 24)).padStart(2, '0')}`,
-    row: String((Math.floor(hash / 24) % 12) + 1).padStart(2, '0'),
-    code,
-    venue: venues[Math.floor(hash / 100000) % venues.length],
+    date: `${clock.year}.${clock.month}.${clock.day}`,
+    time: `${clock.hour}:${clock.minute}`,
     fine: codes[Math.floor(hash / 200000) % codes.length],
   };
+}
+
+/**
+ * 票号下面那行编码（`stack` 版把它印成红色大字）。
+ *
+ * 用**媒体类型 + 整表位次**：IMG 000123 / MOV 000007。和 `NO.` 同源，
+ * 但多告诉一件事——这是图还是视频。早先是 id 散列出来的七位数字，纯编的。
+ */
+export function ticketCode(kind: string, index: number): string {
+  const at = Math.max(0, Math.trunc(index)) + 1;
+  return `${kind === 'video' ? 'MOV' : 'IMG'} ${String(at).padStart(6, '0')}`;
 }
 
 /**

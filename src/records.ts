@@ -28,6 +28,12 @@ export type MediaItem = {
   path: string;
   name: string;
   size: number;
+  /**
+   * 主进程扫描时一次 statSync 顺手拿到的修改时间（毫秒时间戳）。
+   * 票面上的 DATE / TIME 直接印它——这是票上唯一能和文件对上的时间。
+   * 老版本存下来的库没有这个字段；扫描器读不到时间时也不塞 0。
+   */
+  mtime?: number;
   /** 来自壁纸库的条目记作品目录，普通文件为空。用来区分来源与去重。 */
   source?: string;
   /** 不能直接播时的说明（比如场景壁纸只显示预览图）。 */
@@ -133,6 +139,9 @@ export function sanitizeCabinet(value: unknown): Cabinet {
         id: m.id, kind: m.kind, path: m.path,
         name: typeof m.name === 'string' ? m.name.slice(0, 200) : '',
         size: clamp(m.size, 0, 1e12),
+        // 缺失就是缺失，不要补 0（0 会被印成 1970 年）。上限 4e15 ≈ 2096 年，
+        // 只是挡住明显坏掉的值，不是真在防未来。
+        mtime: typeof m.mtime === 'number' && Number.isFinite(m.mtime) ? clamp(m.mtime, 0, 4e15) : undefined,
         source: typeof m.source === 'string' ? m.source.slice(0, 500) : undefined,
         note: typeof m.note === 'string' ? m.note.slice(0, 200) : undefined,
       })),

@@ -157,8 +157,14 @@ function scan(root, depth = 0, out = []) {
       const kind = kindOf(full);
       if (!kind) continue;
       let size = 0;
-      try { size = fs.statSync(full).size; } catch { continue; }
-      out.push({ path: full, name: entry.name, kind, size });
+      let mtime = 0;
+      try {
+        // 一次 stat 同时拿大小和修改时间：票面上的 DATE / TIME 印的就是 mtime。
+        const stat = fs.statSync(full);
+        size = stat.size;
+        mtime = stat.mtimeMs;
+      } catch { continue; }
+      out.push({ path: full, name: entry.name, kind, size, mtime });
     }
   }
   return out;
@@ -207,7 +213,12 @@ function scanWallpaper(root) {
       continue;
     }
     let size = 0;
-    try { size = fs.statSync(target).size; } catch { continue; }
+    let mtime = 0;
+    try {
+      const stat = fs.statSync(target);
+      size = stat.size;
+      mtime = stat.mtimeMs;
+    } catch { continue; }
     out.push({
       // 用作品目录做 id：作品名和视频文件名都可能被作者改，目录 id 不会变
       key: dir,
@@ -215,6 +226,7 @@ function scanWallpaper(root) {
       name: title,
       kind,
       size,
+      mtime,
     });
   }
   return out;
@@ -295,9 +307,14 @@ class MediaBridge {
         const kind = kindOf(file);
         if (!kind) continue;
         let size = 0;
-        try { size = fs.statSync(file).size; } catch { continue; }
+        let mtime = 0;
+        try {
+          const stat = fs.statSync(file);
+          size = stat.size;
+          mtime = stat.mtimeMs;
+        } catch { continue; }
         looseFiles.add(file);
-        files.push({ path: file, name: path.basename(file), kind, size });
+        files.push({ path: file, name: path.basename(file), kind, size, mtime });
       }
       if (!files.length) return;
       this.push(webContents, { type: 'files', files, url: files.map(file => ({ ...file, src: mediaUrl(file.path) })) });
@@ -446,4 +463,6 @@ function attachMedia() {
   });
 }
 
-module.exports = { registerMediaScheme, attachMedia, mediaUrl, allowDir, allowFile, SCHEME };
+// scan 也导出去：它是纯文件系统函数（读目录 + stat），不碰 electron API，
+// 测试可以直接对着一个临时目录跑，验证「扫描时确实带上了 mtime」。
+module.exports = { registerMediaScheme, attachMedia, mediaUrl, allowDir, allowFile, scan, SCHEME };

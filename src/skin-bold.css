@@ -2650,23 +2650,6 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   --album-page: #e7decd;
 }
 
-/* 和左边的筛选胶囊等高（38px），否则工具栏两个控件对不齐 */
-.media-pick {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 38px;
-  margin-left: auto;
-  padding: 0 16px;
-  border-radius: 999px;
-  border: 1px solid var(--bold-line);
-  background: #fff;
-}
-
-.media-pick:hover {
-  background: #f2f1ed;
-}
-
 /* 来源列表：只显示目录名，完整路径放在 title 里。多数时候用户认得出自己的文件夹。 */
 .media-sources {
   display: flex;
@@ -2729,10 +2712,10 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
    照 `.tools/ref-ticket/ref-1.jpg` 做。所有比例都从那张图上量出来的，
    量法与取值记在 `docs/交接文档-2026-11-11.md` 的票根一节，脚本在 `.qa/`。
 
-   整票 1098×526（2.09:1）：画面 779 宽（70.9%），票根 285 宽（26%），
-   两者在撕线处相接。画面本身按 16:9 完整显示（用户 m14515：「至少应该按
-   16：9 把画面展示全了」），所以 16:9 的素材放进 1.48:1 的画面块里，上下
-   各留一条纸色边——看着像把照片裱在相册页上，而不是把两头裁掉。
+   整票 2.09:1（ref-1 实测 1098×526）：画面块 72 宽、票根 28，两者在撕线
+   处相接。画面本身按 16:9 完整显示（用户 m14515：「至少应该按 16：9 把画面
+   展示全了」），所以画面在票面里上下各留 3.7cqw 纸边——看着像把照片裱在
+   相册页上，而不是把两头裁掉。ref-4 / ref-5 就是这种带纸边的构图。
 
    尺寸一律走 `cqw`（容器宽度的 1%）。`.ticket` 与 `.ticket-lift` 都是
    `container-type: inline-size`，同一套比例在列表里和浮起来时自动等比放大，
@@ -2771,22 +2754,44 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
      厚度影改挂在 .ticket 上——那不是容器，cqw 正常解析。 */
 }
 
-/* 鼠标停上去时纸被抬起一点、影子更深（.ticket 自己的 transform 负责抬起）。 */
+/* 鼠标停上去时纸被抬起一点、影子更深（.ticket 自己的 transform 负责抬起）。
+
+   **原来的三层 box-shadow 已删掉**（用户 m02056「鼠标移上去之后底下会有一层
+   背景」、m02116「我截图那个不是完全直边的，所以正好四个角我看见了」）。
+   box-shadow 沿 border-box 的矩形走、不跟票的形状，悬停时凭空加一层，方形的
+   四个角就从票的轮廓外侧露出来。现在只动 `filter: drop-shadow`：它顺着元素
+   的 alpha 轮廓描边，票是齿孔还是撕线孔都贴着走，不会再有方角。
+   幅度刻意压小（半径 9→12px、浓度加一档），抬起的手感仍由 translateY 负责。 */
 .ticket:has(> .ticket-shot):hover {
-  box-shadow:
-    0 0 0 1.6px #3d3526d9,
-    0 2px 4px 0 #3a302140,
-    0 6px 18px 0 #4a3f2b59,
-    0 14px 32px 0 #6b5f4540;
+  filter:
+    drop-shadow(0 0 1.6px #2a2318b3)
+    drop-shadow(0 3px 12px #4a3f2b5c);
 }
 
-/* 播放台上那一张：抬得更高、影子最深，一眼能认出在放谁。 */
+/* 播放台上那一张：抬得更高、影子最深，一眼能认出在放谁。
+   2026-11-12 用户要求去掉外描边（`0 0 0 1.8px` 那层看着像选中框），
+   只留位置与影子。
+
+   影子同样从三层 box-shadow 换成 drop-shadow（理由见上面 hover 那条）：
+   常驻的方影虽不跳变，但四个角一直露在票外，和悬停时看到的是同一类问题。
+   这里保留三层是为了补回原来 `0 18px 40px` 那层落地感；层数在这一层安全 —
+   — 早先「层数一变字被冲白」的读数后来查明是探针没等重绘的假象
+    （见 .ticket 上的注释与 tools/probe/ticket-timing.cjs）。 */
 .ticket.is-current {
-  box-shadow:
-    0 0 0 1.8px #3d3526e6,
-    0 2px 5px 0 #3a30214d,
-    0 8px 22px 0 #4a3f2b66,
-    0 18px 40px 0 #6b5f454d;
+  filter:
+    drop-shadow(0 0 1.8px #2a2318c2)
+    drop-shadow(0 3px 11px #4a3f2b73)
+    drop-shadow(0 7px 22px #6b5f4533);
+}
+
+/* 正在播放那张被悬停时取「更深的那一组」，不要退回 hover 的浅影——否则鼠标
+   一停上去，当前这张反而比别的票更轻，就看不出在放谁了。
+   特异性 0,4,0，压住上面两条。 */
+.ticket.is-current:has(> .ticket-shot):hover {
+  filter:
+    drop-shadow(0 0 1.8px #2a2318c2)
+    drop-shadow(0 3px 12px #4a3f2b80)
+    drop-shadow(0 8px 26px #6b5f453d);
 }
 
 /* 票根列表本身是**一页相册纸**：参考图上票不是直接浮在网页背景上，
@@ -2826,7 +2831,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   --ticket-soft: #595242;
   --ticket-mute: #7d7666;
   --ticket-faint: #8d8676;
-  --ticket-rule: #b2ab9b;
+  --ticket-rule: #a0957f;
   /* 虚线内框。参考图 y=1400 行实测：虚线处亮度 209、纸面 227，差 18 级。
      #d4cdbd 只差 9 级，缩到列表尺寸就看不见了。 */
   /* 参考图上的虚线是实实在在看得见的一圈：#b5a68c、1.2px、dash 4 gap 3。
@@ -2838,42 +2843,18 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
      令牌取 (208,140,135) 才渲得到参考图的 (210,147,142)。
      早先 #d2938e 渲成 (229,196,192)，偏粉——那是拿大片抗锯齿边一起统计的。 */
   --ticket-stamp: #d08c87;
-  /* 四角圆角。相对整票宽度的百分比，两块纸共用同一组。
-     参考图右上角那道弧横竖各跨约 43px（.qa/corner-ascii.py 逐像素图），
-     43 ÷ 整票 1098 = 3.8cqw。取 2.2 时那圈弧只有 15px，跟参考图比像没切角。 */
-  /* 4.4cqw：用户 m06622 效果图（585×236）左上角的弧从 (0,25) 走到 (19,0)，
-     半径约 25px；25 / 562 = 4.4cqw（.qa/ref-corner.py 逐行首列读数）。 */
-  /* 4.5cqw：参考图左上角弧从 (0,25) 走到 (19,0)（.qa/ref-corner.py），
-     半径约 25px，25 / 票宽 550 = 4.5cqw。5.3 那版四角明显比参考圆。 */
-  --ticket-corner: 4.5cqw;
-  /* 接缝两端各一个 1/4 圆缺口（圆心落在接缝线上），两块纸各挖一半，
-     拼起来是一个整圆。参考图实测（.qa/seam-hole.py）：画面块右缘从
-     y=7 的 x=391 一路收到 y=24 的 x=401，纵向跨 17px、横向跨 10px；
-     票根左缘从 y=4 的 x=425 收到 y=23 的 x=402，横 23px、纵 19px ——
-     两块各是一个半径约 20px 的 1/4 圆。20 / 550 = 3.6cqw。 */
-  --seam-hole: 3.6cqw;
-  /* 画面块左缘一排小缺口：参考图逐行剖面（.qa/notch-cycle.py，判据
-     「x=13 偏暖且 x=17 偏冷」）量到 9 个缺口、中心间距 median 17.5px、
-     每个高 7px、深 4.5px。换算 cqw（票宽 550 = 100cqw）：
-     周期 3.18、洞高 1.27 ⇒ 由 洞深 d=R−off、洞高 h=2√(R²−off²) 反解
-     R=0.657cqw、off=−0.162cqw（负号＝圆心在纸里，圆只切进纸边一线）。
-     形状是「圆角方孔」而不是半圆，圆得太狠会变成一串珠子（试过三版）。 */
-  --left-step: 3.18cqw;
-  /* 缺口是**方角浅槽**不是半圆（.qa/q-cmp-left.png 8 倍并排：
-     参考图那一排是平顶平底的矩形缺口，我按圆做过两版都鼓成一串珠子）。
-     尺寸（票宽 550 = 100cqw）：宽 7px = 1.27、深 4.5px = 0.82、
-     间隙 10.5px = 1.9。用 repeating-linear-gradient 挖矩形槽，
-     与四角/接缝大圆一起靠 mask-composite 分组：先 intersect 出轮廓，
-     最后 exclude 掉左边那一列槽。 */
-  /* 三个数分别是：槽高（挖掉的）、槽深（挖进去多少）、槽间隔（保留的纸）。
-     参考图 585 宽：槽高 7、间隔 10.5、深 4.5、周期 17.5 —— 换算成 cqw
-     是 1.20 / 1.79 / 0.77 / 3.0（票宽 550 = 100cqw），再按我这边
-     票宽 625 折算即得上限值。**第一次把槽高与间隔写反了**，放大图上
-     变成「窄纸桥 + 高槽」，与参考图正好相反。 */
-  --left-w: 1.20cqw;
-  --left-d: 0.77cqw;
-  --left-gap: 1.79cqw;
-  /* **没有任何缺口，四条边都是直的。** 用户 m06622 的 585×236 效果图
+  /* 撕线：接缝上一列圆孔，两块纸各挖半圆拼成整孔。周期 2.0cqw、半径 0.55cqw。
+     用户 m00788 定的形状：外缘四条边全部横平竖直，票面只有这一列孔——
+     它同时表达「这张票可以撕开」和两块纸的分界，不需要再靠邮票齿装饰。 */
+  --perf-step: 2.0cqw;
+  --perf-r: 0.55cqw;
+  /* 复古票（data-shape="retro"）才用这三颗：外缘半圆齿的齿距与半径、
+     四角小圆角。现代票用不到它们，但两份形状共用同一段排版，留着定义
+     比在两处写死数值好改。数值照 ref-1 量：齿距约票宽 2.3%、直径 0.94%。 */
+  --tooth-step: 2.3cqw;
+  --tooth-r: 0.47cqw;
+  --ticket-corner: 1.1cqw;
+  /* **modern 版（默认）没有任何缺口，四条边都是直的。** 用户 m06622 的 585×236 效果图
      逐像素量过（.qa/ref-edge2.py / .qa/ref-seam.py / .qa/ref-bbox2.py）：
        · 左缘 x=0..11 恒为 206 203 202 198 195 193 187 182 175 168 152 129，
          每一行完全一样 → 页面→暗边的渐变，边是直的；x=12 突然切进画面；
@@ -2907,12 +2888,15 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
      早先留过 0.55cqw 的缝（照 ref-1 量的 6px），那是「撕开一半」的状态；
      常态应该咬合，撕的动作由交互浮层负责。 */
   gap: 0;
-  /* 高度必须钉死，否则票根里的字一多就把整票撑高，画面块按自己的 16:9
-     定高后下方空出一片米色。用户 m04657 要的是「画面 16:9」+「上下是直线」，
-     两条同时成立只有一种高度：画面块占整票宽 70.9%，它 16:9
-     → 整票高 = 宽 × 0.709 × 9/16 = 宽 × 0.39881 → 比例 1 / 0.39881。
-     钉死之后是「字去适配票」，方向才对。 */
-  aspect-ratio: 100 / 40.364;
+  /* 高度必须钉死，否则票根里的字一多就把整票撑高，画面块上下会空出一片
+     米色。钉死之后是「字去适配票」，方向才对。 */
+  /* 2.09:1（整票 1098×526 实测值）。高度 = 宽 × 0.4785：
+     画面块 72cqw 宽、内部 16:9，高 40.5cqw；上下各留 3.7cqw 纸边，
+     票高 47.85cqw。画面仍是完整 16:9（用户 m14515 的硬要求），
+     只是从「贴边」变成「裱在相册页上」——ref-4 / ref-5 就是这种结构。
+     早先 100/40.364 是让画面贴边撑满高度，票被压到 2.48:1，票根
+     一个字也松不开；m00001 的参考图整票是 2.09:1。 */
+  aspect-ratio: 100 / 47.85;
   width: 100%;
   padding: 0;
   border: 0;
@@ -2922,7 +2906,8 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
      所以这里只画**一圈环**：圆心透明、半径处最深、再往外立刻透明。
      环落在 mask 挖开的那个洞的最外沿，读起来就是纸的切口厚度。
      绝不再垫浅色圆盘（m05573：「你看着不觉得想笑吗」说的就是那个圆盘）。 */
-  border-radius: var(--ticket-corner);
+  /* 现代电影票：四角直角，形状只由中间那列撕线孔定义。 */
+  border-radius: 0;
   text-align: left;
   cursor: pointer;
   /* 这个元素**不是**查询容器——容器在 .ticket-grid > li 上（见那里）。
@@ -2974,85 +2959,49 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
        我：  纸 231 → 170 → 179 187 193 200 … 212，用 17px 就淡完。
      差两处：断崖浅了 49 级、衰减快了一倍。第一层压得更深（0.72 alpha、
      2px 半径）负责断崖，第二层扩到 11px 负责拖尾。 */
+  /* 齿孔很小（半径 0.47cqw），投影若压得太深会顺着孔沿在孔芯里画出一圈黑，
+     一排齿就读成「被咬黑的洞」。所以断崖那层收到 1.2px、拖尾 9px：
+     孔芯仍透出页面纸色，孔沿才有一道接触影。 */
   filter:
-    drop-shadow(0 0 2px #241d12e0)
-    drop-shadow(0 0 11px #4a3f2b66)
-    drop-shadow(0 3px 9px #6b5f4547);
+    drop-shadow(0 0 1.2px #2a2318a6)
+    drop-shadow(0 2px 9px #4a3f2b47);
   transition: transform 220ms cubic-bezier(0.2, 0.7, 0.3, 1), filter 220ms;
 }
 
-/* 票根外缘扇贝洞里的颜色。面板的 mask 挖掉那半个圆之后，露出来的就是这一层。
-
-   参考图洞里 p50 约 154、最深 123，纸面 230——比纸暗 76 级，不是页面底色，
-   所以洞必须垫深色。色值换算：目标 154，纸底约 232，墨色 (36,29,18)，
-   alpha = (232-154)/(232-36) ≈ 0.40 → #241d1266。
-
-   **缝里不放暗带**：参考图的缝本身是亮的（.qa/final-check2.py 的 ref 剖面
-   y=1200 x855..890 = 148,151,…,138,140,144,139,147,179,203,215,228,…）——
-   画面在 x867 结束，之后 179→215→228 一路升到纸面，是纸色的柔和过渡，
-   不是阴影。暗的只有画面自身的右缘（另见 .ticket-shot::after）。 */
-.ticket {
-  /* 孔里**什么都不垫**：mask 把两块纸挖穿之后，透出的是底下那层——
-     列表里是相册页的米色，浮层里是暗幕。用户 m05960 的效果图上，齿孔
-     就是干净的米色半圆、孔沿没有暗环。早先给孔垫过不透明浅色圆盘
-     （与页几乎同色，看得见的只剩一圈深描边，读成「米色珠子」），也垫过
-     深色（接缝两侧深浅不同，拼起来像两块不同材质的饼），两次都被否掉。 */
-  /* 不铺底色：两块纸在接缝上咬合（gap: 0），没有缝要填；
-     齿孔挖空之后该透出底下那层（相册页纸色），票自己不去画它。 */
-      /* 三档齿孔：孔里**不填颜色**——票底下是相册页，挖掉就该露出它。
-     早先给孔垫不透明浅色圆盘（与页同色，看得见的只剩外圈深色，读成
-     「深色描边围着一块纸色」），又试过垫深色（两侧深浅不同，拼起来像
-     两块不同材质的饼）。现在只留孔沿一圈很淡的厚度影，孔芯透明。
-     tile 按 70.9% / 29.1% 切开、圆心压在 tile 边界上，圆被切掉一半，
-     接缝两侧各得半孔，不会出现跨缝的一颗圆珠。 */
-}
-
-/* 画面。四条边都是直的，只有外缘（左）两角是圆的，跟票根同款。
-
-   用户 m14823 原话：「图案部分上下应该是直的没有锯齿这种意思」——
-   上下本来就不带齿，现在左右也不带。
-
-   参考图里那块画面是 779×562 ≈ 1.39:1，不是 16:9。16:9 的素材靠 contain
-   完整放进来，上下各留一条纸色边——用户 m14515 要的是「展示全」，不是填满。 */
+/* 画面。现在整块票是直角矩形，画面铺满这块纸——形状只由右缘那列
+   撕线孔定义（见 .ticket-shot 的 mask）。 */
 .ticket-shot {
   position: relative;
-  display: block;
-  flex: 0 0 70.5%;
+  /* 这块纸撑满票高、画面也撑满它——撕线孔要沿着整条接缝从上到下走，
+     画面要顶到齿边，两者都不留纸边。 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 72%;
   min-width: 0;
-  /* 16:9 不是写死的：画面块的宽是整票的 69%（= 用户效果图的 0.690），
-     整票 2.59:1 折算下来这块正好 1.787:1 —— 几乎就是 16:9。
-     所以素材用 cover 铺满，上下不留纸边；早先整票按 ref-1 的 1.95:1、
-     画面只占 70.9%，那块是 1.39:1，16:9 的素材 contain 进去上下各露
-     一条纸色，整张票看着像「纸板上贴了一张图」。 */
-  /* 自己保持 16:9（整票比例就是照它推出来的，两者必然一致），
-     但显式吃满容器高度：只写 aspect-ratio 时 flex 会按内容撑，接缝端
-     容易差一两个像素，露出纸底。 */
-  aspect-ratio: 16 / 9;
-  align-self: stretch;
   height: 100%;
+  /* 画面直接贴到票边（用户 m00752 否掉了外面那圈米色纸边）。票高按 2.09:1
+     钉死，画面块 72×47.85 是 1.505:1，比 16:9 更方——cover 铺满时左右各裁
+     约 7.6%，换来画满到齿边。 */
   overflow: hidden;
-  background: #2a2622;
-  /* 形状由 mask 决定（五层 intersect）：
-     ① 左外缘一排小圆角缺口（--left-*，周期 3.18cqw、深 4.5px）
-     ②③ 左上/左下圆角 ④⑤ 接缝那侧上下两个 1/4 圆（--seam-hole）
-     border-radius 只裁背景、mask 是在 border-box 上算的，两者不叠加，
-     所以圆角也必须自己进 mask，否则会被缺口那层盖掉、四角看着是尖的。 */
-  mask-image:
-    linear-gradient(#000 0 0),
-    radial-gradient(circle var(--ticket-corner) at 0 0, #0000 calc(var(--ticket-corner) - 0.5px), #000 var(--ticket-corner)),
-    radial-gradient(circle var(--ticket-corner) at 0 100%, #0000 calc(var(--ticket-corner) - 0.5px), #000 var(--ticket-corner)),
-    radial-gradient(circle var(--seam-hole) at 100% 0, #0000 calc(var(--seam-hole) - 0.5px), #000 var(--seam-hole)),
-    radial-gradient(circle var(--seam-hole) at 100% 100%, #0000 calc(var(--seam-hole) - 0.5px), #000 var(--seam-hole)),
-    repeating-linear-gradient(180deg, #0000 0 var(--left-w), #000 var(--left-w) calc(var(--left-w) + var(--left-gap)));
-  mask-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, var(--left-d) var(--left-step);
-  mask-repeat: no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat-y;
-  mask-composite: intersect, intersect, intersect, intersect, exclude;
-  border-radius: var(--ticket-corner) 0 0 var(--ticket-corner);
+  /* 画面直接顶到票边，不垫纸色裱边。 */
+  padding: 0;
+  background: var(--paper-sheet);
+  /* 现代电影票（用户 m00788）：横平竖直的直角矩形，只有画面与票根交接
+     那条线上一列撕线孔。外缘不再有半圆齿，四角也不再倒圆。 */
+  mask-image: radial-gradient(
+    circle var(--perf-r) at 100% 50%,
+    #0000 calc(var(--perf-r) - 0.5px),
+    #000 var(--perf-r)
+  );
+  mask-size: 100% var(--perf-step);
+  mask-repeat: repeat-y;
+  border-radius: 0;
 }
 
-/* cover：画面块本身就是 16:9，16:9 的素材原样铺满、一个像素都不裁。
-   非 16:9 的素材（竖图、超宽）才裁边——留纸边会更难看，那会让形状
-   重新变成「图贴在纸上」。 */
+/* 画面铺满整块票纸：16:9 的素材在 1.505:1 的框里按 cover 裁掉左右各约 7.6%，
+   换来画面一直顶到齿边、外面没有米色裱边（用户 m00752：「有边框很难看」）。
+   竖图 / 超宽素材同样按 cover 裁，票面始终是满的。 */
 .ticket-shot img,
 .ticket-shot video {
   display: block;
@@ -3109,17 +3058,16 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
      3~5px、大块之间 10~14px。gap 只有一个值，space-between 会把富余均摊成
      14 个一样大的缝，两种都排不出参考图那张节奏（实测逐带偏移 ±4% 票高）。 */
   gap: 0;
-  /* 左右 4.6cqw：ref-1 的文字列左缘在票根宽的 17.6%（.qa/cls-rows.py），
-     折算成整票宽就是 5.0cqw，扣掉字形本身约 0.4cqw 的左边距，取 4.6。
-     上下沿用原来的比例，略收一点给条码腾出贴底的空间。 */
-  /* 照参考图实测（.qa/ref-rows3.py / ref-true4.py）：panel 内区 x402..561、
-     y4..225，文字列在 x428..547 —— 左留 26px、右留 14px、上留 3px、条码贴底。
-     换 cqw（÷5.5）：上 0.55、右 2.55、下 0、左 4.73。
-     早先四边各 3.6~4.6cqw，内容宽只剩 16.9cqw（参考 21.6cqw），字被挤小一圈。 */
-  /* 下 1.6cqw：参考图条码底 y188、纸底 y225，中间 37px 里放着「小字 venue」
-     与一圈虚线，折算 4% 纸高 = 1.6cqw。写成 0 时 space-between 把条码一路
-     推到纸边（实测条码落在 95.8~100% 票高，参考 79.3~85.1%）。 */
-  padding: 0.55cqw 2.55cqw 1.6cqw 4.73cqw;
+  /* 左右 3.6cqw 对称。参考图 ref-1 是左 26px / 右 14px，因为右边要给弧形抬头
+     两端的花饰让位；但那一版居中排的行（片名、NO.、条码）全跟着内容框一起
+     偏左 1.1cqw，用户 m00941 一眼看出「文字没有居中」。这里把左右拉平，
+     居中的行才对得上票根中线，DATE/TIME 这类左对齐的行也离边有一样的呼吸。 */
+  /* 下 1.6cqw：参考图条码底 y188、纸底 y225，中间 37px 里放着「小字 venue」，
+     折算 4% 纸高 = 1.6cqw。写成 0 时 space-between 把条码一路
+     推到纸边（实测条码落在 95.8~100% 票高，参考 79.3~85.1%）。
+     上 1.6cqw：参考图抬头离纸顶还有一截呼吸；0.55 时 editorial 版的
+     「THE ART OF LIGHT & COLOR」几乎贴着上齿。 */
+  padding: 1.6cqw 3.6cqw;
   /* 顶部贴顶、底部贴底：剩余空间由 space-between 均摊，各段自己的 margin-top
      只负责「细线两侧收紧、大块之间放松」这点相对差异。只用 flex-start 时
      条码被挤出可视区（实测 y 带表里条码整段消失）；只用 space-between 时
@@ -3141,15 +3089,15 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   /* 与画面块对称：接缝那侧（左）上下两个 1/4 圆 + 外缘（右）两角圆角。
      面板自己没有别的 mask（纸色纸纹在 ::before 上），所以这里加遮罩
      不会碰到「filter + mask 同链」那条老坑。 */
-  mask-image:
-    radial-gradient(circle var(--seam-hole) at 0 0, #0000 calc(var(--seam-hole) - 0.5px), #000 var(--seam-hole)),
-    radial-gradient(circle var(--seam-hole) at 0 100%, #0000 calc(var(--seam-hole) - 0.5px), #000 var(--seam-hole)),
-    radial-gradient(circle var(--ticket-corner) at 100% 0, #0000 calc(var(--ticket-corner) - 0.5px), #000 var(--ticket-corner)),
-    radial-gradient(circle var(--ticket-corner) at 100% 100%, #0000 calc(var(--ticket-corner) - 0.5px), #000 var(--ticket-corner));
-  mask-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
-  mask-repeat: no-repeat;
-  mask-composite: intersect;
-  border-radius: 0 var(--ticket-corner) var(--ticket-corner) 0;
+  /* 与画面块同一套形状、左右镜像：只有左缘那一列撕线孔，其余三边是直边。 */
+  mask-image: radial-gradient(
+    circle var(--perf-r) at 0 50%,
+    #0000 calc(var(--perf-r) - 0.5px),
+    #000 var(--perf-r)
+  );
+  mask-size: 100% var(--perf-step);
+  mask-repeat: repeat-y;
+  border-radius: 0;
   /* 字多的时候**绝不能**反过来把整票撑高——那会把画面块下面的纸底露出来。
      裁掉溢出的部分，版式宁可变紧也不破坏比例（四版式的实测 contentH 都
      已经收进 innerH，正常不会真的溢出，这里是兜底）。 */
@@ -3165,6 +3113,63 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   flex: none;
 }
 
+/* ---- 复古票：data-shape="retro" ----
+   用户 m00941 说两种都好看、都要，所以同一套内部排版配两种外形：
+   modern 是现在这版直角 + 只有撕线孔；retro 是外缘一圈细密半圆齿 + 四角小圆角，
+   撕线孔照旧。形状由 `ticketShape(id)` 定死，同一张票每次都是同一种。
+
+   齿的做法：mask 里 radial-gradient 的圆心落在纸的边界上，一格里挖掉半个圆，
+   repeat 之后连成一排；四角的圆心落在角上，挖出 1/4 圆。画面块与票根各挖
+   自己那一半，接缝两侧的孔拼成整圆。
+
+   所有层必须 `intersect`：漏一层默认是 add，被挖掉的区域会被别的层补回来。
+   角圆那两层必须 `100% 100%`：层不铺满时，层没覆盖到的区域 alpha 是 0，
+   intersect 之后整块纸都会被裁掉（第一版写成 `var(--ticket-corner)` 见方 +
+   no-repeat，票根整块消失，只剩画面）。圆心在角上、半径不变，铺满不影响形状。
+   `mask-position` 给上/下齿补 1.6cqw：画面块 72cqw 除以 2.3cqw 的齿距余 0.7，
+   票根若从自己这侧的 0 开始排，接缝处两排齿会差半格（0.7cqw ≈ 4px）。 */
+.ticket[data-shape="retro"] .ticket-shot,
+.ticket-lift[data-shape="retro"] .ticket-shot {
+  mask-image:
+    radial-gradient(circle at 0 0, #0000 calc(var(--ticket-corner) - 0.5px), #000 var(--ticket-corner)),
+    radial-gradient(circle at 0 100%, #0000 calc(var(--ticket-corner) - 0.5px), #000 var(--ticket-corner)),
+    radial-gradient(circle at 50% 0, #0000 calc(var(--tooth-r) - 0.5px), #000 var(--tooth-r)),
+    radial-gradient(circle at 50% 100%, #0000 calc(var(--tooth-r) - 0.5px), #000 var(--tooth-r)),
+    radial-gradient(circle at 0 50%, #0000 calc(var(--tooth-r) - 0.5px), #000 var(--tooth-r)),
+    radial-gradient(circle at 100% 50%, #0000 calc(var(--perf-r) - 0.5px), #000 var(--perf-r));
+  mask-size:
+    100% 100%,
+    100% 100%,
+    var(--tooth-step) 100%,
+    var(--tooth-step) 100%,
+    100% var(--tooth-step),
+    100% var(--perf-step);
+  mask-repeat: no-repeat, no-repeat, repeat-x, repeat-x, repeat-y, repeat-y;
+  mask-composite: intersect, intersect, intersect, intersect, intersect;
+}
+
+/* 票根是镜像：左缘接缝那一列孔，上下齿、右缘齿、右上右下两角。 */
+.ticket[data-shape="retro"] .ticket-panel,
+.ticket-lift[data-shape="retro"] .ticket-panel {
+  mask-image:
+    radial-gradient(circle at 100% 0, #0000 calc(var(--ticket-corner) - 0.5px), #000 var(--ticket-corner)),
+    radial-gradient(circle at 100% 100%, #0000 calc(var(--ticket-corner) - 0.5px), #000 var(--ticket-corner)),
+    radial-gradient(circle at 50% 0, #0000 calc(var(--tooth-r) - 0.5px), #000 var(--tooth-r)),
+    radial-gradient(circle at 50% 100%, #0000 calc(var(--tooth-r) - 0.5px), #000 var(--tooth-r)),
+    radial-gradient(circle at 100% 50%, #0000 calc(var(--tooth-r) - 0.5px), #000 var(--tooth-r)),
+    radial-gradient(circle at 0 50%, #0000 calc(var(--perf-r) - 0.5px), #000 var(--perf-r));
+  mask-size:
+    100% 100%,
+    100% 100%,
+    var(--tooth-step) 100%,
+    var(--tooth-step) 100%,
+    100% var(--tooth-step),
+    100% var(--perf-step);
+  mask-repeat: no-repeat, no-repeat, repeat-x, repeat-x, repeat-y, repeat-y;
+  mask-position: 0 0, 0 0, 1.6cqw 0, 1.6cqw 0, 0 0, 0 0;
+  mask-composite: intersect, intersect, intersect, intersect, intersect;
+}
+
 /* 纸面与纸纹。
 
    纸色与颗粒走 `filter: url(#tpl-ticket-paper)`（宿主由 src/paper.ts 生成），
@@ -3178,7 +3183,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   background: var(--paper-sheet);
   /* 与 .ticket-panel 的圆角一致：接缝侧是直角，只有外缘两角圆。
      这里若写成四角全圆，接缝那侧会露出两个纸色的圆角缺口。 */
-  border-radius: 0 var(--ticket-corner) var(--ticket-corner) 0;
+  border-radius: 0;
   filter: url(#tpl-ticket-paper);
   /* 这一层**不带 mask**：参考图上没有齿孔（见 .ticket-shot 的注释）。
      早先在这里挂过扇贝遮罩，理由是「遮罩与 filter 同挂会被吃掉」，
@@ -3190,20 +3195,8 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
    下 50px），取中位 25px ÷ 1098 = 2.3cqw。四角是圆的，半径取 1.6cqw。
    它压在纸面之上、文字之下：z-index -1 落在纸色伪元素之后、内容之前
    （同为 -1 时按 DOM 顺序，::before 先画，所以虚线在纸面之上）。 */
-.ticket-panel::after {
-  content: '';
-  position: absolute;
-  /* 上下 0.5cqw、左右 2.4cqw：参考图虚线框上边在 y=4..6（票顶也是 y=4），
-     左右竖边在 x=415 / x=548（纸 402..562，各内收 13px）。
-     写成四边等距 2.3cqw 时上边被压到抬头下面，抬头反而露在框外。 */
-  inset: 0.5cqw 2.4cqw;
-  z-index: -1;
-  /* 1.5px：参考图那圈虚线在缩到列表尺寸后仍然清晰（.qa/ref-user.png
-     的虚线处亮度 209、纸 227），1.2px 在这个尺度上被抗锯齿吃掉一半。 */
-  border: 1.5px dashed var(--ticket-frame);
-  border-radius: 1.6cqw;
-  pointer-events: none;
-}
+/* 参考图的票根上没有内框线：纸面就是纸面，分隔靠细横线。
+   早先那圈虚线（--ticket-frame）在缩到列表尺寸后读成一圈毛边，删掉。 */
 
 /* ── 票面上的字 ─────────────────────────────────────────────────
    字号一律相对整票宽（cqw）。每一档都从 ref-1 的行节奏反算：那张图整票
@@ -3419,7 +3412,8 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   width: 88%;
   align-self: center;
   border-top: 1px solid var(--ticket-rule);
-  opacity: 0.78;
+  /* 不再压透明度：参考图的线在纸上是实色的一道，0.78 在列表尺寸下几乎看不见。 */
+  opacity: 1;
 }
 
 /* 一行「标签 + 值」。标签与值同号，标签略淡——参考图上 DATE: 与日期
@@ -3428,8 +3422,9 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   display: flex;
   justify-content: space-between;
   gap: 4cqw;
-  /* 1.375cqw：按每字符占宽校准（ref 4.6% / mine 4.2%）。 */
-  font: 500 clamp(7px, 1.375cqw, 17px) / 1.4 "Inter", "Microsoft YaHei UI", sans-serif;
+  /* 1.45cqw：按参考图每字符占宽校准，1.375 那版在列表尺寸下偏小一号，
+     票根看着发空。 */
+  font: 500 clamp(7px, 1.45cqw, 17px) / 1.4 "Inter", "Microsoft YaHei UI", sans-serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.05em;
   white-space: nowrap;
@@ -3447,7 +3442,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   display: flex;
   flex-direction: column;
   gap: 0.15cqw;
-  font: 500 clamp(7px, 1.375cqw, 17px) / 1.45 "Inter", "Microsoft YaHei UI", sans-serif;
+  font: 500 clamp(7px, 1.45cqw, 17px) / 1.45 "Inter", "Microsoft YaHei UI", sans-serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.05em;
   white-space: nowrap;
@@ -3465,7 +3460,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
    这里只负责四种骨架各自的排法。 */
 .ticket-label {
   display: block;
-  font: 600 clamp(7px, 1.30cqw, 14px) / 1.3 "Inter", "Microsoft YaHei UI", sans-serif;
+  font: 600 clamp(7px, 1.36cqw, 14px) / 1.3 "Inter", "Microsoft YaHei UI", sans-serif;
   letter-spacing: 0.14em;
   color: var(--ticket-mute);
   white-space: nowrap;
@@ -3473,7 +3468,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 
 .ticket-value {
   display: block;
-  font: 500 clamp(7px, 1.44cqw, 15px) / 1.35 "Inter", "Microsoft YaHei UI", sans-serif;
+  font: 500 clamp(7px, 1.5cqw, 15px) / 1.35 "Inter", "Microsoft YaHei UI", sans-serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.05em;
   color: var(--ticket-soft);
@@ -3622,13 +3617,9 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   margin-top: -0.55cqw;
 }
 
-/* 制片组下面那道线去掉：classic 原本 4 道线（片名上下、制片下、日期下），
-   在 1.80:1 的票根里排得开，2.51:1 的扁票根里 4 道线 + 12 个间隙就把
-   admit 与 credit 挤成 0 高。留 3 道——片名上下各一道负责分区，日期与
-   座位之间那道负责切分底部字段，制片组用自己的字号区分即可。 */
-.ticket-credit + .ticket-credit + .ticket-rule {
-  display: none;
-}
+/* classic 的四道线都留着（片名上下、制片下、座位下）：参考图每一段之间
+   都有一道，少了制片下那道，A FILM BY 与日期会糊成一片。
+   早先因为扁票根排不下藏过它，齿孔改小、行距收紧之后已经有位置了。 */
 
 .ticket-credit {
   display: block;
@@ -3664,7 +3655,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 /* 票号：参考图上它是砖红、大号、字距很宽，居中。 */
 .ticket-no {
   display: block;
-  font: 700 clamp(10px, 1.82cqw, 18px) / 1.2 "Inter", "Microsoft YaHei UI", sans-serif;
+  font: 700 clamp(10px, 2.0cqw, 18px) / 1.2 "Inter", "Microsoft YaHei UI", sans-serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.16em;
   text-indent: 0.16em;
@@ -3677,9 +3668,9 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 .ticket-bars {
   display: flex;
   align-items: stretch;
-  /* 0.55cqw ≈ 1px 的缝。0.06cqw 那版缝只有 0.4px，抗锯齿后 32 条糊成
-     一整块黑（并排图上最扎眼的一处），参考图是「条粗、缝细但白得出来」。 */
-  gap: 0.55cqw;
+  /* 0.4cqw ≈ 2px 的缝：0.22 那版缩到列表尺寸后抗锯齿把 32 条糊成一整块黑，
+     参考图的条和缝都还分得开。 */
+  gap: 0.4cqw;
   /* 3.6cqw：参考图条码块高 69px / 票高 561 = 12.3%。但那张图的票根是
      1.80:1（312×562），我这里整票 2.51:1、票根只有 1.37:1 —— 同样的 12.3%
      在扁票根上会把 other 行全挤掉，所以不能照抄比例，按剩余空间定：
@@ -3688,7 +3679,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
      纯装饰块。 */
   /* 2.8cqw：参考图条码 ink 高 13px / 纸高 222 = 5.9%，3.1cqw 那版
      在我的纸上量到 16px = 6.5%。 */
-  height: clamp(11px, 2.8cqw, 40px);
+  height: clamp(12px, 3cqw, 44px);
   /* 出血：参考图条码占纸宽 85%（.qa/ref-bottom.py 量 x408..555 / 纸 402..562），
      比文字列宽得多，所以用负边距抵回 padding。但**不能捅到虚线框外**——
      虚线框内收 2.4cqw，条码到它内侧为止：文字列左边距 4.73cqw，
@@ -3741,6 +3732,25 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   background: #0b0f14a8;
   backdrop-filter: blur(14px) saturate(1.1);
   animation: ticket-veil 240ms ease both;
+  /* 浮层里整块都不许选中文字。票根是要按住往上撕的，pointerdown 之后
+     浏览器默认会开始拖选，手指划过票面时片名、条码就被涂成蓝色——
+     撕到一半满屏蓝底白字（用户 m03830 报的）。
+     user-select 加在浮层这一层就够了，下面所有票面文字一起继承。
+     不写在 .ticket-lift-panel 上，是因为浮层的点按关闭也走这块：
+     一旦有选区，点击会被当成「取消选区」而不是关闭。 */
+  user-select: none;
+  -webkit-user-select: none;
+  /* 触屏上同样不许把拖动解释成滚动/长按菜单，否则 pointermove 会被抢掉。 */
+  touch-action: none;
+}
+
+/* 撕的那一下要整块吞掉默认行为：文本选中、图片拖动、长按菜单。
+   光靠上一条 user-select 不够——图片在 Chromium 里仍会被拖成「幽灵图」，
+   那条要 dragstart 才能拦住（见 MediaTickets 的 onDragStart）。 */
+.ticket-lift-shot img,
+.ticket-lift-shot video {
+  -webkit-user-drag: none;
+  user-select: none;
 }
 
 @keyframes ticket-veil {
@@ -3749,7 +3759,20 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 }
 
 .ticket-lift {
-  --pull: 0;
+  /* 形变进度 0~1：已经过成「前段绷住、后段加速」的曲线，由 MediaTickets
+     每次 pointermove 写。卷曲角度与票面淡化都读它，两处同源才不会各走各的。 */
+  --bend: 0;
+  /* 右半切成几条。真值从 ticket-tear.ts 的 CURL_SEGMENTS 传进来，这里只是
+     兜底——没传时也还画得出来。 */
+  --seg-count: 6;
+  /* 掀开角度的上限，只给 prefers-reduced-motion 的降级态用（那时不做 3D 卷曲）。
+     真值从 TEAR_HINGE_DEG 传进来。 */
+  --hinge: 12deg;
+  /* 卷轴的倾斜角上限（度）。真值从 ticket-tear.ts 的 TEAR_CURL_TILT_DEG 传进来。
+     斜着撕是用户 m03899 选的：卷轴不能是水平的，要像从右上角拎起一角。
+     这个数越大接缝顶端张得越开，18 度是「看得出斜」与「缝别裂太明显」之间
+     的取舍，改之前先看一眼 .ticket-lift-panel 那段注释里的代价说明。 */
+  --curl-tilt: 18deg;
   position: relative;
   /* 列表里的票受外壳 760px 限制只有约 680 宽，浮起来要明显大一圈才叫「放大」。
      1040 是 1920 窗口下不顶到边的上限；窄屏按 92vw 退让。
@@ -3760,8 +3783,8 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   display: flex;
   /* 接缝咬合，不留缝——与列表里那张一致。 */
   gap: 0;
-  /* 与列表里同一套比例：高度 = 宽 × 0.39881。 */
-  aspect-ratio: 100 / 40.364;
+  /* 与列表里同一套比例：高度 = 宽 × 0.4785（画面 16:9 + 上下纸边）。 */
+  aspect-ratio: 100 / 47.85;
   width: min(1040px, 92vw);
   padding: 0;
   background: transparent;
@@ -3779,45 +3802,210 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 .ticket-lift-shot {
   position: relative;
   display: block;
-  flex: 0 0 70.5%;
+  flex: 0 0 72%;
   min-width: 0;
   height: 100%;
   /* 与列表里同一套形状：只有外缘（左）两角圆。 */
-  border-radius: var(--ticket-corner) 0 0 var(--ticket-corner);
+  border-radius: 0;
   /* 孔里不垫色，透出浮层下面的暗幕（与列表同一套形状规则）。 */
 }
 
 /* 浮层里那张也要同一个比例，否则撕开前后形状不一样、飞出去那一刻会跳一下。
-   宽度撑满就行，高度由外层 .ticket-lift 的 aspect-ratio 定。 */
+   宽度撑满就行，高度由外层 .ticket-lift 的 aspect-ratio 定。
+   必须保持 flex 居中：写成 display:block 时 img 的 margin:auto 只管左右，
+   画面会顶到票的上沿（实测上下纸边 0 / 77px），16:9 的框就贴边了。 */
 .ticket-lift-shot .ticket-shot {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: none;
   width: 100%;
   height: 100%;
   margin: 0;
 }
 
-/* 撕开时票面那半边跟着手上走。用 --pull 一个数驱动位移、旋转、透明度，
-   三者同源才不会各走各的。 */
+/* 撕开时右半沿一条**斜折痕**翻起来，不是整块平移、不是绕轴平转、也不是切碎成条。
+
+   ——为什么不是整块平移（第一版就是那么做的）：
+   两张纸各自在接缝那条边上有一列半圆孔，拼起来才是完整的圆。整块平移意味着
+   右半的孔相对左半错开，错开的距离是「位移 × 0.76」，拖到阈值时约 159px，
+   而孔的间距只有 20.8px —— 整列孔全部错位，每个孔里一半透出浮层后面的暗、
+   一半是邻居的米色纸，混起来就是用户看到的那圈灰（m02721「锯齿部分还有
+   不合适的阴影」）。孔错位只在两半**沿接缝相对平移**时发生。
+
+   ——为什么不是整块绕轴转、也不是 skew（第二、三版）：
+   那都是把右半当成一块硬板在动。绕接缝转是平面翻转、没有曲率；skew 更糟，
+   实测手拖 210px 时右上角被抬了 94.6px，整块像纸片飞起来。用户 m04023 说
+   「这是一个柔软的东西明白吗，这是一种折叠」——软纸的形变是局部的。
+
+   ——为什么不是切成 8 条横带各自转（第四版）：
+   相邻两条的边不再共线，接缝裂成阶梯（探针 maxSeam 从 1.04 涨到 6.21），
+   看着像把票切成八片错开。用户 m03567 说的「分段的也太生硬了」就是它。
+
+   ——为什么不是一条横贯整块面板的斜折痕（第五版）：
+   那样折起来的是面板下沿 60% 的面积，翻过去必然戳出票根之外——探针四档图里
+   那块纸整个飞到了票面上方，露出一大块米色纸背。用户 m04240 说「我感觉这是
+   很简单的一件事情啊，就是让你拟真的做一下撕票根的动画而已」。
+
+   ——现在这样，右下角一个三角狗耳：
+   折痕是从右下角斜切过去的一条 45° 线，切下来的三角形沿折痕翻过去，折满时
+   压在折痕另一侧——三角的直角边长是纸宽的一小段，翻过去正好落在纸面之内，
+   永远不会飞出去。折痕的落点由 ticket-tear.ts 的 foldShape() 算，以
+   --fold-x1（下边缘）与 --fold-y1（右边缘）传进来，两个值都从 1 往 0 退：
+   1 的时候折痕缩在右下角、纸是平的。
+
+   只有一条边要拼（折痕本身），一次旋转作用在整个三角上，接缝不可能裂开——
+   这也是用户 m04075 要的「简单办法」。 */
 .ticket-lift-panel {
   position: relative;
-  display: flex;
+  display: block;
   flex: 1;
   min-width: 0;
   /* 与列表里同一套形状：只有外缘（右）两角圆。 */
-  border-radius: 0 var(--ticket-corner) var(--ticket-corner) 0;
-  /* 孔里不垫色，透出浮层下面的暗幕。 */
+  border-radius: 0;
+  /* 透视：1300px 是「一张纸距离眼睛一臂远」的观感。再远纸就发平，
+     再近翻起来那块会被放大得失真。 */
+  perspective: 1300px;
+  /* 翻起来那块要能转到纸面之外，不被父级压平。 */
+  transform-style: preserve-3d;
+  /* 折痕是斜的这件事交给两块纸自己（见 .ticket-fold），这里不加任何形变。 */
+  transform-origin: 0 0;
+  /* 这里一条位移都不写：上沿必须钉死在桌面那条线上。
+     早先这里有一条 translate: 0 calc(var(--grip-dy) * -0.18)，是从铰链版
+     带过来的「跟手上移」；手拖 210px 时它把整个右半抬上去 37.8px，于是
+     撕的同时上沿也在动（m03762 说的就是它）。
+     手往上的位移只通过 --bend 变成折痕的形状，纸本身不整体平移。 */
+  /* 这里刻意不写 opacity。opacity 不到 1 会让元素成为「分组元素」，
+     浏览器随即忽略 preserve-3d 把子树压平——翻起来那块会瞬间贴回纸面。
+     淡出改挂到两块 .ticket-fold 上（见下）。 */
+}
+
+/* 两块纸，各持一份**完整**票面，靠 clip-path 只留自己那半边，拼起来还是原来那张。
+   用裁切而不是真把票切开：纸色、纸纹、撕线孔、文字、条码全都不用重做，
+   bend=0 时两句 clip-path 恰好拼满整块面板，静止态不需要另一套 DOM。
+
+   为什么两份票面都留整个、而不是各裁一半渲染：裁一半要重排文字，票面版式
+   （arc / stack / editorial / classic）四种都要各写一遍裁法。整份渲染再裁，
+   四种版式一行代码都不用改。 */
+.ticket-fold {
+  position: absolute;
+  inset: 0;
+  /* 裁切窗口之外的票面不参与命中，否则下半张会挡住左半画面的点击。 */
+  pointer-events: none;
+}
+
+/* 折痕**上方**那块：原样躺在桌上，只把右下角那个三角切掉。
+   polygon 的五个点：左上、右上、折痕在右边缘的落点、折痕在下边缘的落点、左下。
+   --fold-y1 = --fold-x1 = 1 时右下角那个点塌成直角，整块等于没有裁。 */
+.ticket-fold[data-side='under'] {
+  clip-path: polygon(
+    0% 0%,
+    100% 0%,
+    100% calc(var(--fold-y1, 1) * 100%),
+    calc(var(--fold-x1, 1) * 100%) 100%,
+    0% 100%
+  );
+}
+
+/* 折痕**右下**那个三角：沿折痕线整体翻过去。
+   三个几何量缺一不可——
+   - clip-path 只留折痕右下（三个点：折痕右端、右下角、折痕下端）；
+   - transform-origin 落在折痕上：取折痕下端那个点，旋转轴从这里出发；
+   - rotate3d 轴 = 折痕方向（--fold-ax / --fold-ay），角度 = --fold-deg。
+   轴与折痕平行且过折痕上一点时，折痕这条边在旋转中保持不动，所以两块
+   永远贴着、不裂。 */
+.ticket-fold[data-side='over'] {
+  clip-path: polygon(
+    100% calc(var(--fold-y1, 1) * 100%),
+    100% 100%,
+    calc(var(--fold-x1, 1) * 100%) 100%
+  );
+  transform-origin: calc(var(--fold-x1, 1) * 100%) 100%;
+  transform: rotate3d(var(--fold-ax, 1), var(--fold-ay, 0), 0, var(--fold-deg, 0deg));
+  /* 纸背：翻过 90 度之后看见的是它。
+     必须比正面明显暗一档，否则折起来那块几乎隐形，整个效果读起来只剩
+     「票根右下角被啃掉一块」——两块纸都是米白时人眼只看得出缺口。
+     真实的折角背面是背光的，天然比正面暗。 */
+  background: linear-gradient(160deg, #ded2b8, #d3c6a9);
+  /* 折起来那块是离开纸面的，必须在底下那张纸上投一道影，否则它和纸面
+     贴在同一个平面里，读起来只是「一块颜色不同的区域」而不是「掀起来的纸」。
+     阴影方向斜向左下（-3px 4px）：光从右上打过来，掀起的角朝左下投影。
+     放在这块而不是缺口的父级：只有它知道自己的轮廓。 */
+  filter: drop-shadow(-3px 4px 5px rgb(42 35 24 / 0.3));
+  /* 抬手回弹挂在这里，不是父级：上沿那条已经钉死、父级没有任何位移可过渡，
+     能弹回去的只有这一块的折叠角。只有松手不撕时才真的用上
+     （拖拽期间 holding 把过渡关掉）；320ms 配 1.28 的过冲，
+     纸摊回平面时略微弹过一点再落定。 */
+  transition: transform 320ms cubic-bezier(0.3, 1.28, 0.48, 1);
+}
+
+/* 两块的票面都要在转过 90 度之后藏起来，露出的才是纸背，
+   而不是正面内容的镜像（倒着的片名与条码）。 */
+.ticket-fold > .ticket-panel {
+  /* 票面必须撑满这个裁切窗口。`.ticket-panel` 自己是 `display:flex`、高度按内容走
+     （只有几行字那么高），不给定位的话它只盖住面板上半截，下半截露出底下模糊的
+     背景——看起来就像票根被啃掉一块（这个坑踩过一次，四档图里下半张凭空消失）。 */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* 拖到后面稍微淡一点点，像纸被拉薄。0.08 是上限，再多会以为要消失了。
+     淡出挂在这一层而不是 .ticket-lift-panel：opacity 会把 preserve-3d
+     压平，挂在这里只淡薄薄一片平面，不动 3D 结构。 */
+  opacity: calc(1 - var(--bend) * 0.08);
+  transition: opacity 320ms ease;
+  backface-visibility: hidden;
+}
+
+/* 折痕上刻意**不画**一条固定的暗带：折痕随进度整条移动，固定暗带会错位。
+   改成在翻起来那块纸自己身上画一圈贴着折痕的暗（见下面的 ::after）——
+   半径由 --fold-x1 推出来，折痕挪到哪儿，暗就跟着到哪儿。 */
+
+/* 翻起来那块纸的折痕侧压暗：折起来的纸，靠近折痕的地方是背光的，
+   一道贴着斜边的暗把「这是一块翻起来的纸」说清楚。
+   - 圆心放在右下角（这块三角的直角顶点），半径按折痕到它的距离算；
+   - (1 - x1) 是折痕吃掉的直角边长（占面板宽），×142% 换成到直角顶点的距离
+     （等腰直角三角形的斜边 ≈ 1.414×直角边）；
+   - 只在最外圈（72%~100%）加深，中间那片纸背保持干净。 */
+.ticket-fold[data-side='over']::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    circle calc((1 - var(--fold-x1, 1)) * 142%) at 100% 100%,
+    rgb(42 35 24 / 0) 72%,
+    rgb(42 35 24 / 0.28) 100%
+  );
+}
+
+/* 按住期间零过渡：纸必须死死跟着手指，迟一帧都会觉得发飘。
+   父级的形变也要算进去——它同样是每帧跟着 --bend 变的，留着 320ms 过渡
+   会让整块纸在拖动时慢半拍才翻过来（m03830 说的「很呆板」有一半来自这里）。 */
+.ticket-lift[data-holding='true'] .ticket-lift-panel,
+.ticket-lift[data-holding='true'] .ticket-fold,
+.ticket-lift[data-holding='true'] .ticket-fold > .ticket-panel {
+  transition: none;
+}
+
+/* 拖过 42%（松手就断）时整张票微微提亮：提示「现在可以松手了」，不用试错。
+
+   提亮只能加在 .ticket-lift 这一层。加到 .ticket-lift-panel 上会踩「filter
+   与 mask 同链」那条老坑——那块纸自己带撕线孔遮罩，Chromium 会把内容卷进
+   滤镜链重算，票根上的字会被冲成一片白（见 .ticket-panel 那段注释）。 */
+.ticket-lift {
+  transition: filter 220ms ease;
+}
+
+.ticket-lift[data-tearable='true'] {
+  filter: drop-shadow(0 24px 54px #1a140c6b) brightness(1.04);
 }
 
 .ticket-lift-panel:active {
   cursor: grabbing;
 }
 
-.ticket-lift-panel .ticket-panel {
-  flex: 1;
-}
-
-/* 提示挂在浮层上、不挂在会动的票根上：票根跟着手走（--pull 驱动
+/* 提示挂在浮层上、不挂在会动的票根上：票根跟着手走（--bend 驱动
    translate/rotate），提示跟着一起转就会「晃」，而且它压在条码上读不出来。 */
 .ticket-tip {
   position: absolute;
@@ -3882,16 +4070,24 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 }
 
 /* 撕开的票根本体在灰烬起来的同时淡出去，两件事叠着看才像烧掉，
-   而不是「纸先消失、灰再出现」。 */
-.ticket-stage:not([data-phase='idle']) .ticket-lift-panel {
+   而不是「纸先消失、灰再出现」。
+
+   烧的是两块 .ticket-fold，不是整个 .ticket-lift、也不是 .ticket-lift-panel：
+   - 烧 .ticket-lift 会把它的孩子（包括要飞走的左半画面）一起淡成透明，
+     画面还没飞就看不见了；
+   - 烧 .ticket-lift-panel 不行，它是折叠的 3D 根（perspective +
+     preserve-3d），filter 会让它变成分组元素、把那块翻起来的纸压回平面，
+     松手那一瞬间纸会「啪」地摊平。
+   挂在两块纸上就没有这两个问题：它们是末端的平面。 */
+.ticket-stage:not([data-phase='idle']) .ticket-fold {
   animation: ticket-burn 520ms ease forwards;
 }
 
-/* 纸跟着字一起没。纸现在长在票根块自己身上，所以 ticket-burn 把那一块
-   整体淡出就够了——不然看到的是「字烧掉了、白纸还在」，像把文字层删掉
-   而不像把票烧掉。画面自己有图、不受影响，烧完剩下的正是用户要的那半张。 */
+/* 纸跟着字一起没。纸长在票根块上，所以把那一块整体淡出就够了——不然
+   看到的是「字烧掉了、白纸还在」，像把文字层删掉而不像把票烧掉。
+   投影在外层 .ticket-lift 上，这里不用管。 */
 @keyframes ticket-burn {
-  0% { filter: none; }
+  0% { filter: brightness(1) saturate(1); }
   40% { filter: brightness(0.62) saturate(0.6); }
   100% { opacity: 0; filter: brightness(0.3) saturate(0); }
 }
@@ -3923,6 +4119,34 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
     transition: none;
   }
 
+  /* 降级态：不做 3D 折叠，整块右半绕接缝底端掀开 --hinge（TEAR_HINGE_DEG）。
+     撕的手感还在，只是纸不翻起来。两块纸的 clip-path 本来就是「折痕上下
+     各留半张」，bend=0 时正好拼满；这里把它们一起抬起来即可，不必按开关
+     渲染两套 DOM。 */
+  .ticket-lift-panel {
+    display: block;
+    perspective: none;
+    transform-style: flat;
+    transform-origin: 0 100%;
+    rotate: calc(var(--bend) * var(--hinge, 12deg));
+    transition: none;
+  }
+
+  /* 不做折叠：纸不该缺一个角，所以下面的那块直接不画，上面的那块恢复成
+     完整矩形——整张票就靠父级那条 rotate 掀开。 */
+  .ticket-fold[data-side='under'] {
+    clip-path: none;
+  }
+
+  .ticket-fold[data-side='over'] {
+    display: none;
+  }
+
+  .ticket-fold > .ticket-panel {
+    opacity: 1;
+    transition: none;
+  }
+
   .ticket-tip {
     animation: none;
     opacity: 0.6;
@@ -3932,7 +4156,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
     animation-duration: 1ms;
   }
 
-  .ticket-stage:not([data-phase='idle']) .ticket-lift-panel {
+  .ticket-stage:not([data-phase='idle']) .ticket-fold {
     animation-duration: 1ms;
   }
 
@@ -3940,21 +4164,6 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
     transition-duration: 1ms;
   }
 }
-.media-badge {
-  position: absolute;
-  left: 9px;
-  bottom: 9px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: #ffffffd9;
-  font-size: 9px;
-  font-style: normal;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: #101010;
-}
-
-/* 空态。和唱片柜的空态保持同一套呼吸：一个淡底方块，一句说明，一个黑胶囊。 */
 .media-empty {
   display: grid;
   justify-items: center;
@@ -4116,17 +4325,8 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 
 /* ---------- 壁纸库 ---------- */
 
-/* 工具栏第二个按钮：和「加入文件夹」并排，样式一致但底色压一档，
-   让主次分得开——多数人第一次来是选文件夹，壁纸库是顺手试的。 */
-.media-pick + .media-pick {
-  margin-left: 8px;
-  background: #f0efea;
-  border-color: transparent;
-}
-
-.media-pick + .media-pick:hover {
-  background: #e8e6e0;
-}
+/* 壁纸库那条入口现在和「从本地添加」一起待在页尾的添加区里（.media-import），
+   主次靠那里分，不再有工具栏里的并排按钮。 */
 
 .media-empty-actions {
   display: flex;
@@ -4157,27 +4357,23 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
     width: 100%;
   }
 
+  /* 「从本地添加」外面多包了一层 .media-add（挂菜单用），
+     所以不能再写 `> button`——那样只管到「读取壁纸库」。 */
+  .media-empty-actions > .media-add,
+  .media-empty-actions > button {
+    width: 100%;
+  }
+
+  .media-empty-actions > .media-add > button,
   .media-empty-actions > button {
     width: 100%;
     justify-content: center;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .media-pick + .media-pick {
-    transition: none;
-  }
-}
-
-/* 放映页的工具栏比唱片柜多一个按钮，窄屏会挤成两行，
-   于是筛选胶囊里的文字被压成竖排。这里让它整体换行、各占一行，文字不再折。 */
+/* 放映页的工具栏现在只剩分类胶囊，窄屏让它整行铺开、两档平分。
+   滑块量的是 offsetWidth，铺开后会经 ResizeObserver 重新量一次，不会偏。 */
 @media (max-width: 599px) {
-  .media-room .collection-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-  }
-
   .media-room .filter-tabs {
     width: 100%;
     justify-content: space-between;
@@ -4188,30 +4384,11 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
     white-space: nowrap;
     padding: 7px 10px;
   }
-
-  .media-room .media-pick {
-    width: 100%;
-    margin-left: 0;
-    justify-content: center;
-  }
-
-  .media-room .media-pick + .media-pick {
-    margin-left: 0;
-  }
 }
 
-/* 唱片柜的筛选胶囊靠 App.tsx 算出来的黑色滑块（.flip-marker）表示选中，
-   放映页是独立组件、没有那个滑块，所以这里的选中项要自己带实底，
-   否则是白字压在浅灰底上，等于看不见。 */
-.media-room .filter-tabs button.active {
-  background: #101010;
-  color: #fff;
-}
-
-.media-room .filter-tabs button.active:hover {
-  background: #101010;
-  color: #fff;
-}
+/* 放映页的胶囊现在也用唱片柜那块黑色滑块（见 MediaRoom.tsx 的 kindTabs），
+   所以选中项不能再自己带实底——两层黑叠在一起，滑块滑过去时旧的那一块会亮着。
+   文字变白仍交给基础规则里的 .filter-tabs button.active{color:#fff}。 */
 
 
 /* ---------- 放映：播放台 ---------- */
@@ -4360,14 +4537,6 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   color: #fff !important;
 }
 
-/* 当前在播放台上的那一张票的记号写在票根那一段（.ticket.is-current） */
-.media-badge-note {
-  left: auto;
-  right: 9px;
-  background: #ffffffd9;
-  color: #101010;
-}
-
 @media (max-width: 599px) {
   .media-theater {
     border-radius: 18px;
@@ -4475,6 +4644,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 .media-room.is-expanded .ticket-grid,
 .media-room.is-expanded .ticket-pager,
 .media-room.is-expanded .no-results,
+.media-room.is-expanded .media-import,
 .media-room.is-expanded .media-empty {
   display: none;
 }
@@ -4862,28 +5032,126 @@ body:has(.media-room.is-expanded) {
 
 /* ---------- 放映：工具条重排 ---------- */
 
-/* 动作在右、分类在左不行——用户的原话是「你咋又把从本地添加放在左边了」。
-   所以这一行分成两簇：左边是视图切换（图片 / 视频），右边是「从本地添加 / 读取壁纸库」。
-   和唱片柜那一行一致：那里也是分类在左、搜索在右。 */
+/* 工具栏只剩分类胶囊了。「从本地添加 / 读取壁纸库」已经搬到列表下面
+   （和唱片柜的「再收藏一个声音」同一个位置），这里不需要再分左右两簇。 */
 .media-room .collection-toolbar.media-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
 }
 
-.media-room .media-actions {
-  display: inline-flex;
+/* ---------- 放映：页尾添加区 ---------- */
+
+/* 照唱片柜那条虚线条的样子：两个入口都在列表末尾，
+   看完自己有什么之后顺手再加，而不是在顶上抢分类的地盘。
+   两列等宽（minmax(0,1fr)）：宽度不表达主次，主次靠灰度——
+   「从本地添加」深一档，「读取壁纸库」压灰。
+   用 grid 而不是 flex：flex 的等分会被两边的内容尺寸带偏（实测差过 24px，
+   怎么调 basis / min-width 都追不平），grid 的 1fr 是按轨道分的，天生对称。 */
+.media-import {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
-  margin-left: auto;
+  gap: 6px;
+  margin: 22px 0 20px;
+  padding: 6px;
+  border: 1px dashed #d8d6cf;
+  border-radius: 14px;
+  background: transparent;
 }
 
-/* .media-pick 自带 margin-left:auto（本来是给「工具栏只有一个按钮」那版用的）。
-   现在它在右侧容器里，再 auto 一次会把两个按钮撑开，所以要清掉。 */
-.media-room .media-actions .media-pick {
-  margin-left: 0;
+/* 菜单要挂在按钮上，所以主按钮外面还得有一层定位容器。
+   它自己只负责占满左列，宽度由 grid 决定。 */
+.media-import .media-add {
+  display: flex;
+  min-width: 0;
+}
+
+.media-import-main {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #6f6f6a;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.media-import-main:hover {
+  background: #f2f1ed;
+  color: #101010;
+}
+
+.media-import-alt {
+  display: inline-flex;
+  /* 宽度由父级的 grid 轨道给，这里只要保证不被内容撑破、文字居中。
+     主次只靠灰度分。 */
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  /* padding 和主按钮保持一致：两边等宽之后，悬停背景块的左右边界才会对称。 */
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #8b8b85;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.media-import-alt:hover {
+  background: #f2f1ed;
+  color: #101010;
+}
+
+/* 贴底的菜单只能往上弹，否则一出页面就被切掉。
+   空台那一处（.media-empty-actions 里的 .media-add）沿用基础规则向下弹。 */
+.media-import .media-add-menu {
+  top: auto;
+  right: auto;
+  bottom: calc(100% + 8px);
+  left: 0;
+  animation: add-menu-up 160ms cubic-bezier(.2,.7,.3,1) both;
+}
+
+@keyframes add-menu-up {
+  from { opacity: 0; transform: translateY(6px) scale(.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-import-main,
+  .media-import-alt {
+    transition: none;
+  }
+
+  .media-import .media-add-menu {
+    animation: none;
+  }
+}
+
+@media (max-width: 599px) {
+  /* 窄屏改成一行一个：父级是 grid，所以是改轨道数而不是 flex-direction。 */
+  .media-import {
+    grid-template-columns: minmax(0, 1fr);
+    margin: 18px 0 16px;
+  }
+
+  .media-import-main,
+  .media-import-alt {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 /* 空台：库里一件都没有时播放台的样子。保持和正常播放台同样的占位高度，
@@ -4906,28 +5174,7 @@ body:has(.media-room.is-expanded) {
   letter-spacing: 0.02em;
 }
 
-/* 窄屏：两簇各占一行，右簇靠右。 */
-@media (max-width: 599px) {
-  .media-room .collection-toolbar.media-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .media-room .media-actions {
-    margin-left: 0;
-  }
-
-  .media-room .media-actions .media-pick {
-    flex: 1;
-    justify-content: center;
-    width: auto;
-  }
-
-  .media-room .media-actions {
-    display: flex;
-    gap: 8px;
-  }
-}
+/* 窄屏：工具栏只剩分类胶囊一行，胶囊铺满（见上文 599px 那条）。 */
 
 /* 断链保底：原文件被挪走或删掉时，<img> 加载失败会塌成 0 高，
    播放台就剩一条黑线。给台面一个下限，塌的时候还是个台子。 */

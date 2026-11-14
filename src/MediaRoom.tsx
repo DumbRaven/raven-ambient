@@ -7,7 +7,7 @@
 // （实测 178 件里 1024×1024 / 192×192 / 224×224 各种正方形），跟壁纸本身的比例无关，
 // 摆进 4:3 的格子里会被裁掉两边，而且分辨率低。所以直接挂 <video> 读自己的第一帧。
 // 一屏最多也就九件，配合视口懒加载不会同时开一百多个文件句柄。
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Droplets, FilePlus2, FolderOpen, ImageIcon, Maximize2, Minimize2, MonitorPlay, Pause, Play, RefreshCw, Sparkles, X, Palette
 } from 'lucide-react';
 import { setDesktopStage, setWindowFullscreen } from './media';
@@ -70,6 +70,40 @@ const ADD_CHOICES = [
   { key: 'folder' as const, label: '选一个文件夹', hint: '把这个文件夹里的图片和视频都收进来', icon: FolderOpen },
   { key: 'file' as const, label: '选几张文件', hint: '只收点中的这几件，不动别处', icon: FilePlus2 },
 ];
+
+/**
+ * 「从本地添加」的选项菜单。空库和页尾那条添加区共用一份，
+ * 哪边的按钮点开就贴着哪边弹——所以挂载位置跟着 `.media-add` 走，
+ * 自己不掺和定位（定位全在 CSS 里，贴底那条会改方向）。
+ */
+function AddMenu({ open, onClose, onPick, onPickFiles }: { open: boolean; onClose: () => void; onPick: () => void; onPickFiles: () => void }) {
+  if (!open) return null;
+  return (
+    <>
+      {/* 点空白处收起。排在菜单之前，保证菜单自己的点击先到。 */}
+      <button className="media-add-veil" aria-label="收起" onClick={onClose} />
+      <div className="media-add-menu" role="menu">
+        {ADD_CHOICES.map(choice => (
+          <button
+            key={choice.key}
+            role="menuitem"
+            onClick={() => {
+              onClose();
+              if (choice.key === 'folder') onPick();
+              else onPickFiles();
+            }}
+          >
+            <choice.icon size={14} />
+            <span>
+              <b>{choice.label}</b>
+              <small>{choice.hint}</small>
+            </span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
 
 export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, onRescan, onForgetDir, onScanWallpapers, onForgetWallpapers, disc, ambience, now, onPrevTrack, onNextTrack }: Props) {
   // 只有图片和视频两档，不再有「全部」。
@@ -162,6 +196,11 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   useEffect(() => { writeLayers(layers); }, [layers]);
   const screen = useRef<HTMLVideoElement>(null);
   const grid = useRef<HTMLUListElement>(null);
+  // 「图片 / 视频」胶囊底下那块黑滑块。唱片柜的筛选胶囊是同一套做法：
+  // 滑块的位置和宽度由 JS 量出选中项写进 CSS 变量，两个按钮之间就有了滑动过渡。
+  // 量 offsetLeft/offsetWidth 而不是 getBoundingClientRect：全屏时 .view-stage 带
+  // transform: scale()，外接矩形是缩放后的值，写进 CSS 会越缩越小。
+  const kindTabs = useRef<HTMLDivElement>(null);
   // 已经进过视口的条目。壁纸库一次能读进来一百多件，每个视频都要读文件头、
   // 每个封面都要解一张帧；同时挂上会卡住渲染进程（实测 178 件直接把窗口拖到无响应）。
   // 所以只给滚到眼前的那批挂真实元素，其余先留空。
@@ -186,6 +225,27 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   // 条目被删掉（移出来源、重扫之后文件没了）就退回第一件，
   // 不能留着一个指向不存在条目的 id，否则播放台会空着而格子里明明有东西。
   const current = useMemo(() => usable.find(item => item.id === currentId) ?? usable[0], [usable, currentId]);
+
+  // 「图片 / 视频」的黑滑块：跟唱片柜筛选胶囊（App.tsx 里的 filterTabsRef）同一套。
+  // 按钮宽度一变（窄屏变成 flex:1 平分）就要重量，所以挂 ResizeObserver。
+  // 依赖 kind：切档之后选中项换了，得重新量一次。
+  useLayoutEffect(() => {
+    const tabs = kindTabs.current;
+    if (!tabs) return;
+    const sync = () => {
+      const active = tabs.querySelector<HTMLElement>('button.active');
+      if (!active) return;
+      tabs.style.setProperty('--flip-x', `${active.offsetLeft}px`);
+      tabs.style.setProperty('--flip-width', `${active.offsetWidth}px`);
+    };
+    sync();
+    // 首帧不带动画：不然页面一进来滑块会从 0 宽滑到选中项。
+    const ready = requestAnimationFrame(() => { tabs.dataset.ready = 'true'; });
+    const observer = new ResizeObserver(sync);
+    observer.observe(tabs);
+    tabs.querySelectorAll('button').forEach(button => observer.observe(button));
+    return () => { cancelAnimationFrame(ready); observer.disconnect(); };
+  }, [kind, expanded]);
 
   // 上一件 / 下一件也走全部条目，跟着筛选走会让「下一件」变成换个类别。
   const step = useCallback((direction: number) => {
@@ -405,47 +465,14 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   return (
     <section className={`media-room ${expanded ? 'is-expanded' : ''}`} data-chrome={chrome ? 'visible' : 'hidden'} aria-label="放映">
       <div className="collection-toolbar media-toolbar">
-        <div className="filter-tabs" role="group" aria-label="媒体分类">
+        <div ref={kindTabs} className="filter-tabs" role="group" aria-label="媒体分类">
+          {/* 滑块在按钮底下，按钮自己不再带实底（见 skin-bold.css 里那条旧规则的注释）。 */}
+          <span className="flip-marker" aria-hidden="true" />
           {(['image', 'video'] as const).map(type => (
             <button key={type} aria-pressed={kind === type} className={kind === type ? 'active' : ''} onClick={() => setKind(type)}>
               {type === 'image' ? '图片' : '视频'}
             </button>
           ))}
-        </div>
-        <div className="media-actions">
-          <div className="media-add">
-            <button className="text-button media-pick" aria-haspopup="menu" aria-expanded={adding} onClick={() => setAdding(value => !value)}>
-              <FolderOpen size={13} />从本地添加
-            </button>
-            {adding && (
-              <>
-                {/* 点空白处收起。放在按钮之后、菜单之前，保证菜单自己的点击先到。 */}
-                <button className="media-add-veil" aria-label="收起" onClick={() => setAdding(false)} />
-                <div className="media-add-menu" role="menu">
-                  {ADD_CHOICES.map(choice => (
-                    <button
-                      key={choice.key}
-                      role="menuitem"
-                      onClick={() => {
-                        setAdding(false);
-                        if (choice.key === 'folder') onPick();
-                        else onPickFiles();
-                      }}
-                    >
-                      <choice.icon size={14} />
-                      <span>
-                        <b>{choice.label}</b>
-                        <small>{choice.hint}</small>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-          <button className="text-button media-pick" onClick={onScanWallpapers}>
-            <Sparkles size={13} />读取壁纸库
-          </button>
         </div>
       </div>
 
@@ -864,9 +891,13 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
           <h2>这一面墙还空着</h2>
           <p>选几张图片或视频，或者挑一整个文件夹；装了 Wallpaper Engine 也可以直接读壁纸库。</p>
           <div className="media-empty-actions">
-            <button className="primary-button" onClick={() => setAdding(true)}>
-              <FolderOpen size={14} />从本地添加
-            </button>
+            {/* 空库这一处菜单向下弹（下面就是空的），页尾那条向上弹，定位由 CSS 按父容器区分。 */}
+            <div className="media-add">
+              <button className="primary-button" aria-haspopup="menu" aria-expanded={adding} onClick={() => setAdding(value => !value)}>
+                <FolderOpen size={14} />从本地添加
+              </button>
+              <AddMenu open={adding} onClose={() => setAdding(false)} onPick={onPick} onPickFiles={onPickFiles} />
+            </div>
             <button className="secondary-button" onClick={onScanWallpapers}>
               <Sparkles size={14} />读取壁纸库
             </button>
@@ -923,6 +954,46 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               <p>{kind === 'image' ? '这个文件夹里还没有图片。' : '这个文件夹里还没有视频。'}</p>
             </div>
           )}
+
+          {/* 添加入口放在列表底下，跟唱片柜的「再收藏一个声音」同一个位置。
+              之前它在工具栏右边，用户说太难看：那一条已经是「换个看法」的区域，
+              塞两个导入按钮进去，等于把浏览和搬家混在一行。 */}
+          <div className="media-import">
+            <div className="media-add">
+              <button className="media-import-main" aria-haspopup="menu" aria-expanded={adding} onClick={() => setAdding(value => !value)}>
+                <FolderOpen size={14} />从本地添加
+              </button>
+              {adding && (
+                <>
+                  {/* 点空白处收起。放在按钮之后、菜单之前，保证菜单自己的点击先到。 */}
+                  <button className="media-add-veil" aria-label="收起" onClick={() => setAdding(false)} />
+                  {/* 贴底所以往上弹：向下展开会顶出窗口、被页面裁掉。 */}
+                  <div className="media-add-menu" role="menu">
+                    {ADD_CHOICES.map(choice => (
+                      <button
+                        key={choice.key}
+                        role="menuitem"
+                        onClick={() => {
+                          setAdding(false);
+                          if (choice.key === 'folder') onPick();
+                          else onPickFiles();
+                        }}
+                      >
+                        <choice.icon size={14} />
+                        <span>
+                          <b>{choice.label}</b>
+                          <small>{choice.hint}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <button className="media-import-alt" onClick={onScanWallpapers}>
+              <Sparkles size={13} />读取壁纸库
+            </button>
+          </div>
         </>
       )}
     </section>
