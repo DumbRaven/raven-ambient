@@ -348,7 +348,13 @@ class MediaBridge {
       }
       for (const file of files) grantsOf().addFile(file.path);
       grantsOf().save();
-      if (!files.length) return;
+      // 挑完之后一个都没剩下时也必须回包。以前这里直接 return，
+      // 前端永远等不到消息，用户看到的就是「点了没反应」。
+      // 最常见的原因是挑中的文件在选中之后、确认之前被别的程序删掉了。
+      if (!files.length) {
+        this.push(webContents, { type: 'rejected', path: '', reason: 'empty' });
+        return;
+      }
       this.push(webContents, { type: 'files', files, url: files.map(file => ({ ...file, src: mediaUrl(file.path) })) });
       return;
     }
@@ -356,7 +362,13 @@ class MediaBridge {
     if (type === 'rescan') {
       const dir = typeof action.dir === 'string' ? path.resolve(action.dir) : '';
       // 壁纸库根目录也算合法来源，它不进台账（位置固定、由主进程自己发现）。
-      if (!dir || !(grantsOf().dirs.has(dir) || wallpaperAllowed.has(dir))) return;
+      // 目录不在台账里意味着两种可能：用户从没授权过，或者授权过但那之后目录被
+      // 改名/移动/删除了（isWithin 会 realpath，路径不存在就判 false）。
+      // 两种都必须回包——静默 return 会让「重扫」按钮点了毫无反应。
+      if (!dir || !(grantsOf().dirs.has(dir) || wallpaperAllowed.has(dir))) {
+        this.push(webContents, { type: 'rejected', path: dir, reason: 'missing' });
+        return;
+      }
       const files = scan(dir);
       this.push(webContents, { type: 'scan', dir, files, url: files.map(f => ({ ...f, src: mediaUrl(f.path) })) });
       return;

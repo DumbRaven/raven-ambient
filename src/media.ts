@@ -38,12 +38,16 @@ export type MediaMessage =
   | { type: 'files'; files: Omit<ScannedFile, 'src'>[]; url: ScannedFile[] }
   | { type: 'wallpapers'; roots: { dir: string; count: number }[]; items: WallpaperFile[] }
   /**
-   * 选的目录被主进程拒了（盘根、系统目录）。
+   * 主进程拒了一个动作。
    *
-   * 有这一条是因为「选了半天什么也没发生」是最难查的一类坏掉：用户会以为是
-   * 软件卡了，然后反复重试。主进程不静默吞掉，页面负责说清为什么。
+   * 有这一条是因为「点了什么也没发生」是最难查的一类坏掉：用户会以为是软件卡了，
+   * 然后反复重试。主进程不静默吞掉，页面负责说清为什么。
+   *
+   * - `system`：选的是盘根或系统目录，不收。
+   * - `empty`：挑完之后一个可用的都没剩下（常见于选中之后文件被别的程序删掉）。
+   * - `missing`：要重扫的目录已经不在台账里了，通常是目录被改名/移动/删除。
    */
-  | { type: 'rejected'; path: string; reason: 'system' }
+  | { type: 'rejected'; path: string; reason: 'system' | 'empty' | 'missing' }
 
 /** 壁纸库里的一件。key 是作品目录，比标题和文件名都稳。 */
 export type WallpaperFile = ScannedFile & { key: string; note: string };

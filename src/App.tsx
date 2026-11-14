@@ -118,7 +118,11 @@ export default function App() {
       if (message.type === 'rejected') {
         // 盘根、系统目录这类位置主进程不收。必须说出来：用户选了、点了确定、
         // 然后界面毫无反应，他会以为软件卡住了，再试几次还是一样。
-        notify(message.reason === 'system' ? '这个位置不能收：请选你的素材文件夹，别选磁盘根目录或系统目录。' : '这个位置不能用。');
+        notify(message.reason === 'system'
+          ? '这个位置不能收：请选你的素材文件夹，别选磁盘根目录或系统目录。'
+          : message.reason === 'empty'
+            ? '挑中的文件都读不到了，可能刚被移走或删除。再选一次试试。'
+            : '这个文件夹找不到了，可能被改名或移动过。重新添加一次就好。');
         return;
       }
       if (message.type === 'wallpapers') {
@@ -453,10 +457,16 @@ export default function App() {
     const storage = new CabinetStorage(); cabinetStorage.current = storage;
     void (async () => {
       try {
-        const saved = await storage.load(); if (!active) return;
+        const loaded = await storage.load(); if (!active) return;
+        const saved = loaded.cabinet;
         cabinetRef.current = saved; setCabinet(saved);
-        player.current = new RoomPlayer(saved, state => { if (active) setStatus(state); }, error => { if (active) notify(message(error)); });
+        // ready 必须在拿到 cabinet 后立刻置真，**不能等到整个流程跑完**。
+        // 这里曾经是死锁来源：只有 try 末尾才 setReady(true)，而读盘一抛错就
+        // 直接进 catch，结果界面永远停在「空柜 + 所有导入按钮全灰」。
         setReady(true);
+        if (loaded.broken) notify(`收藏读不出来（${loaded.reason || '格式异常'}）。已备份原文，可以继续使用。`);
+        else if (loaded.lost > 0) notify(`有 ${loaded.lost} 张唱片的数据不完整，已跳过；其余照常。原文已备份。`);
+        player.current = new RoomPlayer(saved, state => { if (active) setStatus(state); }, error => { if (active) notify(message(error)); });
         const image = await readAsset('background'); if (!active) return;
         if (image) { const url = URL.createObjectURL(image); urls.current.set('background', url); setBackground(url); }
         // 封面并发读，不再一张一张排队：串行读 16 张要 1.5 秒，并发只要一个来回。
@@ -484,9 +494,14 @@ export default function App() {
           }
         }
       } catch (error) {
-        // 读失败也不能把用户留在开屏上，界面本身还能用
+        // 走到这里说明连「读盘」这一步本身都炸了（比如存储驱动不可用）。
+        // 界面照样要能用：开屏撤掉、ready 置真、给一句提示。收藏读失败是数据问题，
+        // 不该让整个软件变成一块点不动的空壳。
         dismissSplash();
-        if (active) notify(`本地收藏读取失败：${message(error)}。旧数据仍保留。`);
+        if (active) {
+          setReady(true);
+          notify(`本地收藏读取失败：${message(error)}。旧数据仍保留。`);
+        }
       }
     })();
     return () => { active = false; line.current.close(); player.current?.dispose(); player.current = null; window.clearTimeout(justAddedTimer.current); window.clearTimeout(previewTimer.current); window.clearTimeout(confirmTimer.current); for (const url of urls.current.values()) URL.revokeObjectURL(url); urls.current.clear(); };

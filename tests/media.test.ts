@@ -179,3 +179,34 @@ test('扫描带的修改时间会一路留到票面：扫描 → 条目 → 存�
   assert.equal(saved.media[0].mtime, at);
   assert.equal(saved.media[1].mtime, undefined);
 });
+
+/**
+ * 主进程的两个分支必须回包。
+ *
+ * 以前 `pick-files` 挑完发现一个可用文件都没有、`rescan` 发现目录不在台账里，
+ * 都是直接 `return` —— 页面永远等不到消息，用户看到的是「点了没反应」，
+ * 然后反复重试。这类坏掉最难查，因为没有任何报错。
+ *
+ * 这里用读源码的方式钉住行为（主进程模块在纯 node 下要 electron，跑不起来）。
+ */
+test('主进程不会静默吞掉「拒收」，两种情形都要回 rejected', () => {
+  const source = fs.readFileSync(new URL('../electron/media.cjs', import.meta.url), 'utf8');
+
+  const pickFiles = source.slice(source.indexOf("if (type === 'pick-files')"), source.indexOf("if (type === 'rescan')"));
+  assert.ok(pickFiles.length > 0, '找不到 pick-files 分支');
+  assert.ok(/reason: 'empty'/.test(pickFiles), 'pick-files 一个文件都没剩下时必须回 rejected(empty)');
+  assert.ok(!/if \(!files\.length\) return;/.test(pickFiles), 'pick-files 不能静默 return');
+
+  const rescan = source.slice(source.indexOf("if (type === 'rescan')"), source.indexOf("if (type === 'forget')"));
+  assert.ok(rescan.length > 0, '找不到 rescan 分支');
+  assert.ok(/reason: 'missing'/.test(rescan), 'rescan 目录不在台账里时必须回 rejected(missing)');
+  assert.ok(!/wallpaperAllowed\.has\(dir\)\)\) return;/.test(rescan), 'rescan 不能静默 return');
+});
+
+test('页面侧把三种拒收原因都说成人话', () => {
+  const source = fs.readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  // 三个分支各自有不同的下一步动作，不能合并成一句「这个位置不能用」
+  assert.ok(/reason === 'system'/.test(source));
+  assert.ok(/reason === 'empty'/.test(source));
+  assert.ok(/重新添加一次就好/.test(source), 'missing 要告诉用户怎么办');
+});
