@@ -43,6 +43,7 @@ const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const wait = ms => new Promise(r => setTimeout(r, ms));
+const { STYLE_SNAPSHOT } = require('./style-snapshot.cjs');
 
 // 探针窗口默认不出现。
 //
@@ -324,6 +325,14 @@ async function launch(opts = {}) {
     // 离屏 能跑、显示 能跑、隐藏 不能跑（rAF 被挂起）。
     offscreen: OFFSCREEN,
     visible: SHOW,
+    // styleSnapshot：导出页面上每个元素每个属性的最终计算值。
+    //
+    // 这是截图之外的第二种门禁。截图只能看见视口里那个尺寸下的样子，
+    // 折叠的抽屉、:hover / :focus-visible 独占的规则、视口外滚不到的部分、
+    // `@media (max-height: 700px)` 分支全都在盲区里。重构 8000 行样式时，
+    // 盲区里坏掉的东西不会让图变红，只会在用户点到时才崩。
+    // 详见 tools/probe/style-snapshot.cjs。
+    styleSnapshot: () => run(STYLE_SNAPSHOT),
     shot: async file => {
       const png = (await win.webContents.capturePage()).toPNG();
       if (file) fs.writeFileSync(file, png);

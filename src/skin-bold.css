@@ -4,7 +4,18 @@
    想回到原来的玻璃柜风格，把 main.tsx 里的这行 import 删掉即可。
    ========================================================================== */
 
-.app {
+/* 令牌定义在 :root 而不是 .app。
+ *
+ * 原因是采样范围：`body` 与几个挂在 `document.body` 上的隐藏宿主节点
+ * （rain / marble / paper 三套 SVG filter，见 RainLayer.tsx、TemplateStage.tsx、
+ * MediaTickets.tsx）都不在 `.app` 里面，拿不到定义在 `.app` 上的自定义属性。
+ * 此前它们靠 `var(--bold-page, #f6f5f2)` 里那个**碰巧同值**的兜底才没出错——
+ * 一旦改配色而忘了同步兜底值，这部分就会静默变回旧色。
+ * 提到 :root 之后，任何地方都能直接用 var()，兜底值可以放心删。
+ *
+ * 覆盖优先级不变：这些值原本就只在 `.app` 出现一次，没有别处定义同名变量。
+ */
+:root {
   --bold-bg: #ffffff;
   --bold-page: #f6f5f2;
   --bold-ink: #101010;
@@ -17,16 +28,20 @@
   --bold-coral: #f7b7a8;
   --bold-sand: #efede6;
 
+  color: var(--bold-ink);
+  background: var(--bold-page);
+  font-family: "Inter", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 原版 styles.css:7 用 `--ink` / `--muted-ink` 两枚变量驱动大量文字色，
+ * 明亮版把它们指到自己的墨色上。必须留在 `.app`：它是覆盖原版规则的入口，
+ * 提到 :root 会因为原版在 `.app` 上也定义而输掉。
+ */
+.app {
   --ink: var(--bold-ink);
   --muted-ink: var(--bold-muted);
   background: var(--bold-page);
-}
-
-:root {
-  color: #101010;
-  background: #f6f5f2;
-  font-family: "Inter", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
 }
 
 body { background: var(--bold-page, #f6f5f2); }
