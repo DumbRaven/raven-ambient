@@ -1,7 +1,7 @@
 import { type ChangeEvent, type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDownToLine, ArrowLeft, ArrowRight, Bird, Check, CheckCheck, ChevronLeft, ChevronRight, Disc3, FolderOpen, Headphones, ImagePlus, Info, LoaderCircle, Music2, Play, Plus, RotateCcw, Search, Settings2, Sparkles, Square, Timer, Trash2, Waves, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, Bird, Check, CheckCheck, ChevronLeft, ChevronRight, Disc3, FolderOpen, Headphones, ImagePlus, Info, LoaderCircle, Music2, Play, Plus, Search, Settings2, Sparkles, Square, Timer, Trash2, Waves, X } from 'lucide-react';
 import FocusRoom from './FocusRoom';
-import { cabinetRecords, clampPage, emptyCabinet, fingerprint, isAudioFile, nextOrder, orderNames, pageCount, paginate, removeRecord, toggleRecord, trackTransitions, transitionHints, transitionNames, type Cabinet, type CabinetFilter, type RecordItem, type RecordType } from './records';
+import { cabinetRecords, clampPage, emptyCabinet, fingerprint, isAudioFile, nextOrder, orderNames, pageCount, paginate, removeRecord, toggleRecord, type Cabinet, type CabinetFilter, type RecordItem, type RecordType } from './records';
 import { ambientCovers, ambientCoverUrl, matchAmbientCover, type AmbientCover } from './ambient-covers';
 import { CabinetStorage, CabinetWriteError } from './cabinet-storage';
 import { RoomPlayer, type RoomStatus } from './player';
@@ -10,176 +10,31 @@ import { prepareImage, readAsset, storeAsset } from './storage';
 import { listAssetKeys } from './store';
 import { formatTime } from './model';
 import { depthRange, describeDepth } from './ducking';
-import { launchSeed, pickSleeve, type SleeveArt, type SleeveMotif } from './sleeves';
-import { coverPalette, recordPressing, vinylPalette } from './vinyl';
-import { coverMarks } from './cover-marks';
-import MusicQueue from './MusicQueue';
-import RecordPlayer, { type TurntableDisc } from './RecordPlayer';
+import { launchSeed, pickSleeve } from './sleeves';
+import Slider from './Slider';
+import Vinyl from './VinylDisc';
+import Sleeve from './Sleeve';
+import RecordCard from './RecordCard';
+import { type TurntableDisc } from './RecordPlayer';
 import PlayCard from './PlayCard';
 import { dismissSplash } from './splash';
 import RollNumber from './roll-number';
 import { LineIn, lineInError } from './line-in';
-import { appLabel, emptyNowPlaying, hasTrack, parseNowPlaying, playbackHint, type NowPlaying } from './now-playing';
+import { appLabel, emptyNowPlaying, hasTrack, parseNowPlaying, type NowPlaying } from './now-playing';
 import { askNowPlaying, commandNowPlaying, listenNowPlaying } from './now-playing-bridge';
 import { askMedia, dropWallpapers, forgetMediaDir as forgetMediaDirGrant, listenMedia, looseMedia, mergeMedia, pickMediaFiles, pickMediaFolder, replaceMediaDir, replaceWallpapers, rescanMediaFolder, restoreMediaDirs, scanWallpapers, toMediaItem, toWallpaperItem, type MediaMessage } from './media';
 import MediaRoom from './MediaRoom';
+import ListeningRoom from './ListeningRoom';
 import type { StageNow } from './TemplateStage';
 import { useDialogMotion, useFilterMotion, usePageMotion } from './use-motion';
 import { useViewLayout } from './use-view-layout';
 import MotionNotice from './MotionNotice';
+import GuideModal from './GuideModal';
+import SettingsModal from './SettingsModal';
 
 const emptyStatus: RoomStatus = { running: false, playing: false, musicPlaying: false, ducked: false, level: 0, currentTime: 0, duration: 0, musicOn: true, ambientOn: true, lineInput: 0, lineLive: false };
 type Modal = 'import' | 'settings' | 'edit' | 'guide' | null;
 function message(error: unknown) { return error instanceof Error ? error.message : '没有完成，请重试。'; }
-/**
- * 滑杆 + 可直接输入的数字。
- *
- * 只给滑杆时，用户想精确调到某个值只能一格一格蹭；尤其「避让幅度」以 dB 计、
- * 差 1 dB 听感就不同。数字和滑杆绑同一份值，两边都能改。
- *
- * 平时它看起来就是一行文字（标签在左、数字在右），点上去才变成输入框。
- * 常驻一个带边框的 number input 会把右侧面板弄得像张表单 —— 这是用户明确否掉的。
- *
- * 输入过程中的中间态（清空、只打了负号）不能直接往上游写，否则值会在
- * 「没输入完」时被夹到 min，输入框自己跳数字。所以草稿单独存一份，
- * 失焦或回车时才提交；期间滑杆仍按上一个有效值画。
- */
-function Slider({ label, value, onChange, min = 0, max = 100, unit = '%' }: { label: string; value: number; onChange: (n: number) => void; min?: number; max?: number; unit?: string }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const editing = draft !== null;
-
-  function commit(text: string) {
-    const parsed = Number.parseInt(text, 10);
-    setDraft(null);
-    if (!Number.isFinite(parsed)) return;
-    const next = Math.min(max, Math.max(min, parsed));
-    if (next !== value) onChange(next);
-  }
-
-  return (
-    <label className="slider-field">
-      <span>
-        <span className="slider-label">{label}</span>
-        {/* 不编辑时是一个只读的 <span>，点上去才换成 <input>。
-            这样平时它和「11%」是同一行文字，不会凭空多出一个框。 */}
-        <span className={`slider-value ${editing ? 'is-editing' : ''}`}>
-          {editing ? (
-            <input
-              className="slider-number"
-              type="number"
-              inputMode="numeric"
-              step={1}
-              min={min}
-              max={max}
-              autoFocus
-              aria-label={label}
-              value={draft}
-              onChange={event => setDraft(event.target.value)}
-              onBlur={event => commit(event.target.value)}
-              onKeyDown={event => {
-                if (event.key === 'Enter') { event.preventDefault(); commit((event.target as HTMLInputElement).value); }
-                else if (event.key === 'Escape') { event.preventDefault(); setDraft(null); }
-              }}
-            />
-          ) : (
-            <button
-              type="button"
-              className="slider-read"
-              aria-label={`${label}，${value}${unit}，点击可输入`}
-              onClick={() => setDraft(String(value))}
-            >
-              {value}
-            </button>
-          )}
-          {unit && <em>{unit}</em>}
-        </span>
-      </span>
-      <input type="range" aria-label={label} min={min} max={max} value={value} onChange={e => onChange(Number(e.target.value))} style={{ '--fill': `${(value - min) / (max - min) * 100}%` } as CSSProperties} />
-    </label>
-  );
-}
-function Vinyl({ record, color, cover, spinning = false }: { record?: RecordItem; color: string; cover?: string; spinning?: boolean }) {
-  // 内圈始终是封面；外圈按封面取色做成彩色胶盘。没有封面时用唱片自己的颜色。
-  const pressing = recordPressing(record?.id ?? color, launchSeed);
-  const [colors, setColors] = useState<string[]>([]);
-  useEffect(() => {
-    if (!cover) { setColors([]); return; }
-    let active = true;
-    void coverPalette(cover).then(palette => { if (active) setColors(palette); });
-    return () => { active = false; };
-  }, [cover]);
-  const palette = vinylPalette(colors, color);
-  const style = {
-    '--record-color': color,
-    '--vinyl-base': palette.base,
-    '--vinyl-accent': palette.accent,
-    '--vinyl-accent-2': palette.accent2,
-    '--vinyl-groove': palette.groove,
-    '--vinyl-sheen': palette.sheen,
-    '--vinyl-angle': `${pressing.angle}deg`,
-  } as CSSProperties;
-  return <span className={`vinyl pressing-${pressing.style} ${palette.light ? 'is-light' : ''} ${spinning ? 'spinning' : ''}`} style={style}><span className="vinyl-label" style={cover ? { backgroundImage: `url("${cover}")` } : undefined} /><i className="spindle" /></span>;
-}
-function Sleeve({ record, cover, art, playing, preview = false }: { record?: RecordItem; cover?: string; art?: SleeveArt; playing: boolean; preview?: boolean }) {
-  // 有自定义封面就照用；没有就用本次启动随机到的封套款式。
-  const motif = cover ? undefined : art?.motif ?? 'orbit';
-  const tone = art?.tone;
-  const artStyle = motif ? { '--cover-from': tone?.from ?? '#d3d9cb', '--cover-to': tone?.to ?? '#8b9c85', '--cover-ink': tone?.ink ?? '#f6f8ec' } as CSSProperties : undefined;
-  return <span className={`record-case ${preview ? 'showcase-case' : ''} ${record?.category === 'ambient' ? 'ambient-case' : ''}`} style={{ '--record-color': record?.color ?? '#a0a79d' } as CSSProperties}>
-    <span className="case-back" /><span className="disc-pocket"><Vinyl record={record} color={record?.color ?? '#a0a79d'} cover={cover} spinning={playing} /></span>
-    <span className="case-front"><span className={`cover-art ${record?.category === 'ambient' ? 'cover-ambient' : 'cover-music'} ${motif ? `sleeve-${motif}` : ''}`} style={cover ? { backgroundImage: `url("${cover}")` } : artStyle}>{motif && <SleeveMarks motif={motif} />}</span><span className="cover-border" /><span className="cover-title">{record?.name ?? 'Slow\nmoments.'}</span><span className="case-spine" /></span>
-  </span>;
-}
-/** 环境音的小标识：选了内置封面就画那张封面的主图形，否则用波浪纹。 */
-function AmbientMark({ record }: { record?: RecordItem }) {
-  const mark = record ? coverMarks[record.coverPreset ?? ''] : undefined;
-  if (!mark) return <Waves size={13} />;
-  return <svg className="ambient-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{ __html: mark }} />;
-}
-/** 无封面唱片的构图元素。每一款只放真正需要的形状，其余靠 CSS 画。
-*/
-function SleeveMarks({ motif }: { motif: SleeveMotif }) {
-  if (motif === 'orbit') return <><span className="cover-orbit orbit-one" /><span className="cover-orbit orbit-two" /><span className="cover-orbit orbit-three" /><span className="cover-sun" /></>;
-  if (motif === 'dawn') return <><span className="sleeve-glow" /><span className="sleeve-disc" /></>;
-  if (motif === 'horizon') return <><span className="sleeve-sky" /><span className="sleeve-line" /><span className="sleeve-line second" /></>;
-  if (motif === 'arch') return <span className="sleeve-gate" />;
-  if (motif === 'ripple') return <><span className="ripple-ring r1" /><span className="ripple-ring r2" /><span className="ripple-ring r3" /><span className="ripple-ring r4" /></>;
-  return <><span className="sleeve-band b1" /><span className="sleeve-band b2" /><span className="sleeve-band b3" /></>;
-}
-/**
- * 唱片柜里的一格。封面可以掀开，黑胶从里面滑出来——这是这个软件最早的招牌动作。
- * 列表视图只是另一种排法，两种视图共用同一份数据和同一套交互。
- */
-// 唱片盒的开合是三态：'open' 钉住掀开、'closed' 钉住合上、undefined 交给鼠标悬停。
-// 之所以要 'closed'，是因为刚合上时鼠标还停在卡片上，光去掉 'open' 会被 hover 立刻again掀开。
-function RecordCard({ record, cover, art, selected, justAdded, order, flip, playing, onFocus, onSelect }: { record: RecordItem; cover?: string; art?: SleeveArt; selected: boolean; justAdded?: boolean; order: number; flip?: 'open' | 'closed'; playing: boolean; onFocus: () => void; onSelect: () => void }) {
-  const mark = useRef<HTMLButtonElement>(null);
-  // 加进队列的那一下：圆圈弹一下，外面荡开一圈淡环。
-  // 用 WAAPI 而不是切 class——同名 CSS animation 在同一元素上重加不会重播，
-  // 而用户连着点同一张是完全可能的。
-  useEffect(() => {
-    const node = mark.current;
-    if (!justAdded || !node || typeof node.animate !== 'function') return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    node.animate([
-      { transform: 'scale(0.7)' },
-      { transform: 'scale(1.16)', offset: 0.55 },
-      { transform: 'scale(1)' },
-    ], { duration: 420, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' });
-    const ring = document.createElement('span');
-    ring.className = 'select-ring';
-    node.append(ring);
-    ring.animate([
-      { transform: 'scale(0.7)', opacity: 0.34 },
-      { transform: 'scale(2)', opacity: 0 },
-    ], { duration: 460, easing: 'cubic-bezier(0.23, 1, 0.32, 1)' }).finished
-      .then(() => ring.remove(), () => ring.remove());
-  }, [justAdded]);
-  return <li className={`record-card ${selected ? 'selected' : ''}`} data-flip={flip}>
-    <button className="record-preview" onClick={onFocus} aria-label={`打开 ${record.name} 的唱片盒`}><Sleeve record={record} cover={cover} art={art} playing={playing} /></button>
-    <p><button ref={mark} className={`select-record ${selected ? 'on' : ''}`} aria-pressed={selected} aria-label={`${selected ? '取消选择' : '选择'}${record.name}`} onClick={onSelect}>{selected ? (order > 0 && order <= 9 ? <RollNumber value={order} /> : <Check size={11} />) : null}</button><span className="record-name">{record.name}</span>{playing && <span className="playing-bars" aria-label="正在播放"><i /><i /><i /></span>}</p>
-  </li>;
-}
 export default function App() {
   const [cabinet, setCabinet] = useState<Cabinet>(structuredClone(emptyCabinet));
   const cabinetRef = useRef(cabinet); cabinetRef.current = cabinet;
@@ -825,7 +680,7 @@ export default function App() {
             <div className="notes-disc"><Vinyl record={focused} color={focused.color} cover={coverFor(focused)} spinning={isPlaying(focused)} /></div><div className="record-type">{focused.category === 'music' ? 'SIDE A — 音乐' : 'SIDE B — 环境音'}</div><h2>{focused.name}</h2><p className="artist">{focused.artist}</p><div className="fine-rule" /><p className="record-description">{focused.description || '有些声音不必解释。\n也可以为它写下一段，\n只属于你的介绍。'}</p><div className="notes-actions"><button className="text-button edit-notes" onClick={() => openEdit()}>编辑介绍与封面<ArrowRight size={12} /></button><button className={`icon-button notes-preview ${previewId === focused.id ? 'on' : ''}`} aria-label={previewId === focused.id ? '停止试听' : `试听 ${focused.name}`} aria-pressed={previewId === focused.id} onClick={() => void togglePreview(focused)}>{previewId === focused.id ? <Square size={12} /> : <Play size={12} />}</button><button className={`icon-button notes-remove ${confirmRemove === focused.id ? 'armed' : ''}`} aria-label={confirmRemove === focused.id ? `确认移除 ${focused.name}` : `从唱片柜移除 ${focused.name}`} onClick={() => removeFromCabinet(focused)}>{confirmRemove === focused.id ? <Check size={13} /> : <Trash2 size={13} />}</button></div><dl className="record-meta"><div><dt>时长</dt><dd>{focused.duration ? formatTime(focused.duration) : '—'}</dd></div><div><dt>格式</dt><dd>{focused.format}</dd></div><div><dt>播放</dt><dd>{focused.category === 'music' ? '顺序播放' : '循环叠加'}</dd></div></dl><button className={`notes-select ${selected(focused) ? 'chosen' : ''}`} onClick={() => choose(focused)}>{selected(focused) ? <Check size={13} /> : <Plus size={13} />}{selected(focused) ? '已加入此刻' : '加入此刻'}</button><Slider label="唱片音量" max={100} value={focused.volume} onChange={volume => editRecord(focused.id, { volume })} />{focused.category === 'ambient' && <details className="sound-tweaks"><summary>声音微调 <Settings2 size={12} /></summary><Slider label="左右位置" min={-100} value={focused.pan} unit="" onChange={pan => editRecord(focused.id, { pan })} /><Slider label="柔和程度" value={focused.warmth} onChange={warmth => editRecord(focused.id, { warmth })} /><Slider label="避让幅度" max={depthRange.max} value={focused.duckDepth} unit=" dB" onChange={duckDepth => editRecord(focused.id, { duckDepth })} /><p className="tweak-help">{focused.duckDepth === 0 ? '这张唱片保持原音量，不随音乐变轻。' : `音乐响起时，这张唱片让出 ${focused.duckDepth} dB，${describeDepth(focused.duckDepth)}。`}</p></details>}
           </> : <div className="empty-notes"><Sparkles size={25} strokeWidth={1} /><p>点开一张唱片，<br />它的介绍会出现在这里。</p></div>}</aside>
         </div>
-      </> : pageMotion.value === 'listening' ? <section className="listening-room"><div className={`turntable ${status.running ? 'is-playing' : ''}`}><div className="platter">{externalDisc ? <div className="platter-disc disc-swap" key={`ext:${externalDisc.info.app}:${externalDisc.info.title}`}><RecordPlayer disc={externalDisc} spinning={status.running && nowPlaying.playing} /></div> : shownOutgoing ? <div className="platter-disc disc-leaving" key={`out:${shownOutgoing.id}`}><RecordPlayer disc={{ kind: 'local', record: shownOutgoing }} cover={coverFor(shownOutgoing)} spinning={status.running && status.musicPlaying} leaving /></div> : (current ?? focused) ? <div className="platter-disc disc-swap" key={`in:${(current ?? focused)!.id}`}><RecordPlayer disc={{ kind: 'local', record: (current ?? focused)! }} cover={coverFor((current ?? focused)!)} spinning={status.running && status.musicPlaying} /></div> : <div className="platter-disc disc-swap" key="empty" />}</div><div className="tonearm"><span /><i /></div><span className={`power-light ${status.running ? 'on' : ''}`} /><span className="rpm">33 ⅓<br /><small>STEREO</small></span></div><div className="playing-title" key={externalDisc ? `ext:${externalDisc.info.app}:${externalDisc.info.title}` : titleRecord?.id ?? 'empty'}><span>{externalDisc ? `${appLabel(externalDisc.info.app)}${playbackHint(externalDisc.info) ? ' · ' + playbackHint(externalDisc.info) : ''}` : status.running ? '正在播放' : '待机'}</span><h2>{externalDisc ? externalDisc.info.title : titleRecord?.name ?? (cabinet.ambience.length ? '环境音的合奏' : '等待一张喜欢的唱片')}</h2></div>{cabinet.lineMode ? <><div className="queue-heading"><h3>正在流动的环境音</h3><span>{cabinet.ambience.length} / 8 · 一起循环</span></div><MusicQueue variant="ambient" queue={cabinet.ambience} records={cabinet.records} muted={cabinet.muted} onToggle={toggleAmbience} onPlay={() => undefined} onRemove={choose} onReorder={ambience => change({ ambience })} />{!cabinet.ambience.length && <p className="queue-empty">外部音乐已经在响了，再选几张环境音，让它有地方落脚。</p>}<p className="line-mode-hint">音乐来自外部播放器，{status.ducked ? '正在为你让路。' : '这里只负责环境音。'}</p></> : <><div className="queue-heading"><h3>接下来听什么</h3><span>{cabinet.queue.length} 张音乐 · {orderNames[cabinet.order]}</span></div><MusicQueue queue={cabinet.queue} records={cabinet.records} currentId={status.currentId} onPlay={id => player.current?.playRecord(id)} onRemove={choose} onReorder={queue => change({ queue })} />{!cabinet.queue.length && <p className="queue-empty">还没有音乐唱片，纯粹的环境音也很好听。</p>}<div className="queue-heading"><h3>一起流动的环境音</h3><span>{cabinet.ambience.length} / 8</span></div><div className="ambient-chips">{cabinet.ambience.map(id => { const record = cabinet.records.find(r => r.id === id)!; return <button key={id} onClick={() => choose(record)}><AmbientMark record={record} />{record.name}<X size={12} /></button>; })}{!cabinet.ambience.length && <p className="queue-empty">从唱片柜选几张环境音，给音乐添一点风景。</p>}</div></>}<button className="text-button back-cabinet" onClick={() => setView('cabinet')}><ArrowLeft size={13} />回唱片柜，再挑一张</button></section> : null}
+      </> : pageMotion.value === 'listening' ? <ListeningRoom cabinet={cabinet} status={status} externalDisc={externalDisc} shownOutgoing={shownOutgoing} current={current} focused={focused} titleRecord={titleRecord} coverFor={coverFor} nowPlaying={nowPlaying} onToggleAmbience={toggleAmbience} onChoose={choose} onChange={change} onPlayRecord={id => player.current?.playRecord(id)} onBack={() => setView('cabinet')} /> : null}
       <div hidden={pageMotion.value !== 'focus'}><FocusRoom active={view === 'focus' && pageMotion.value === 'focus' && pageMotion.phase !== 'exit'} playing={status.running} hasSelection={selectedCount > 0} onPlaySelection={() => player.current?.start()} onNotice={notify} disc={miniDiscSource} onPrev={previousTrack} onNext={nextTrack} canSkip={canSkipDisc} /></div>
       <div hidden={pageMotion.value !== 'media'}><MediaRoom items={mediaReady ? cabinet.media : []} dirs={mediaDirs} active={view === 'media' && pageMotion.value === 'media'} onPick={pickMediaFolder} onRescan={rescanMediaFolder} onForgetDir={forgetMediaDir} onScanWallpapers={scanWallpapers} onPickFiles={pickMediaFiles} onForgetWallpapers={forgetWallpapers} disc={miniDiscSource} ambience={ambienceStage} now={stageNow} onPrevTrack={canSkipDisc ? previousTrack : undefined} onNextTrack={canSkipDisc ? nextTrack : undefined} /></div>
       </div>
@@ -859,8 +714,8 @@ export default function App() {
         editRecord(focused.id, { ...draft, name });
         setModal(null);
       }} noValidate><label className="text-field" data-invalid={draftError ? 'true' : undefined}>唱片名称<input ref={nameInputRef} value={draft.name} maxLength={100} required aria-invalid={draftError ? true : undefined} aria-describedby={draftError ? 'record-name-error' : undefined} onChange={e => { setDraft(d => ({ ...d, name: e.target.value })); if (draftError) setDraftError(''); }} />{draftError && <span className="field-error" id="record-name-error" role="alert">{draftError}</span>}</label><label className="text-field">作者<input value={draft.artist} maxLength={100} onChange={e => setDraft(d => ({ ...d, artist: e.target.value }))} /></label><label className="text-field">一段介绍<textarea placeholder="它让你想起了什么？" value={draft.description} maxLength={500} rows={4} onChange={e => setDraft(d => ({ ...d, description: e.target.value }))} /></label>{focused.category === 'ambient' && <section className="cover-library" aria-label="环境音封面库"><div className="cover-library-heading"><h3>本地封面库</h3><span>{ambientCovers.length} 款声音小景</span></div><p>点选即可换上封面，也可以上传自己的图片。</p><div className="cover-options">{ambientCovers.map(cover => <button type="button" key={cover.id} className={focused.coverPreset === cover.id ? 'chosen' : ''} aria-label={"使用" + cover.name + "封面"} aria-pressed={focused.coverPreset === cover.id} disabled={!!busy} onClick={() => chooseCover(cover)}><img src={ambientCoverUrl(cover.id)} alt="" loading="lazy" /><span>{cover.name}</span>{focused.coverPreset === cover.id && <Check size={12} />}</button>)}</div><button type="button" className="text-button" disabled={!!busy} onClick={autoCover}><Sparkles size={12} />按唱片名称重新匹配</button></section>}<button type="button" className="secondary-button full-width" disabled={!!busy} onClick={() => coverInput.current?.click()}><ImagePlus size={15} />{busy || '上传自己的封面'}</button><button type="submit" className="primary-button full-width" disabled={!!busy}><CheckCheck size={15} />保存介绍</button></form><button className="text-button remove-record" onClick={() => takeOffShelf(focused)}><Trash2 size={12} />从唱片柜移除</button></>}
-      {shownModal === 'settings' && <><h2>设置</h2><div className="settings-group"><h3>空间的颜色</h3><button className="secondary-button full-width" disabled={!!busy} onClick={() => imageInput.current?.click()}><ImagePlus size={15} />{busy || '选择背景照片'}</button>{background && <button className="text-button" onClick={() => void clearBackground()}><RotateCcw size={12} />恢复默认背景</button>}</div><div className="settings-group"><h3>声音的分寸</h3><Slider label="音乐总音量" value={cabinet.musicVolume} onChange={musicVolume => change({ musicVolume })} /></div><div className="settings-group"><h3>外部音乐</h3><p>把播放器的输出切到 CABLE Input，再打开下面的开关。<span>外部音乐会在响起时压低环境音。</span></p><label className="line-mode-toggle"><input type="checkbox" checked={cabinet.lineMode} onChange={e => void toggleLineMode(e.target.checked)} /><span className="line-mode-switch" aria-hidden="true" /><span className="line-mode-copy"><b>外部音乐模式</b><small>{cabinet.lineMode ? '音乐来自外部播放器，这里只留环境音' : '关着的时候播放本地唱片'}</small></span></label>{cabinet.lineMode && <div className="line-in-meter" aria-label="外部音乐电平"><span style={{ '--level': `${Math.round(status.lineInput * 100)}%` } as CSSProperties} /><small>{status.lineInput > 0.02 ? (status.ducked ? '收到外部音乐 · 环境音正在退让' : '收到外部音乐 · 环境音没有退让') : '已接上虚拟声卡，等待声音'}</small></div>}{cabinet.lineMode && <label className="line-volume"><span>外部音乐音量</span><input type="range" min={0} max={100} value={cabinet.lineVolume} aria-label="外部音乐音量" onChange={e => change({ lineVolume: Number(e.target.value) })} style={{ '--fill': `${cabinet.lineVolume}%` } as CSSProperties} /><small>{cabinet.lineVolume}%</small></label>}{lineError && <p className="line-in-error" role="alert">{lineError}</p>}</div><div className="settings-group"><h3>换唱片的方式</h3><div className="transition-options" role="radiogroup" aria-label="换唱片的方式">{trackTransitions.map(value => <button key={value} type="button" role="radio" aria-checked={cabinet.transition === value} className={cabinet.transition === value ? 'selected' : ''} onClick={() => change({ transition: value })}><strong>{transitionNames[value]}</strong><small>{transitionHints[value]}</small></button>)}</div></div><div className="settings-group"><h3>存储</h3><p>换过封面之后，旧的那张还留在本地。<span>清理只删这些不再被引用的封面图，音频和唱片一张都不会动。</span></p><button className="secondary-button full-width" disabled={!!busy} onClick={() => void clearCoverCache()}>{busy ? <LoaderCircle size={15} className="loading-spin" /> : <RotateCcw size={15} />}{busy || '清理封面缓存'}</button></div><div className="settings-group"><h3>定时休息</h3><label className="sleep-select">在这之后停止全部声音<select aria-label="定时休息" value={sleepUntil ? 'active' : '0'} onChange={e => setSleepUntil(Number(e.target.value) ? Date.now() + Number(e.target.value) * 60000 : 0)}>{sleepUntil > 0 && <option value="active">剩余 {formatTime(remaining)}</option>}<option value="0">不设定时</option><option value="15">15 分钟</option><option value="30">30 分钟</option><option value="60">60 分钟</option><option value="90">90 分钟</option></select></label></div><p className="import-help">你的音频、封面和介绍仅保存在这台设备。<br />Raven Ambient · 0.3.3</p></>}
-      {shownModal === 'guide' && <><h2>使用说明</h2><div className="guide-steps"><p><span>01</span><strong>收藏</strong>音频文件或整个文件夹，音乐与环境音分开收。</p><p><span>02</span><strong>打开唱片盒</strong>鼠标停留或点一下，看介绍。</p><p><span>03</span><strong>加入此刻</strong>点 ＋ 选择。数字是播放顺序，环境音同时循环。</p><p><span>04</span><strong>微调</strong>「正在听」里改顺序，环境音的「声音微调」调避让幅度。</p></div><button className="primary-button full-width" onClick={() => setModal(null)}>知道了<ArrowRight size={14} /></button></>}
+      {shownModal === 'settings' && <SettingsModal cabinet={cabinet} busy={busy} background={background} lineError={lineError} status={status} sleepUntil={sleepUntil} remaining={remaining} imageInput={imageInput} onChange={change} onClearBackground={() => void clearBackground()} onToggleLineMode={next => void toggleLineMode(next)} onClearCoverCache={() => void clearCoverCache()} onSetSleep={raw => setSleepUntil(Number(raw) ? Date.now() + Number(raw) * 60000 : 0)} />}
+      {shownModal === 'guide' && <GuideModal onClose={() => setModal(null)} />}
     </div></dialog>
     <MotionNotice message={notice} onClose={() => setNotice('')} />
   </div>;
