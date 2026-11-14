@@ -44,6 +44,27 @@ const { execFileSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '..', '..');
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
+// 探针窗口默认不出现。
+//
+// 这些脚本经常在用户打游戏的时候跑，一个 1920×1080 的窗口弹出来会直接抢走
+// 焦点、挡住屏幕（被抱怨过两次）。而「隐藏窗口」又不行：Chromium 对不可见窗口
+// 会停掉 requestAnimationFrame（实测 1000ms 只有 2 帧、maxGap 1000ms），
+// 量动画的探针会量出一堆「没动」的假值。
+//
+// 所以默认走 Chromium 的离屏渲染（offscreen）：画面合成到内存缓冲区，窗口从头
+// 到尾不创建，屏幕上、任务栏、Alt-Tab 里都没有它，rAF 却按真实节拍跑
+// （实测 1000ms 62 帧、maxGap 17ms、63fps）。capturePage 也正常，而且截出来的
+// 是 1200×800 而不是带窗口边框的 1184×735。
+//
+// 两种退出方式：
+//   PROBE_SHOW=1        真把窗口显示出来（要看效果时用），此时允许聚焦。
+//   PROBE_OFFSCREEN=0   保留「隐藏窗口」，给纯读数据、完全不碰动画的探针用。
+//
+// 离屏下 `webContents.sendInputEvent` 投不进渲染进程（离屏窗口没有平台句柄），
+// 所以鼠标类的验证一律用下面的 `hover()`，它走 CDP。
+const SHOW = process.env.PROBE_SHOW === '1';
+const OFFSCREEN = !SHOW && process.env.PROBE_OFFSCREEN !== '0';
+
 // 隔离 userData：绝不让探针碰到 %APPDATA%\raven-ambient-bold 里的真实数据。
 app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'probe-')));
 
@@ -119,19 +140,88 @@ async function launch(opts = {}) {
   const win = new BrowserWindow({
     width,
     height,
-    show: true,
+    show: SHOW,
+    // focusable / skipTaskbar 只在隐藏时关掉：这样窗口连「可被激活」都不是，
+    // 不会在打游戏时把前台抢走，任务栏上也不会多一个图标。
+    focusable: SHOW,
+    skipTaskbar: !SHOW,
     backgroundColor: '#ffffff',
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
       backgroundThrottling: false,
+      offscreen: OFFSCREEN,
     },
   });
 
   await win.loadFile(path.join(ROOT, 'dist', 'index.html'));
   await wait(2200);
   const run = code => win.webContents.executeJavaScript(code, true);
+
+  // hover(selector | {x, y})：把鼠标移到目标中心，让 CSS `:hover` 真的生效。
+  //
+  // 为什么要绕 CDP：`webContents.sendInputEvent({type:'mouseMove'})` 需要真实的
+  // 平台窗口句柄，离屏渲染（PROBE_OFFSCREEN）的窗口没有，事件发进去不会变成
+  // `:hover`（实测 hover 完全不触发）；CDP 的 `Input.dispatchMouseEvent` 走渲染
+  // 进程内部，离屏下照样生效（实测触发、同时 63fps）。真实窗口下两条路等价，
+  // 所以统一走 CDP，探针不用关心自己是哪种模式。
+  //
+  // 页面里 `dispatchEvent(new MouseEvent('mouseover'))` 无论如何都不算：它不会让
+  // CSS `:hover` 命中，量到的 transform 恒为 none。这个坑项目里踩过一次。
+  //
+  // 目标在视口外时先滚进来再量。`getBoundingClientRect()` 给的是**视口坐标**，
+  // 页尾那类元素（文档 y≈1258，视口只有 900 高）不滚就直接投坐标，鼠标落在
+  // 空白处，读回来是「hover 没生效」的假值——这个坑也踩过一次（点 y=1284）。
+  let debuggerAttached = false;
+  const hover = async target => {
+    if (!debuggerAttached) {
+      try {
+        win.webContents.debugger.attach('1.3');
+      } catch (e) {
+        // 已经挂上了（多个探针共用一次 launch）——不是错误。
+      }
+      debuggerAttached = true;
+    }
+    const centerOf = sel => run(`(() => {
+      const el = document.querySelector(${JSON.stringify(sel)});
+      if (!el) return null;
+      const b = el.getBoundingClientRect();
+      return {
+        x: b.left + b.width / 2,
+        y: b.top + b.height / 2,
+        inViewport: b.top >= 0 && b.bottom <= window.innerHeight,
+      };
+    })()`);
+    let x;
+    let y;
+    let scrolled = false;
+    if (typeof target === 'string') {
+      let box = await centerOf(target);
+      if (!box) throw new Error('hover: 页面里找不到 ' + target);
+      if (!box.inViewport) {
+        await run(`document.querySelector(${JSON.stringify(target)})
+          .scrollIntoView({ block: 'center' })`);
+        await wait(400);
+        box = await centerOf(target);
+        if (!box) throw new Error('hover: 滚动后找不到 ' + target);
+        scrolled = true;
+      }
+      x = box.x;
+      y = box.y;
+    } else {
+      x = target.x;
+      y = target.y;
+    }
+    await win.webContents.debugger.sendCommand('Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x,
+      y,
+      button: 'none',
+      clickCount: 0,
+    });
+    return { x: Math.round(x), y: Math.round(y), scrolled };
+  };
 
   const cabinet = patch ? Object.assign({}, CABINET, patch) : CABINET;
   await run(`(() => {
@@ -155,10 +245,30 @@ async function launch(opts = {}) {
     await wait(1400);
   }
 
+  // 隐藏窗口能不能出图，实测比假设可靠：个别显卡驱动下 Chromium 对「从来没
+  // 显示过」的窗口不合成画面，capturePage 会拿到 0×0。那样后面每张截图都是
+  // 废的，而且不会报错。所以先探一张 2×2；拿不到就退到 showInactive——
+  // 窗口会出现，但不激活、不抢当前前台（showInactive 的语义就是不抢焦点）。
+  // 离屏渲染（OFFSCREEN）本身就在内存里合成，不存在这个情况，不用探。
+  if (!SHOW && !OFFSCREEN) {
+    const probeShot = await win.webContents.capturePage({ x: 0, y: 0, width: 2, height: 2 });
+    const probeSize = probeShot.getSize();
+    if (!probeSize.width || !probeSize.height) {
+      console.error('[probe] 隐藏窗口截不到图，退回 showInactive（可见但不抢焦点）');
+      win.showInactive();
+      await wait(500);
+    }
+  }
+
   return {
     win,
     run,
     geo: () => run(`(${measureAll.toString()})()`),
+    hover,
+    // 窗口当前是哪种形态。量动画的探针要据此判断「动画时钟能不能跑」：
+    // 离屏 能跑、显示 能跑、隐藏 不能跑（rAF 被挂起）。
+    offscreen: OFFSCREEN,
+    visible: SHOW,
     shot: async file => {
       const png = (await win.webContents.capturePage()).toPNG();
       if (file) fs.writeFileSync(file, png);
