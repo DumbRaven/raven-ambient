@@ -41,7 +41,7 @@
 //
 // 位置要求：appendSwitch 必须在 app ready 之前生效，而 `registerMediaScheme()`
 // 在 harness.cjs 顶层就会跑（同样必须在 ready 前），所以这两行必须排在最前面。
-const { app } = require('electron');
+const { app, BrowserWindow } = require('electron');
 const DPR = process.env.PROBE_DPR || '1';
 app.commandLine.appendSwitch('force-device-scale-factor', DPR);
 
@@ -60,6 +60,33 @@ const SIZES = [
   { id: 'wide', width: 680, height: 980 },
   { id: 'narrow', width: 440, height: 860 },
 ];
+
+/**
+ * 放映全屏（`.media-room.is-expanded`）用多大来拍。
+ *
+ * 54 条规则只在这个状态下生效，而全屏恰恰是这个软件的主形态——不测等于
+ * 六分之一皮肤没覆盖。麻烦在于真全屏会让离屏窗口的 contentSize 变成
+ * **显示器尺寸**（本机是 3840×2160），换台机器整档作废。
+ *
+ * 所以下面把 `BrowserWindow.prototype.setFullScreen` 换掉，改成 setContentSize
+ * 到一个固定大小。被换掉的只有「窗口怎么变大」这一步，页面侧的链路一点没动：
+ * 主进程照样收到 `fullscreen` 消息 → 窗口照样变尺寸 → `afterResizeWait`
+ * 照样等到尺寸真的变了 → 照样挂上 `.is-expanded`。测的正好是要测的那一段，
+ * 而不该靠截图去看的那段（Windows 全屏过渡）也就不测了。
+ */
+const FULL = { width: 1280, height: 800 };
+const realSetFullScreen = BrowserWindow.prototype.setFullScreen;
+/** 退出全屏时要还原到哪。由主循环在换尺寸时更新——写死 680×980 会让
+ *  narrow（440×860）那轮退出全屏后跳到 wide 的尺寸。 */
+let windowedSize = { width: SIZES[0].width, height: SIZES[0].height };
+BrowserWindow.prototype.setFullScreen = function (on) {
+  if (on) {
+    this.setContentSize(FULL.width, FULL.height);
+    return;
+  }
+  this.setContentSize(windowedSize.width, windowedSize.height);
+};
+void realSetFullScreen;
 
 const VIEWS = [
   { id: 'cabinet', label: '唱片柜' },
@@ -466,6 +493,7 @@ guard(async () => {
   for (const size of SIZES) {
     // 同一窗口实例改尺寸，launchSeed 不变，封面不会换一批。
     probe.win.setContentSize(size.width, size.height);
+    windowedSize = { width: size.width, height: size.height };
     // 重新加载，把上一轮尺寸留下的 React 状态清干净。
     //
     // 真踩到的坑：上一轮拍 modal-edit 时点过 .record-preview，而 toggleFlip
@@ -626,6 +654,82 @@ guard(async () => {
       return 1;
     })()`).catch(() => {});
     await wait(400);
+
+    // 放映全屏。放在最后：它把窗口撑到 1280×800，其它图都在原尺寸上拍，
+    // 顺序一乱就要在两种窗口尺寸之间来回跳，每次都得等布局重排。
+    //
+    // 只拍**真实存在**的形态，不硬加类：
+    //   - 拼贴全屏、相集全屏是主窗口里真能点到的两种（「全屏」按钮）；
+    //   - 透明版式在主窗口里没有全屏入口——那颗按钮变成「放到桌面」，点它开的是
+    //     另一个渲染进程（src/desktop.tsx），画面贴回桌面。所以它只拍窗口态。
+    // 54 条 is-expanded 规则由前两档覆盖：其中只有 1 条在 collage-type.css、
+    // 1 条跟雨丝有关，其余是与版式无关的容器规则，两档都走得到。
+    await probe.run(switchView('相集'));
+    await wait(1100);
+    const presets = [
+      { label: '拼贴', expand: true },
+      { label: '相集', expand: true },
+      // 透明：窗口态，不点全屏。它的铺满形态在桌面窗里，这里不模拟。
+      { label: '透明', expand: false },
+    ];
+    for (const preset of presets) {
+      const id = preset.expand ? `expand-${preset.label}` : `window-${preset.label}`;
+      try {
+        const picked = await probe.run(`(() => {
+          const hit = [...document.querySelectorAll('.theater-templates button')]
+            .find(b => b.textContent.trim() === ${JSON.stringify(preset.label)});
+          if (!hit) return 'missing-template';
+          hit.click();
+          return 1;
+        })()`);
+        if (picked !== 1) throw new Error(String(picked));
+        await wait(700);
+        if (preset.expand) {
+          const opened = await probe.run(`(() => {
+            const hit = [...document.querySelectorAll('button')]
+              .find(b => b.getAttribute('aria-label') === '全屏');
+            if (!hit) return 'missing-expand';
+            hit.click();
+            return 1;
+          })()`);
+          if (opened !== 1) throw new Error(String(opened));
+          // 窗口从 680×980 撑到 1280×800：等尺寸真的变完再挂 .is-expanded
+          // （见 MediaRoom.tsx:304），再加余量给版式内部重排。
+          await wait(2000);
+        }
+        await probe.run(FREEZE_DATES);
+        await grab(size.id, id);
+        if (preset.expand) {
+          const closed = await probe.run(`(() => {
+            const hit = [...document.querySelectorAll('button')]
+              .find(b => b.getAttribute('aria-label') === '退出全屏');
+            if (!hit) return 'missing-collapse';
+            hit.click();
+            return 1;
+          })()`);
+          if (closed !== 1) throw new Error(String(closed));
+          await wait(1600);
+        }
+      } catch (error) {
+        console.log(`[baseline] 跳过 ${size.id}/${id}：${error.message}`);
+        // 出错时也要退出全屏，否则下一轮的图全在 1280×800 上拍。
+        await probe.run(`(() => {
+          const hit = [...document.querySelectorAll('button')]
+            .find(b => b.getAttribute('aria-label') === '退出全屏');
+          hit?.click();
+          return 1;
+        })()`).catch(() => {});
+        await wait(1200);
+      }
+    }
+    // 回到拼贴，别把版式选择带给下一轮尺寸（它存在 localStorage 里，会跨 reload）。
+    await probe.run(`(() => {
+      const hit = [...document.querySelectorAll('.theater-templates button')]
+        .find(b => b.textContent.trim() === '拼贴');
+      hit?.click();
+      return 1;
+    })()`).catch(() => {});
+    await wait(500);
   }
 
   const manifest = {
