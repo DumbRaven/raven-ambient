@@ -1,8 +1,8 @@
 import { type ChangeEvent, type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDownToLine, ArrowRight, Bird, Check, CheckCheck, ChevronLeft, ChevronRight, Disc3, FolderOpen, Headphones, ImagePlus, Info, LoaderCircle, Music2, Play, Plus, Search, Settings2, Sparkles, Square, Timer, Trash2, Waves, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, Bird, Check, ChevronLeft, ChevronRight, Disc3, FolderOpen, Headphones, ImagePlus, Info, LoaderCircle, Music2, Play, Plus, Search, Settings2, Sparkles, Square, Timer, Trash2, Waves, X } from 'lucide-react';
 import FocusRoom from './FocusRoom';
 import { cabinetRecords, clampPage, emptyCabinet, fingerprint, isAudioFile, nextOrder, orderNames, pageCount, paginate, removeRecord, toggleRecord, type Cabinet, type CabinetFilter, type RecordItem, type RecordType } from './records';
-import { ambientCovers, ambientCoverUrl, matchAmbientCover, type AmbientCover } from './ambient-covers';
+import { ambientCoverUrl, matchAmbientCover, type AmbientCover } from './ambient-covers';
 import { CabinetStorage, CabinetWriteError } from './cabinet-storage';
 import { RoomPlayer, type RoomStatus } from './player';
 import { inspectAudio } from './importer';
@@ -31,6 +31,8 @@ import { useViewLayout } from './use-view-layout';
 import MotionNotice from './MotionNotice';
 import GuideModal from './GuideModal';
 import SettingsModal from './SettingsModal';
+import ImportModal from './ImportModal';
+import EditModal from './EditModal';
 
 const emptyStatus: RoomStatus = { running: false, playing: false, musicPlaying: false, ducked: false, level: 0, currentTime: 0, duration: 0, musicOn: true, ambientOn: true, lineInput: 0, lineLive: false };
 type Modal = 'import' | 'settings' | 'edit' | 'guide' | null;
@@ -689,31 +691,8 @@ export default function App() {
       <PlayCard open={cardOpen} playing={playingNow} title={discTitle} subtitle={discSubtitle} cover={discCover} time={formatTime(status.currentTime)} duration={formatTime(status.duration)} timeValue={status.currentTime} durationValue={status.duration} level={levelTick} musicOn={status.running && status.musicOn} ambientOn={status.running && status.ambientOn} musicReady={!!cabinet.queue.length} lineMode={cabinet.lineMode} order={cabinet.order} master={cabinet.master} onClose={() => setCardOpen(false)} onToggle={togglePlay} onPrev={previousTrack} onNext={nextTrack} onSeek={value => { if (cabinet.lineMode) return; player.current?.seek(value * (status.duration || 0)); }} onToggleMusic={() => player.current?.toggleMusic()} onToggleAmbient={() => player.current?.toggleAmbient()} onOrder={() => change({ order: nextOrder(cabinet.order) })} onMaster={value => change({ master: value })} />
       <dialog ref={modalRef} className="modal" data-motion={dialogMotion.phase} aria-label="空间窗口" onClick={e => { if (e.target === modalRef.current && !busy) setModal(null); }}><div className="modal-content" inert={dialogMotion.phase === 'exit'}><button className="modal-close icon-button" aria-label="关闭窗口" disabled={!!busy} onClick={() => setModal(null)}><X size={18} /></button>
       {shownModal === 'import' && <><h2>收藏声音</h2><div className="import-types"><button className={importType === 'music' ? 'selected' : ''} disabled={!!busy} onClick={() => setImportType('music')}><Music2 size={22} /><strong>音乐唱片</strong><small>多选后，按顺序播放</small>{importType === 'music' && <Check size={12} />}</button><button className={importType === 'ambient' ? 'selected' : ''} disabled={!!busy} onClick={() => setImportType('ambient')}><Waves size={22} /><strong>环境音唱片</strong><small>多路循环，一起流动</small>{importType === 'ambient' && <Check size={12} />}</button></div><button className="primary-button full-width" disabled={!!busy || !ready} onClick={() => filesInput.current?.click()}>{busy ? <LoaderCircle size={15} className="loading-spin" /> : <ArrowDownToLine size={15} />}{busy || '选择本地音频'}</button><button className="secondary-button full-width" disabled={!!busy || !ready} onClick={() => folderInput.current?.click()}><FolderOpen size={15} />导入整个文件夹</button><p className="import-help">{importType === 'ambient' ? '单张不超过 50 MB / 10 分钟，最多叠加 8 路。' : '单张不超过 200 MB，支持 MP3、WAV、FLAC。'}<br />重复文件会自动跳过。</p>{report.length > 0 && <div role="alert" className="import-report"><strong>这些文件暂时没有收藏成功</strong>{report.map((error, index) => <p key={index}>{error}</p>)}</div>}</>}
-      {shownModal === 'edit' && focused && <><h2>编辑唱片</h2><form onSubmit={e => {
-        e.preventDefault();
-        const name = draft.name.trim();
-        if (!name) {
-          setDraftError('给这张唱片留一个名字。');
-          // 抖动用 element.animate()：每次调用都是独立动画，连续提交失败也能重播
-          if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            nameInputRef.current?.animate(
-              [
-                { transform: 'translateX(0)' },
-                { transform: 'translateX(-4px)' },
-                { transform: 'translateX(3px)' },
-                { transform: 'translateX(-2px)' },
-                { transform: 'translateX(0)' },
-              ],
-              { duration: 320, easing: 'cubic-bezier(.2,.7,.3,1)' },
-            );
-          }
-          nameInputRef.current?.focus();
-          return;
-        }
-        setDraftError('');
-        editRecord(focused.id, { ...draft, name });
-        setModal(null);
-      }} noValidate><label className="text-field" data-invalid={draftError ? 'true' : undefined}>唱片名称<input ref={nameInputRef} value={draft.name} maxLength={100} required aria-invalid={draftError ? true : undefined} aria-describedby={draftError ? 'record-name-error' : undefined} onChange={e => { setDraft(d => ({ ...d, name: e.target.value })); if (draftError) setDraftError(''); }} />{draftError && <span className="field-error" id="record-name-error" role="alert">{draftError}</span>}</label><label className="text-field">作者<input value={draft.artist} maxLength={100} onChange={e => setDraft(d => ({ ...d, artist: e.target.value }))} /></label><label className="text-field">一段介绍<textarea placeholder="它让你想起了什么？" value={draft.description} maxLength={500} rows={4} onChange={e => setDraft(d => ({ ...d, description: e.target.value }))} /></label>{focused.category === 'ambient' && <section className="cover-library" aria-label="环境音封面库"><div className="cover-library-heading"><h3>本地封面库</h3><span>{ambientCovers.length} 款声音小景</span></div><p>点选即可换上封面，也可以上传自己的图片。</p><div className="cover-options">{ambientCovers.map(cover => <button type="button" key={cover.id} className={focused.coverPreset === cover.id ? 'chosen' : ''} aria-label={"使用" + cover.name + "封面"} aria-pressed={focused.coverPreset === cover.id} disabled={!!busy} onClick={() => chooseCover(cover)}><img src={ambientCoverUrl(cover.id)} alt="" loading="lazy" /><span>{cover.name}</span>{focused.coverPreset === cover.id && <Check size={12} />}</button>)}</div><button type="button" className="text-button" disabled={!!busy} onClick={autoCover}><Sparkles size={12} />按唱片名称重新匹配</button></section>}<button type="button" className="secondary-button full-width" disabled={!!busy} onClick={() => coverInput.current?.click()}><ImagePlus size={15} />{busy || '上传自己的封面'}</button><button type="submit" className="primary-button full-width" disabled={!!busy}><CheckCheck size={15} />保存介绍</button></form><button className="text-button remove-record" onClick={() => takeOffShelf(focused)}><Trash2 size={12} />从唱片柜移除</button></>}
+      {shownModal === 'import' && <ImportModal importType={importType} busy={busy} ready={ready} report={report} onType={setImportType} onFiles={() => filesInput.current?.click()} onFolder={() => folderInput.current?.click()} />}
+      {shownModal === 'edit' && focused && <EditModal record={focused} draft={draft} draftError={draftError} busy={busy} nameInputRef={nameInputRef} onDraft={setDraft} onSubmit={() => { setDraftError(''); editRecord(focused.id, { ...draft, name: draft.name.trim() }); setModal(null); }} onChooseCover={chooseCover} onAutoCover={autoCover} onUploadCover={() => coverInput.current?.click()} onRemove={() => takeOffShelf(focused)} />}
       {shownModal === 'settings' && <SettingsModal cabinet={cabinet} busy={busy} background={background} lineError={lineError} status={status} sleepUntil={sleepUntil} remaining={remaining} imageInput={imageInput} onChange={change} onClearBackground={() => void clearBackground()} onToggleLineMode={next => void toggleLineMode(next)} onClearCoverCache={() => void clearCoverCache()} onSetSleep={raw => setSleepUntil(Number(raw) ? Date.now() + Number(raw) * 60000 : 0)} />}
       {shownModal === 'guide' && <GuideModal onClose={() => setModal(null)} />}
     </div></dialog>
