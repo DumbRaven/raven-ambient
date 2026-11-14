@@ -78,6 +78,23 @@ const MEDIA_DIR = path.join(os.tmpdir(), 'probe-media');
 const MEDIA_IMG = path.join(MEDIA_DIR, 'DROWNED DUSK.png');
 const MEDIA_NAME = 'Ocean';
 
+// 探针唱片的音频素材。
+//
+// 为什么必须造真音频：`RoomPlayer.schedule()` 在真正播放前会
+// `await readAsset(record.assetId)`，拿不到就 throw「找不到「x」的文件」。
+// 探针的唱片只有元数据、没有资产，所以点播放只会弹一条错误提示，
+// status.running 永远是 false —— 「正在播放」那一屏拍不出来。
+//
+// 用 ffmpeg 合成一段 60 秒的等幅正弦：噪声/音乐波形在响度分析里会走不同的
+// 分支（`loudness.ts` 会剔静音块），等幅正弦最稳定，段间响度不抖。
+//
+// 为什么是 60 秒而不是 3 秒：基线要拍「正在播放」这一屏，截图前会推进几百毫秒
+// 到一两秒。3 秒的素材在两次运行之间可能一次还没播完、一次刚播完
+// （播完会触发 `onMusicEnded` 自动接下一首，`tick` 定时器也随之停摆，
+// 读数就冻结在播完那一刻）。实测该缺陷让 `narrow/listening-playing`
+// 出现「0:00 vs 0:01」的差异。60 秒留足余量，截不到播完那一刻。
+const MEDIA_AUDIO = path.join(MEDIA_DIR, 'probe-tone.m4a');
+
 function ensureMedia() {
   fs.mkdirSync(MEDIA_DIR, { recursive: true });
   execFileSync('ffmpeg', [
@@ -85,6 +102,13 @@ function ensureMedia() {
     '-f', 'lavfi', '-i', 'color=c=0x39557a:s=1920x1080:d=1',
     '-frames:v', '1', MEDIA_IMG,
   ]);
+  if (!fs.existsSync(MEDIA_AUDIO)) {
+    execFileSync('ffmpeg', [
+      '-y', '-loglevel', 'error',
+      '-f', 'lavfi', '-i', 'sine=frequency=220:duration=60',
+      '-c:a', 'aac', '-b:a', '96k', MEDIA_AUDIO,
+    ]);
+  }
 }
 
 const CABINET = {
@@ -265,6 +289,37 @@ async function launch(opts = {}) {
     run,
     geo: () => run(`(${measureAll.toString()})()`),
     hover,
+    // seedAsset：往页面 IndexedDB 的 assets store 里放一份素材。
+    //
+    // 用途是让探针里的唱片能真的播放。`store-browser.ts` 的资产库是
+    // `raven-ambient` / `assets`，纯 key-value，值是 Blob。这里把文件读成
+    // base64 传进去再还原成 Blob——离屏窗口里没有 fs，只能这样过桥。
+    //
+    // 必须在**注入 cabinet 之前**调用，否则 App 启动时读不到资产。
+    seedAsset: async (key, file) => {
+      const base64 = fs.readFileSync(file).toString('base64');
+      return run(`(async () => {
+        const bin = atob(${JSON.stringify(base64)});
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const blob = new Blob([bytes], { type: 'audio/mp4' });
+        const database = await new Promise((resolve, reject) => {
+          const req = indexedDB.open('raven-ambient', 1);
+          req.onupgradeneeded = () => {
+            if (!req.result.objectStoreNames.contains('assets')) req.result.createObjectStore('assets');
+          };
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+        await new Promise((resolve, reject) => {
+          const tx = database.transaction('assets', 'readwrite');
+          tx.objectStore('assets').put(blob, ${JSON.stringify(key)});
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+        return blob.size;
+      })()`);
+    },
     // 窗口当前是哪种形态。量动画的探针要据此判断「动画时钟能不能跑」：
     // 离屏 能跑、显示 能跑、隐藏 不能跑（rAF 被挂起）。
     offscreen: OFFSCREEN,
@@ -338,4 +393,4 @@ function guard(fn) {
   });
 }
 
-module.exports = { launch, measureAll, report, guard, wait, CQW_PROBE, ROOT, MEDIA_IMG, MEDIA_DIR, CABINET };
+module.exports = { launch, measureAll, report, guard, wait, CQW_PROBE, ROOT, MEDIA_IMG, MEDIA_DIR, MEDIA_AUDIO, CABINET };

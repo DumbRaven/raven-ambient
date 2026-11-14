@@ -47,7 +47,7 @@ app.commandLine.appendSwitch('force-device-scale-factor', DPR);
 
 const path = require('node:path');
 const fs = require('node:fs');
-const { launch, guard, wait, ROOT } = require('./harness.cjs');
+const { launch, guard, wait, ROOT, MEDIA_AUDIO } = require('./harness.cjs');
 
 // 输出目录可以用 PROBE_BASELINE_OUT 覆盖：验证「连拍两遍是否一致」时
 // 需要保留上一遍的结果，否则第二遍会覆盖掉要比对的基准。
@@ -134,16 +134,37 @@ const FREEZE_RANDOM = `(() => {
   };
   Math.random = next;
 
-  const FIXED = 1763164800000; // 2025-11-14T00:00:00Z
+  // 可控时钟：不是"永不变"，而是"只有探针能推动它"。
+  //
+  // 为什么不能只是钉死成一个常数：专注计时靠
+  // \`FocusRoom.tsx\` 里 \`setInterval(() => setNow(Date.now()), 250)\` 驱动，
+  // \`remainingFocus()\` 算的是 \`state.endAt - now\`。now 一动不动，
+  // 计时器就永远停在原地——"运行中"那一屏拍不到，因为点了开始之后
+  // 剩余时间不会从满格往下走。
+  //
+  // 为什么不能让它自由跑：跑起来每秒掉一格，两张图之间就差几秒，
+  // 进度环角度和读数都不一样，逐像素比对必然失败。
+  //
+  // 所以拆成两件事：
+  //   - \`Date.now()\` / \`new Date()\` 读的是 \`offset\` 偏移后的基准点；
+  //   - 探针用 \`__probeClock.advance(ms)\` 一次性把基准点推前固定量。
+  // 推进之后时钟又静止，同一份脚本每次跑到同一个位置。
+  const BASE = 1763164800000; // 2025-11-14T00:00:00Z
+  let offset = 0;
   const RealDate = Date;
+  const at = () => BASE + offset;
   class FixedDate extends RealDate {
     constructor(...args) {
-      if (args.length === 0) super(FIXED);
+      if (args.length === 0) super(at());
       else super(...args);
     }
-    static now() { return FIXED; }
+    static now() { return at(); }
   }
   window.Date = FixedDate;
+  window.__probeClock = {
+    advance(ms) { offset += ms; return at(); },
+    now() { return at(); },
+  };
   return 1;
 })()`;
 
@@ -210,6 +231,71 @@ const FREEZE_DATES = `(() => {
   const corner = document.querySelector('.tpl-corner-date');
   if (corner) corner.innerHTML = '2026<br>1114';
   return 1;
+})()`;
+
+/**
+ * 把播放态里两处「跟着真实时间走」的东西钉死。
+ *
+ * 为什么单独的 `FREEZE_RANDOM` 不够：那套只替换了 `Math.random` 和 `Date`，
+ * 而播放面板上的两样东西根本不经过它们——
+ *
+ *   - 进度读数与进度条填充比，来自 `AmbientEngine.tick()` 每 80ms 读一次的
+ *     `AudioContext.currentTime`（`src/audio.ts:257`）。真实音频时钟停不下来。
+ *   - 波形条 40 根的高度，来自 `PlayCard` 的 rAF 循环从 `levelRef` 取实时电平
+ *     （`src/PlayCard.tsx:56-70`）。同一段音频每次跑到的相位不同，波形就不同。
+ *
+ * 实测后果：`wide/listening-playing` 连拍两遍差 3812 像素（0.57%）、最大通道差
+ * 200，全部落在波形条与秒数上。这跟样式无关，但会让这张图永远无法当门禁用。
+ *
+ * 三处分别处理：
+ *   1. `HTMLMediaElement.prototype.currentTime` 钉成常量。进度读数与进度条的
+ *      填充比来自 `status.currentTime = this.music?.currentTime ?? 0`
+ *      （`src/audio.ts:257`），而 `music` 就是一个 `<audio>` 元素——真实播放进度
+ *      不受 `Date` 影响，也不受 `AudioContext` 影响。第一版只改了后者，圆点照跳。
+ *      duration 不动：它由文件决定，本来就是稳定的。
+ *   2. 把 `BaseAudioContext.prototype.currentTime` 的 getter 换成常量。引擎里的
+ *      音量包络、淡入淡出都读它，钉住后这些调度也稳定。引擎把 ctx 藏在私有字段
+ *      里，页面外部拿不到；同类上下文只有这一个，改原型等价。
+ *   3. 波形条用带 `!important` 的样式表压住内联 `--h`。内联声明不带
+ *      `!important`，所以 CSS 里的 `!important` 能赢过 rAF 每帧的写入。
+ *      高度序列取一段起伏，保留「有波形」这个视觉信息——要验的是条宽、间距、
+ *      圆角、颜色，不是某个瞬时电平该有多高。
+ *
+ * 只在需要播放态的那一张之前调用，别放进 SETTLE：其余 20 张不涉及音频。
+ */
+const FREEZE_MEDIA = `(() => {
+  const mediaProto = window.HTMLMediaElement && window.HTMLMediaElement.prototype;
+  if (mediaProto) {
+    Object.defineProperty(mediaProto, 'currentTime', {
+      configurable: true,
+      get() { return 1.0; },
+      set() { /* 播放器想 seek 也拦住：让它停在固定点 */ },
+    });
+  }
+
+  const proto = window.BaseAudioContext && window.BaseAudioContext.prototype;
+  if (proto) {
+    const desc = Object.getOwnPropertyDescriptor(proto, 'currentTime');
+    if (desc && desc.get) {
+      Object.defineProperty(proto, 'currentTime', { configurable: true, get() { return 1.0; } });
+    }
+  }
+
+  const BARS = 40;
+  const heights = Array.from({ length: BARS }, (_, i) => {
+    // 一段确定的伪波形：两头低、中间有起伏，看起来像正在出声。
+    const t = i / (BARS - 1);
+    const wave = Math.abs(Math.sin(t * Math.PI * 3.3)) * (0.35 + 0.55 * Math.sin(t * Math.PI));
+    return Math.max(0.08, Math.min(0.95, wave)).toFixed(3);
+  });
+
+  const style = document.createElement('style');
+  style.setAttribute('data-baseline-media', '');
+  style.textContent = heights
+    .map((h, i) => '.play-card-wave span:nth-child(' + (i + 1) + ') { --h: ' + h + ' !important; }')
+    .join('\\n');
+  document.head.appendChild(style);
+  return heights.length;
 })()`;
 
 /**
@@ -311,6 +397,20 @@ guard(async () => {
   );
   await probe.win.webContents.reload();
   await wait(5200);
+
+  // 把 8 张唱片的音频资产种进 IndexedDB。
+  //
+  // 必须在 reload 之后、进入各视图之前：App 启动时只读 localStorage 的 cabinet，
+  // 资产是点播放那一刻才去 IndexedDB 取的，所以顺序其实宽松；但一次性种完，
+  // 后面任何一屏想播放都不用再问。
+  //
+  // key 必须和记录里的 assetId 完全一致（probe-asset-N）。写错一个字符就是
+  // 「找不到「x」的文件」——而且只在点播放时才暴露，静态截图完全看不出来。
+  // 这里直接从 records 取，不再手写一遍，免得两处漂移。
+  for (const record of records) {
+    await probe.seedAsset(record.assetId, MEDIA_AUDIO);
+  }
+  console.log(`[baseline] 音频资产已种入 IndexedDB（${records.length} 条）`);
 
   // 确认补丁真的生效了。没生效的话后面所有图都白拍，而且看起来完全正常
   // （尺寸对、画面对，只是两次运行不一致）。
@@ -454,6 +554,78 @@ guard(async () => {
     } catch (error) {
       console.log(`[baseline] 跳过 ${size.id}/modal-edit：${error.message}`);
     }
+
+    // 两个「动起来之后才存在」的状态。
+    //
+    // 静态截图拍不到它们，而它们偏偏是样式最重的两屏：
+    //   - 正在听：唱盘 is-playing、黑胶 spinning、唱臂落针、进度条在走；
+    //   - 专注运行：进度环 is-running、读数在倒数。
+    // 重构 CSS 时这两块被误改的概率最高，却一直没有任何基准覆盖。
+    //
+    // 两者都需要真音频才能进入：
+    //   RoomPlayer.schedule() 播放前会 await readAsset(record.assetId)，
+    //   拿不到就 throw「找不到「x」的文件」并回调 onError，
+    //   status.running 永远停在 false，唱盘就一直是待机态。
+    // 所以资产在 launch 之前就要种进 IndexedDB（见 seedAssets）。
+    //
+    // 播放时长要固定：MediaTone 是 3 秒，播完会触发 onMusicEnded 自动接下一首。
+    // 推进 1200ms 落在第一首中间，读数稳定在 0:01 附近。
+    await probe.run(switchView('正在听'));
+    await wait(1100);
+    try {
+      await probe.run(`(() => {
+        document.querySelector('.dock-disc')?.click();
+        return 1;
+      })()`);
+      await wait(500);
+      // 冻结必须在「点播放之前」：`HTMLMediaElement.currentTime` 的 getter 一旦
+      // 被换掉，播放器往后再怎么走都读到 1.0。反过来先播一会儿再冻结，读到的
+      // 就是那一刻的真实进度——而那一刻落在哪里取决于两次运行的实际耗时。
+      await probe.run(FREEZE_MEDIA);
+      await wait(200);
+      await probe.run(`(() => {
+        document.querySelector('.main-play')?.click();
+        return 1;
+      })()`);
+      await wait(900);
+      // 时钟推到一个固定点再拍，否则两次运行差几秒，进度条对不上。
+      await probe.run(`(() => { window.__probeClock.advance(1200); return 1; })()`);
+      await wait(500);
+      await probe.run(FREEZE_DATES);
+      await grab(size.id, 'listening-playing');
+    } catch (error) {
+      console.log(`[baseline] 跳过 ${size.id}/listening-playing：${error.message}`);
+    }
+    // 收起播放器并暂停，别让它在专注/相集那几屏继续跑（会污染其它截图）。
+    await probe.run(`(() => {
+      document.querySelector('.main-play')?.click();
+      document.querySelector('.play-card-close')?.click();
+      return 1;
+    })()`).catch(() => {});
+    await wait(400);
+
+    await probe.run(switchView('专注'));
+    await wait(1100);
+    try {
+      await probe.run(`(() => {
+        document.querySelector('.focus-actions .primary-button')?.click();
+        return 1;
+      })()`);
+      await wait(900);
+      // 专注默认 25 分钟。推进固定量，进度环角度与读数每次都一样。
+      await probe.run(`(() => { window.__probeClock.advance(600000); return 1; })()`);
+      await wait(600);
+      await probe.run(FREEZE_DATES);
+      await grab(size.id, 'focus-running');
+    } catch (error) {
+      console.log(`[baseline] 跳过 ${size.id}/focus-running：${error.message}`);
+    }
+    // 重置，避免"运行中"状态残留到下一轮尺寸。
+    await probe.run(`(() => {
+      document.querySelector('button[aria-label="重置本轮"]')?.click();
+      return 1;
+    })()`).catch(() => {});
+    await wait(400);
   }
 
   const manifest = {
