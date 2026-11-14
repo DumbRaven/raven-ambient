@@ -689,38 +689,184 @@ export default function App() {
       <div ref={viewLayout.stageRef} className="view-stage" data-motion={pageMotion.phase} data-view={pageMotion.value} inert={pageMotion.phase === 'exit'} style={{ '--page-direction': pageMotion.direction, '--wipe-x': `${wipe.x}px`, '--wipe-y': `${wipe.y}px`, '--wipe-r': `${wipe.r}px` } as CSSProperties}>
       <div ref={viewLayout.contentRef} className="view-content">
       {pageMotion.value === 'cabinet' ? <>
-        <div className="collection-toolbar"><div ref={filterTabsRef} className="filter-tabs" role="group" aria-label="唱片分类"><span className="flip-marker" aria-hidden="true" />{(cabinet.lineMode ? (['selected', 'ambient'] as const) : (['selected', 'music', 'ambient'] as const)).map(type => <button key={type} aria-pressed={filter === type} className={filter === type ? 'active' : ''} onClick={event => selectFilter(type, event.currentTarget)}>{type === 'selected' ? '已选择' : type === 'music' ? '音乐' : '环境音'}</button>)}</div><label className="search"><Search size={13} /><input aria-label="搜索唱片" placeholder="寻找一张唱片" value={query} onChange={e => setQuery(e.target.value)} /></label></div>
+        <div className="collection-toolbar">
+          <div ref={filterTabsRef} className="filter-tabs" role="group" aria-label="唱片分类">
+            <span className="flip-marker" aria-hidden="true" />
+            {(cabinet.lineMode ? (['selected', 'ambient'] as const) : (['selected', 'music', 'ambient'] as const)).map(type => <button
+              key={type}
+              aria-pressed={filter === type}
+              className={filter === type ? 'active' : ''}
+              onClick={event => selectFilter(type, event.currentTarget)}
+            >{type === 'selected' ? '已选择' : type === 'music' ? '音乐' : '环境音'}</button>)}
+          </div>
+          <label className="search">
+            <Search size={13} />
+            <input aria-label="搜索唱片" placeholder="寻找一张唱片" value={query} onChange={e => setQuery(e.target.value)} />
+          </label>
+        </div>
         <div ref={shelfRef} className={`cabinet-layout ${!cabinet.records.length ? 'empty-cabinet-layout' : ''}`} data-motion={filterMotion.phase} style={{ '--wipe-x': `${shelfWipe.x}px`, '--wipe-y': `${shelfWipe.y}px`, '--wipe-r': `${shelfWipe.r}px` } as CSSProperties}>
           <section className="cabinet" aria-label="我的唱片柜"><div className="cabinet-corners"><i /><i /><i /><i /></div>
             {!cabinet.records.length ? <div className="empty-cabinet"><div className="empty-art"><Sleeve playing={false} preview /></div><span className="shelf-line" /><div className="empty-copy"><h2>唱片柜还是空的</h2><button className="primary-button" disabled={!ready || !!busy} onClick={() => openImport()}><Plus size={14} />放入第一张唱片</button></div></div> : <>
               <div className="shelf-label"><span>{filter === 'music' ? '此刻的声音' : filter === 'ambient' ? '此刻的环境音' : '此刻的声音'}</span><span><RollNumber value={visible.length} minDigits={2} /></span></div>
 
-              <ul className="record-grid">{shown.map(record => <RecordCard key={record.id} record={record} cover={coverFor(record)} art={artFor(record)} selected={selected(record)} justAdded={justAdded?.id === record.id} order={cabinet.queue.indexOf(record.id) + 1} flip={flip?.id === record.id ? (flip.open ? 'open' : 'closed') : undefined} playing={isPlaying(record)} onFocus={() => { if (!modal) toggleFlip(record.id); }} onSelect={() => choose(record)} />)}</ul>
+              <ul className="record-grid">
+                {shown.map(record => <RecordCard
+                  key={record.id}
+                  record={record}
+                  cover={coverFor(record)}
+                  art={artFor(record)}
+                  selected={selected(record)}
+                  justAdded={justAdded?.id === record.id}
+                  order={cabinet.queue.indexOf(record.id) + 1}
+                  flip={flip?.id === record.id ? (flip.open ? 'open' : 'closed') : undefined}
+                  playing={isPlaying(record)}
+                  onFocus={() => { if (!modal) toggleFlip(record.id); }}
+                  onSelect={() => choose(record)}
+                />)}
+              </ul>
               {pages > 1 && <nav className="shelf-pager" aria-label="唱片分页">
                 <button className="pager-arrow" aria-label="上一页" disabled={currentPage === 0} onClick={() => turnPage(-1)}><ChevronLeft size={13} /></button>
-                <div className="pager-numbers">{Array.from({ length: pages }, (_, index) => <button key={index} className={index === currentPage ? 'active' : ''} aria-label={`第 ${index + 1} 页`} aria-current={index === currentPage ? 'page' : undefined} onClick={() => goToPage(index)}>{String(index + 1).padStart(2, '0')}</button>)}</div>
+                <div className="pager-numbers">
+                  {Array.from({ length: pages }, (_, index) => <button
+                    key={index}
+                    className={index === currentPage ? 'active' : ''}
+                    aria-label={`第 ${index + 1} 页`}
+                    aria-current={index === currentPage ? 'page' : undefined}
+                    onClick={() => goToPage(index)}
+                  >{String(index + 1).padStart(2, '0')}</button>)}
+                </div>
                 <button className="pager-arrow" aria-label="下一页" disabled={currentPage === pages - 1} onClick={() => turnPage(1)}><ChevronRight size={13} /></button>
               </nav>}
-              {!visible.length && <div className="no-results"><Disc3 size={28} /><p>{query ? '还没有找到这张唱片。' : filter === 'selected' ? '把喜欢的声音，加入此刻。' : '这一格，等一个新的声音。'}</p>{filter === 'selected' && !query ? <><small>在音乐和环境音中点击 ＋，就会出现在这里。</small><div className="selection-links"><button className="text-button" onClick={() => setFilter('music')}>挑选音乐<ArrowRight size={12} /></button><button className="text-button" onClick={() => setFilter('ambient')}>挑选环境音 <ArrowRight size={12} /></button></div></> : <button className="text-button" onClick={() => openImport(filter === 'ambient' ? 'ambient' : 'music')}>收藏本地音频 <Plus size={12} /></button>}</div>}
+              {!visible.length && <div className="no-results">
+                <Disc3 size={28} />
+                <p>{query ? '还没有找到这张唱片。' : filter === 'selected' ? '把喜欢的声音，加入此刻。' : '这一格，等一个新的声音。'}</p>
+                {filter === 'selected' && !query ? <>
+                  <small>在音乐和环境音中点击 ＋，就会出现在这里。</small>
+                  <div className="selection-links">
+                    <button className="text-button" onClick={() => setFilter('music')}>挑选音乐<ArrowRight size={12} /></button>
+                    <button className="text-button" onClick={() => setFilter('ambient')}>挑选环境音 <ArrowRight size={12} /></button>
+                  </div>
+                </> : <button className="text-button" onClick={() => openImport(filter === 'ambient' ? 'ambient' : 'music')}>收藏本地音频 <Plus size={12} /></button>}
+              </div>}
               <button className="add-to-shelf" disabled={!!busy} onClick={() => openImport(filter === 'ambient' ? 'ambient' : 'music')}><Plus size={15} /><span>再收藏一个声音</span></button>
             </>}
             <div className="cabinet-base"><span>R / A</span><span>HANDLE WITH FEELING.</span><i /></div>
           </section>
           <aside className="record-notes" aria-label="唱片介绍">{focused ? <>
-            <RecordNotes record={focused} cover={coverFor(focused)} playing={isPlaying(focused)} selected={selected(focused)} previewing={previewId === focused.id} confirming={confirmRemove === focused.id} onEdit={() => openEdit()} onPreview={() => void togglePreview(focused)} onRemove={() => removeFromCabinet(focused)} onSelect={() => choose(focused)} onChange={changes => editRecord(focused.id, changes)} />
+            <RecordNotes
+              record={focused}
+              cover={coverFor(focused)}
+              playing={isPlaying(focused)}
+              selected={selected(focused)}
+              previewing={previewId === focused.id}
+              confirming={confirmRemove === focused.id}
+              onEdit={() => openEdit()}
+              onPreview={() => void togglePreview(focused)}
+              onRemove={() => removeFromCabinet(focused)}
+              onSelect={() => choose(focused)}
+              onChange={changes => editRecord(focused.id, changes)}
+            />
           </> : <div className="empty-notes"><Sparkles size={25} strokeWidth={1} /><p>点开一张唱片，<br />它的介绍会出现在这里。</p></div>}</aside>
         </div>
-      </> : pageMotion.value === 'listening' ? <ListeningRoom cabinet={cabinet} status={status} externalDisc={externalDisc} shownOutgoing={shownOutgoing} current={current} focused={focused} titleRecord={titleRecord} coverFor={coverFor} nowPlaying={nowPlaying} onToggleAmbience={toggleAmbience} onChoose={choose} onChange={change} onPlayRecord={id => player.current?.playRecord(id)} onBack={() => setView('cabinet')} /> : null}
+      </> : pageMotion.value === 'listening' ? <ListeningRoom
+        cabinet={cabinet}
+        status={status}
+        externalDisc={externalDisc}
+        shownOutgoing={shownOutgoing}
+        current={current}
+        focused={focused}
+        titleRecord={titleRecord}
+        coverFor={coverFor}
+        nowPlaying={nowPlaying}
+        onToggleAmbience={toggleAmbience}
+        onChoose={choose}
+        onChange={change}
+        onPlayRecord={id => player.current?.playRecord(id)}
+        onBack={() => setView('cabinet')}
+      /> : null}
       <div hidden={pageMotion.value !== 'focus'}><FocusRoom active={view === 'focus' && pageMotion.value === 'focus' && pageMotion.phase !== 'exit'} playing={status.running} hasSelection={selectedCount > 0} onPlaySelection={() => player.current?.start()} onNotice={notify} disc={miniDiscSource} onPrev={previousTrack} onNext={nextTrack} canSkip={canSkipDisc} /></div>
-      <div hidden={pageMotion.value !== 'media'}><MediaRoom items={mediaReady ? cabinet.media : []} dirs={mediaDirs} active={view === 'media' && pageMotion.value === 'media'} onPick={pickMediaFolder} onRescan={rescanMediaFolder} onForgetDir={forgetMediaDir} onScanWallpapers={scanWallpapers} onPickFiles={pickMediaFiles} onForgetWallpapers={forgetWallpapers} disc={miniDiscSource} ambience={ambienceStage} now={stageNow} onPrevTrack={canSkipDisc ? previousTrack : undefined} onNextTrack={canSkipDisc ? nextTrack : undefined} /></div>
+      <div hidden={pageMotion.value !== 'media'}>
+        <MediaRoom
+          items={mediaReady ? cabinet.media : []}
+          dirs={mediaDirs}
+          active={view === 'media' && pageMotion.value === 'media'}
+          onPick={pickMediaFolder}
+          onRescan={rescanMediaFolder}
+          onForgetDir={forgetMediaDir}
+          onScanWallpapers={scanWallpapers}
+          onPickFiles={pickMediaFiles}
+          onForgetWallpapers={forgetWallpapers}
+          disc={miniDiscSource}
+          ambience={ambienceStage}
+          now={stageNow}
+          onPrevTrack={canSkipDisc ? previousTrack : undefined}
+          onNextTrack={canSkipDisc ? nextTrack : undefined}
+        />
+      </div>
       </div>
       </div>
     </div>
-      <PlayCard open={cardOpen} playing={playingNow} title={discTitle} subtitle={discSubtitle} cover={discCover} time={formatTime(status.currentTime)} duration={formatTime(status.duration)} timeValue={status.currentTime} durationValue={status.duration} level={levelTick} musicOn={status.running && status.musicOn} ambientOn={status.running && status.ambientOn} musicReady={!!cabinet.queue.length} lineMode={cabinet.lineMode} order={cabinet.order} master={cabinet.master} onClose={() => setCardOpen(false)} onToggle={togglePlay} onPrev={previousTrack} onNext={nextTrack} onSeek={value => { if (cabinet.lineMode) return; player.current?.seek(value * (status.duration || 0)); }} onToggleMusic={() => player.current?.toggleMusic()} onToggleAmbient={() => player.current?.toggleAmbient()} onOrder={() => change({ order: nextOrder(cabinet.order) })} onMaster={value => change({ master: value })} />
+      <PlayCard
+        open={cardOpen}
+        playing={playingNow}
+        title={discTitle}
+        subtitle={discSubtitle}
+        cover={discCover}
+        time={formatTime(status.currentTime)}
+        duration={formatTime(status.duration)}
+        timeValue={status.currentTime}
+        durationValue={status.duration}
+        level={levelTick}
+        musicOn={status.running && status.musicOn}
+        ambientOn={status.running && status.ambientOn}
+        musicReady={!!cabinet.queue.length}
+        lineMode={cabinet.lineMode}
+        order={cabinet.order}
+        master={cabinet.master}
+        onClose={() => setCardOpen(false)}
+        onToggle={togglePlay}
+        onPrev={previousTrack}
+        onNext={nextTrack}
+        onSeek={value => { if (cabinet.lineMode) return; player.current?.seek(value * (status.duration || 0)); }}
+        onToggleMusic={() => player.current?.toggleMusic()}
+        onToggleAmbient={() => player.current?.toggleAmbient()}
+        onOrder={() => change({ order: nextOrder(cabinet.order) })}
+        onMaster={value => change({ master: value })}
+      />
       <dialog ref={modalRef} className="modal" data-motion={dialogMotion.phase} aria-label="空间窗口" onClick={e => { if (e.target === modalRef.current && !busy) setModal(null); }}><div className="modal-content" inert={dialogMotion.phase === 'exit'}><button className="modal-close icon-button" aria-label="关闭窗口" disabled={!!busy} onClick={() => setModal(null)}><X size={18} /></button>
       {shownModal === 'import' && <ImportModal importType={importType} busy={busy} ready={ready} report={report} onType={setImportType} onFiles={() => filesInput.current?.click()} onFolder={() => folderInput.current?.click()} />}
-      {shownModal === 'edit' && focused && <EditModal record={focused} draft={draft} draftError={draftError} busy={busy} nameInputRef={nameInputRef} onDraft={setDraft} onSubmit={() => { setDraftError(''); editRecord(focused.id, { ...draft, name: draft.name.trim() }); setModal(null); }} onChooseCover={chooseCover} onAutoCover={autoCover} onUploadCover={() => coverInput.current?.click()} onRemove={() => takeOffShelf(focused)} />}
-      {shownModal === 'settings' && <SettingsModal cabinet={cabinet} busy={busy} background={background} lineError={lineError} status={status} sleepUntil={sleepUntil} remaining={remaining} imageInput={imageInput} onChange={change} onClearBackground={() => void clearBackground()} onToggleLineMode={next => void toggleLineMode(next)} onClearCoverCache={() => void clearCoverCache()} onSetSleep={raw => setSleepUntil(Number(raw) ? Date.now() + Number(raw) * 60000 : 0)} />}
+      {shownModal === 'edit' && focused && <EditModal
+        record={focused}
+        draft={draft}
+        draftError={draftError}
+        busy={busy}
+        nameInputRef={nameInputRef}
+        onDraft={setDraft}
+        onSubmit={() => {
+          setDraftError('');
+          editRecord(focused.id, { ...draft, name: draft.name.trim() });
+          setModal(null);
+        }}
+        onChooseCover={chooseCover}
+        onAutoCover={autoCover}
+        onUploadCover={() => coverInput.current?.click()}
+        onRemove={() => takeOffShelf(focused)}
+      />}
+      {shownModal === 'settings' && <SettingsModal
+        cabinet={cabinet}
+        busy={busy}
+        background={background}
+        lineError={lineError}
+        status={status}
+        sleepUntil={sleepUntil}
+        remaining={remaining}
+        imageInput={imageInput}
+        onChange={change}
+        onClearBackground={() => void clearBackground()}
+        onToggleLineMode={next => void toggleLineMode(next)}
+        onClearCoverCache={() => void clearCoverCache()}
+        onSetSleep={raw => setSleepUntil(Number(raw) ? Date.now() + Number(raw) * 60000 : 0)}
+      />}
       {shownModal === 'guide' && <GuideModal onClose={() => setModal(null)} />}
     </div></dialog>
     <MotionNotice message={notice} onClose={() => setNotice('')} />

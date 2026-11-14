@@ -49,7 +49,9 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { launch, guard, wait, ROOT } = require('./harness.cjs');
 
-const OUT_ROOT = path.join(ROOT, '.qa', 'baseline');
+// 输出目录可以用 PROBE_BASELINE_OUT 覆盖：验证「连拍两遍是否一致」时
+// 需要保留上一遍的结果，否则第二遍会覆盖掉要比对的基准。
+const OUT_ROOT = process.env.PROBE_BASELINE_OUT ? path.resolve(ROOT, process.env.PROBE_BASELINE_OUT) : path.join(ROOT, '.qa', 'baseline');
 
 // 尺寸取真实窗口的边界：main.cjs:27 默认 680 宽，minWidth 360。
 // 440 是皮肤里唯一有专门断点的窄宽度（skin-bold.css:1294/4296），
@@ -214,7 +216,12 @@ const SETTLE = `(async () => {
   const guard_ms = new Promise(done => setTimeout(done, 1500));
   await Promise.race([Promise.all(finite.map(a => a.finished.catch(() => {}))), guard_ms]);
 
-  // 再把无限动画钉到终态。放在有限动画之后，避免把它们也提前结束。
+  // 再把无限动画钉到终态，同时把过渡也压成瞬时的。放在有限动画之后，
+  // 避免把它们也提前结束。
+  //
+  // transition 必须一起处理：唱片盒掀开、黑胶滑出全是 transition 驱动的，
+  // 只冻 animation 的话，hover 那张拍到的是过渡进行到一半的样子，每次
+  // 停在不同进度，逐像素比对会永远差那么十几个像素。
   if (endless.length) {
     const style = document.createElement('style');
     style.setAttribute('data-baseline-freeze', '');
@@ -224,10 +231,12 @@ const SETTLE = `(async () => {
         animation-fill-mode: forwards !important;
         animation-duration: 0.001s !important;
         animation-delay: 0s !important;
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
       }
     \`;
     document.head.appendChild(style);
-    // 等一帧让新样式生效并跑到终点。
+    // 等一帧让新样式生效并跑到终点；过渡归零后仍要两帧才稳定。
     await new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)));
   }
 
@@ -408,6 +417,6 @@ guard(async () => {
     files: captured,
   };
   fs.writeFileSync(path.join(OUT_ROOT, 'manifest.json'), JSON.stringify(manifest, null, 2));
-  console.log(`[baseline] 完成 ${captured.length} 张，输出在 .qa/baseline/`);
+  console.log(`[baseline] 完成 ${captured.length} 张，输出在 ${path.relative(ROOT, OUT_ROOT)}`);
   probe.close();
 });
