@@ -2,7 +2,7 @@ import { type Mix, type Track } from './model.ts';
 import { DuckEnvelope, duckGain, duckProfile } from './ducking.ts';
 import { readAsset } from './storage.ts';
 import { AudioBufferCache } from './audio-buffer-cache.ts';
-import { loudnessGain, measureRms } from './loudness.ts';
+import { loudnessGain, measureLevel } from './loudness.ts';
 
 type Voice = { source: AudioBufferSourceNode; gain: GainNode; duck: GainNode; filter: BiquadFilterNode; pan: StereoPannerNode; clip: WaveShaperNode; envelope: DuckEnvelope; coverId?: string; depth: number; loudness: number };/** 一块唱盘：一个音频元素加它自己的音量，两块交替用来做切歌过渡。 */
 type Deck = { el: HTMLAudioElement; gain: GainNode; level: number; url?: string; owner?: number };
@@ -293,7 +293,7 @@ export class AmbientEngine {
         clip.curve = softClipCurve(); clip.oversample = '2x';
         source.connect(filter).connect(pan).connect(gain).connect(clip).connect(duck).connect(this.ambient!);
         source.start();
-        this.voices.set(track.id, { source, gain, duck, filter, pan, clip, envelope: new DuckEnvelope(), coverId: track.coverId, depth: track.duckDepth, loudness: loudnessGain(measureRms(buffer)) });
+        this.voices.set(track.id, { source, gain, duck, filter, pan, clip, envelope: new DuckEnvelope(), coverId: track.coverId, depth: track.duckDepth, loudness: loudnessGain(measureLevel(buffer)) });
       }
       this.status.playing = this.voices.size > 0; this.setMix(this.mix ?? mix); this.tick();
     } catch (error) { if (valid()) { this.stopAmbience(); throw error; } }
