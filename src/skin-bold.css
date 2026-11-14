@@ -467,8 +467,6 @@ body { background: var(--bold-page, var(--bold-page)); }
   color: var(--bold-on-dark);
   box-shadow: none;
 }
-.select-record > span { font: 600 11px/1 "Inter", sans-serif; }
-
 .record-card > p {
   font-size: 11px;
   color: var(--bold-muted);
@@ -1117,9 +1115,7 @@ input[type="range"]::-webkit-slider-thumb {
 .music-queue li.current { background: var(--bold-page); }
 .queue-number { font: 600 10px "Inter", sans-serif; color: var(--bold-faint); width: 26px; }
 .queue-title { font-size: 13px; font-weight: 600; color: var(--bold-ink); }
-.queue-title small { color: var(--bold-muted); font-size: 11px; margin-top: 4px; font-weight: 400; }
-.queue-remove { color: var(--bold-faint); }
-.queue-remove:hover { color: var(--bold-danger); }
+.queue-title small { color: var(--bold-muted); font-size: 11px; margin-top: 4px; font-weight: 400; }.queue-remove:hover { color: var(--bold-danger); }
 .queue-empty { font-size: 12px; color: var(--bold-muted); line-height: 1.8; margin-top: 16px; }
 
 .ambient-chips { gap: 9px; padding-top: 15px; }
@@ -1302,9 +1298,7 @@ input[type="range"]::-webkit-slider-thumb {
   .view-tabs > button { padding: 8px 12px; font-size: 11px; }
   .cabinet-layout { grid-template-columns: minmax(0, 1fr) 148px; gap: 20px; }
   .cabinet { padding: 18px 15px 0; border-radius: 22px; }
-  .cabinet-base { margin: 0 -15px; padding: 0 15px; border-radius: 0 0 22px 22px; }
-  .record-grid { column-gap: 13px; row-gap: 22px; }
-  .cover-title { font-size: 15px; left: 14px; right: 14px; bottom: 28px; }
+  .cabinet-base { margin: 0 -15px; padding: 0 15px; border-radius: 0 0 22px 22px; }  .cover-title { font-size: 15px; left: 14px; right: 14px; bottom: 28px; }
   .cover-edition { font-size: 8px; top: 13px; left: 14px; right: 14px; }
   .cover-bottom { font-size: 8px; left: 14px; right: 14px; bottom: 12px; }
   .record-name { font-size: 12px; }
@@ -5851,9 +5845,7 @@ body:has(.media-room.is-expanded) {
 .media-room.is-expanded .tpl-fields b,
 .media-room.is-expanded .tpl-list b { font-size: 13px; }
 .media-room.is-expanded .tpl-fields span { font-size: 17px; max-width: 30ch; }
-.media-room.is-expanded .tpl-list span { font-size: 15px; }
-.media-room.is-expanded .tpl-fields { gap: 0; }
-.media-room.is-expanded .tpl-block-bar { padding: 4% 14% 4% 3%; }
+.media-room.is-expanded .tpl-list span { font-size: 15px; }.media-room.is-expanded .tpl-block-bar { padding: 4% 14% 4% 3%; }
 .media-room.is-expanded .tpl-block-panel { padding: 34px 30px 38px; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -6566,9 +6558,7 @@ body:has(.media-room.is-expanded) {
    现在位移正好等于图案周期（20px），循环无缝，而且方向就是往下。 */
 
 
-@keyframes rain-fall {
-  from { transform: translateY(0); }
-  to { transform: translateY(20px); }
+@keyframes rain-fall {  to { transform: translateY(20px); }
 }
 
 /* ---------- 放映：乌鸦 / 雨丝 / 空库提示（定稿） ---------- */
@@ -7002,56 +6992,7 @@ body:has(.media-room.is-expanded) {
 @media (prefers-reduced-motion: reduce) {
   .theater-tone-menu { animation: none; }
   .tone-swatches button { transition: none; }
-}
-
-
-.template-collage .tpl-star-a { left: -12%; top: 12%; }
-.template-collage .tpl-star-b { right: -10%; top: 44%; }
-.template-collage .tpl-star-c { left: 4%; bottom: 14%; }
-
-
-.template-collage .tpl-disc-label {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  /* 参考图里内圈大约占直径 40%，中间还有一个更浅的 center label */
-  width: 40%;
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background-color: var(--disc-groove);
-  background-size: cover;
-  background-position: center;
-  box-shadow: inset 0 0 0 1px #00000024;
-}
-
-.template-collage .tpl-disc-hole {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 3.2%;
-  aspect-ratio: 1;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: var(--tpl-panel);
-  box-shadow: inset 0 0 0 1px #00000030;
-}
-
-
-.template-collage .tpl-dot-tl { top: 3%; left: 3%; }
-.template-collage .tpl-dot-tr { top: 3%; right: 3%; }
-.template-collage .tpl-dot-bl { bottom: 3%; left: 3%; }
-.template-collage .tpl-dot-br { bottom: 3%; right: 3%; }
-
-
-.template-collage .tpl-fields {
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 2cqw;
-  align-items: start;
-}
-
-.template-collage .tpl-fields > div > b,
+}.template-collage .tpl-fields > div > b,
 .template-collage .tpl-list > b {
   display: block;
   font-size: 1.8cqw;
@@ -7060,20 +7001,6 @@ body:has(.media-room.is-expanded) {
   opacity: 0.72;
   margin-bottom: 0.5cqw;
 }
-
-.template-collage .tpl-fields > div > span,
-.template-collage .tpl-list > span {
-  font-size: 2.2cqw;
-  line-height: 1.35;
-  font-style: italic;
-}
-
-.template-collage .tpl-note-icon {
-  font-style: normal;
-  opacity: 0.8;
-}
-
-
 /* 这里原本有 `.tpl-brand`（`DumbRaven bilibili` 那行署名）的定位与字体。
    这块已经从 JSX 里删掉：AE 源文件里没有 brand 图层，参考图里也没有它，
    是早期自行加的，而且正好压在倒影上。品牌在右下的 Produced By 里已有一次。 */
@@ -7705,16 +7632,7 @@ body:has(.media-room.is-expanded) {
   transform: none; margin: 0; padding: 0;
 }
 .template-collage .tpl-title-text { font-size: 2.93cqw; line-height: 1.16; }
-.template-collage .tpl-sub { font-size: 1.63cqw; }
-
-/* 信息条：display:grid 会重置绝对定位的子项，所以也改块级 */
-.template-collage .tpl-block-bar { display: block; padding: 0; }
-/* TITLE pos(89.76,805) 字号 16 → 相对信息条 (4.61%,13.50%) */
-.template-collage .tpl-block-bar .tpl-fields {
-  position: absolute; inset: 0; padding: 0;
-  display: block;
-}
-.template-collage .tpl-block-bar .tpl-fields > div:first-child {
+.template-collage .tpl-sub { font-size: 1.63cqw; }.template-collage .tpl-block-bar .tpl-fields > div:first-child {
   position: absolute; left: 4.61%; top: 13.50%; margin: 0;
 }
 .template-collage .tpl-block-bar .tpl-fields > div:first-child > b { font-size: 1.32cqw; }
@@ -8304,8 +8222,6 @@ body:has(.media-room.is-expanded) {
   top: 47.5%;
   width: 62%;
 }
-.template-collage .tpl-title-text { font-size: 3.0cqw; }
-
 /* 标题的倒影：AE 里就压在标题正下方，只留一点点。 */
 /* （标题倒影规则已删，见上方说明） */
 
