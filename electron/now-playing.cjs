@@ -3,14 +3,12 @@
 // 页面是 sandbox: true + 无 preload，里面没有 ipcRenderer，也不允许改这个安全设置。
 // 但主进程可以主动在页面里执行代码，所以约定是这样：
 //   页面把 'start' / 'stop' / 'ping' / 动作（toggle、next、prev）压进 outbox 数组
-//   主进程每次收到通道消息时去读它；想要推送，页面把 window.__ravenNowPlaying 挂上。
+//   主进程每 400ms 去读它；想要推送，页面把 window.__ravenNowPlaying 挂上。
 // 也就是说页面永远是被动的一方，不依赖任何 Node 能力。
-const { ipcMain } = require('electron');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const CHANNEL = 'raven-now-playing';
 const EMPTY = { app: '', title: '', artist: '', album: '', status: 'None', playing: false, cover: '' };
 // 页面把动作写进这个数组，主进程来取。见 src/now-playing-bridge.ts 的说明。
 const OUTBOX = 'window.__ravenNowPlayingOutbox';
@@ -53,7 +51,10 @@ class NowPlayingBridge {
     const exe = exePath();
     if (!exe) { this.handle(webContents, EMPTY); return false; }
     try {
-      this.child = spawn(exe, ['--watch'], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+      // `--parent <pid>` 让子进程自己也能判断父进程还在不在。
+      // 光靠 stdin 断掉不够：万一句柄被别的子进程继承，管道就不会断，
+      // 那个 exe 会一直转到用户注销。见 NowPlaying.cs 的 stdinClosed 注释。
+      this.child = spawn(exe, ['--watch', '--parent', String(process.pid)], { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     } catch {
       this.child = null;
       this.handle(webContents, EMPTY);
@@ -135,14 +136,7 @@ function attachNowPlaying() {
     }
   }, 400).unref?.();
 
-  // 兼容：外部（比如测试脚本）也可以直接走 IPC
-  ipcMain.handle(CHANNEL, (event, action) => {
-    if (action === 'start') { bridge.start(event.sender); return true; }
-    if (action === 'ping') { bridge.replay(event.sender); return true; }
-    if (action === 'stop') { bridge.stop(); return true; }
-    return bridge.send(action);
-  });
   return bridge;
 }
 
-module.exports = { attachNowPlaying, exePath, CHANNEL };
+module.exports = { attachNowPlaying, exePath };

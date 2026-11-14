@@ -124,6 +124,19 @@ class Program {
     // 主循环和读 stdin 的线程都碰它，用并发队列，各自不用加锁。
     static readonly ConcurrentQueue<string> commands = new ConcurrentQueue<string>();
 
+    /// <summary>
+    /// stdin 关了没有。父进程一死，管道就断，这里会变成 true。
+    ///
+    /// 为什么要这个开关：主循环原本是 `while (true)`，没有任何退出条件。
+    /// Electron 那边就算 kill 主进程，这个 exe 是独立进程，不会跟着退出——
+    /// 用户关了软件，任务管理器里还留着一个 0.7 秒转一圈的进程，直到注销。
+    /// 靠父进程 kill 也不够可靠：`child.kill()` 在 Windows 上只发终止信号，
+    /// 进程被强制杀、或者 Electron 自己崩了，就没人来 kill 它了。
+    ///
+    /// stdin 断掉是**父进程没了**最可靠的信号，比任何一侧主动调 stop 都稳。
+    /// </summary>
+    static volatile bool stdinClosed = false;
+
     static readonly string[] known = {
         "cloudmusic",       // 网易云音乐
         "qqmusic",          // QQ 音乐
@@ -299,14 +312,29 @@ class Program {
                 }
             }
             catch { /* stdin 关了就当没命令，不影响轮询 */ }
+            // ReadLine 返回 null = 管道对端关闭 = 父进程没了。置位让主循环退出。
+            stdinClosed = true;
         });
         reader.IsBackground = true;
         reader.Start();
 
+        // 退出的三种情形：
+        //   1) stdinClosed —— 父进程死了（最可靠，也是兜底的主力）
+        //   2) parentPid 已经不存在 —— 管道意外没断时的第二道保险
+        //   3) 显式收到 quit 命令
+        // 循环体里每轮只多两次几乎零成本的判断，不值得为性能犹豫。
+        var parentPid = ParentPid(args);
         while (true)
         {
+            if (stdinClosed) return 0;
+            if (parentPid > 0 && !Alive(parentPid)) return 0;
+
             string action;
-            while (commands.TryDequeue(out action)) Act(mgr, action);
+            while (commands.TryDequeue(out action))
+            {
+                if (action == "quit") return 0;
+                Act(mgr, action);
+            }
 
             try {
                 var snap = Pick(mgr);
@@ -317,6 +345,40 @@ class Program {
                 }
             } catch { /* 播放器刚关掉这类瞬时错误，下一轮再说 */ }
             Thread.Sleep(700);
+        }
+    }
+
+    /// <summary>
+    /// 从 `--parent <pid>` 取父进程号。没传就返回 0（不启用这道检查）。
+    ///
+    /// 为什么要有这道保险：stdin 断掉能覆盖「Electron 正常退出」和「Electron 崩了」，
+    /// 但如果父进程把 stdin 的写端漏给了别人（比如自己又 spawn 了子进程继承句柄），
+    /// 管道就不会断。多一个 pid 检查，代价是一次 OpenProcess。
+    /// </summary>
+    static int ParentPid(string[] args) {
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--parent")
+            {
+                int pid;
+                if (int.TryParse(args[i + 1], out pid) && pid > 0) return pid;
+            }
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// 进程还在不在。用 OpenProcess 探测，不持有句柄。
+    ///
+    /// 注意 pid 会被系统复用，所以这个检查只作为兜底，不作为唯一依据——
+    /// 万一复用到一个新进程，最坏结果是多活一会儿，等 stdinClosed 兜住。
+    /// </summary>
+    static bool Alive(int pid) {
+        try {
+            using (var handle = System.Diagnostics.Process.GetProcessById(pid)) return !handle.HasExited;
+        } catch {
+            // ArgumentException = 没有这个进程；InvalidOperation = 已退出
+            return false;
         }
     }
 }

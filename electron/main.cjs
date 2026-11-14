@@ -63,15 +63,35 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
 app.on('second-instance', () => {
-  // 只找主窗口：小组件也是 BrowserWindow，按数组下标取会拿到它。
-  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : BrowserWindow.getAllWindows().find(w => w.isVisible() && !w.isAlwaysOnTop());
-  if (!win) return;
-  if (win.isMinimized()) win.restore();
-  win.show(); win.focus();
+  // 主窗口是唯一的主入口。它在，就把它叫到前面；它已经关了（用户可能关掉主窗、
+  // 只留着壁纸窗或专注小窗），就**重建**一个。
+  //
+  // 不能靠猜。原来写的是「找可见且不是 alwaysOnTop 的窗口」——
+  // 但 `desktop-stage.cjs` 早就明确不做 alwaysOnTop，专注小窗也不做，
+  // 于是猜中的可能是它们：用户点了任务栏图标，冒出来的却是壁纸窗，主界面没影。
+  // 而如果当时只剩壁纸窗，`show()` 还会把一个本该贴在桌面上的窗口翻到前台。
+  //
+  // 主窗口的身份只能由 `mainWindow` 这个变量回答，不能用任何属性去推断。
+  if (!mainWindow || mainWindow.isDestroyed()) { createWindow(); return; }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show(); mainWindow.focus();
 });
 app.whenReady().then(() => {
-  attachNowPlaying();
+  const nowPlaying = attachNowPlaying();
+  // 退出时把 NowPlaying.exe 收掉。
+  //
+  // 没有这一步的时候，那个 exe 是独立进程、自己也没有退出条件，
+  // 用户关了软件它还在每 0.7 秒转一圈，直到注销或手动去任务管理器结束。
+  // `will-quit` 是 Electron 唯一保证「退出流程已经启动、窗口可能还在」的时机；
+  // 放在 `window-all-closed` 里不行——那里主窗口已经没了，而 quit 还可能被别的
+  // 监听取消（比如有未保存状态时）。
+  //
+  // 这里只做同步的 kill：`will-quit` 不 await 异步工作，写成异步也来不及。
+  // 子进程侧另有 stdin 断开兜底，所以就算这里没跑到（比如进程被强杀），
+  // exe 也会自己退。
+  app.on('will-quit', () => { try { nowPlaying.stop(); } catch { /* 已经退了 */ } });
   attachMedia();
+
   // 默认一律拒绝，只放行音频输入（外部音乐的虚拟声卡）。
   // 摄像头、屏幕采集、通知、地理位置等仍然全部拒绝。
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {

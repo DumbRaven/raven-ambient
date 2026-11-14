@@ -33,7 +33,8 @@ async function boot(locked: boolean) {
     restore() { calls.push('restore'); }
     show() { calls.push('show'); }
     focus() { calls.push('focus'); }
-    on() {}
+    // 主窗口自己会挂 'closed' 把 mainWindow 置空，测「窗口关了再启动」要靠它
+    on(key: string, cb: () => void) { if (key === 'closed') events.set('closed', cb); }
     loadFile() {}
   }
   runInNewContext(readFileSync(new URL('../electron/main.cjs', import.meta.url), 'utf8'), {
@@ -59,4 +60,22 @@ test('首实例收到重复启动时还原并聚焦已有窗口', async () => {
   events.get('second-instance')!();
   assert.equal(calls.filter(c => c === 'window').length, 1);
   assert.deepEqual(calls.slice(-3), ['restore', 'show', 'focus']);
+});
+
+test('主窗口已经关了，再启动要把主窗口建回来', async () => {
+  // 回归测试：原来靠「可见且不是 alwaysOnTop」猜主窗口。但壁纸窗和专注小窗
+  // 都不做 alwaysOnTop，猜中的可能是它们——用户点任务栏图标，冒出来的是壁纸窗。
+  // 更糟的是只剩壁纸窗时 `show()` 会把它从桌面翻到前台。
+  const { events, calls } = await boot(true);
+  events.get('second-instance')!();
+  const before = calls.filter(c => c === 'window').length;
+
+  // 主窗口关掉（win.on('closed') 会把 mainWindow 置空）
+  events.get('closed')?.();
+  calls.length = 0;
+  events.get('second-instance')!();
+
+  assert.equal(calls.filter(c => c === 'window').length, 1, '要重建主窗口');
+  assert.equal(calls.includes('show'), false, '不该去 show 别人的窗口');
+  assert.ok(before >= 1);
 });
