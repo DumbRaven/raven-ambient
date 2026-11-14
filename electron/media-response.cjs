@@ -96,6 +96,26 @@ function mediaResponse(target, request, size) {
     'Cache-Control': 'no-store',
   };
 
+  // 空文件要单独接住，而且必须排在 `unsatisfiable` 之前——实测过：
+  // `size = 0` 时 `parseRange('bytes=0-1023', 0)` 返回 `'unsatisfiable'`，
+  // 顺序反过来就永远走 416，下面这段根本执行不到。
+  //
+  // 为什么是 200 而不是 416：`size = 0` 时 `end = -1`，`createReadStream(start:0, end:-1)`
+  // 直接抛 ERR_OUT_OF_RANGE —— 那不是「读不到」，是同步异常，会从协议处理器里
+  // 冒成未捕获错误。用户那边看到的是「这张图/这个视频坏了」，而文件本身没问题
+  // （空文件常见于刚创建的占位文件、下载中断的残片、编辑器写一半崩掉）。
+  //
+  // 416 的语义是「你请求的范围没法满足」，浏览器收到会当成服务端拒绝，
+  // 把排障方向引到白名单或权限上去——而真相是文件在、就是空的。
+  // 回 200 在规范上也站得住：RFC 7233 允许服务端忽略 Range 回整段，
+  // 0 字节文件的「整段」就是空 body。
+  if (size === 0) {
+    return new Response(new Uint8Array(0), {
+      status: 200,
+      headers: { ...common, 'Content-Length': '0' },
+    });
+  }
+
   if (range === 'unsatisfiable') {
     return new Response(null, {
       status: 416,

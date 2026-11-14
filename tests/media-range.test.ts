@@ -50,6 +50,35 @@ test('mimeOf 认得出视频与图片，认不出给 octet-stream', () => {
   assert.equal(mimeOf('x.unknownext'), 'application/octet-stream');
 });
 
+test('空文件不炸，回 200 + 空 body', async () => {
+  // 回归测试：`size = 0` 时 `end = -1`，`createReadStream(start:0, end:-1)`
+  // 会同步抛 ERR_OUT_OF_RANGE，从协议处理器里冒成未捕获错误。
+  // 用户看到的是「这个文件坏了」，而空文件其实很常见：刚创建的占位、下载残片。
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'media-empty-'));
+  const file = path.join(dir, 'empty.mp4');
+  fs.writeFileSync(file, Buffer.alloc(0));
+  try {
+    const size = fs.statSync(file).size;
+    assert.equal(size, 0, '前提：真的是空文件');
+
+    const plain = await fetchLike(file, size, null);
+    assert.equal(plain.status, 200);
+    assert.equal(plain.headers.get('Content-Length'), '0');
+    assert.equal(plain.body.byteLength, 0);
+
+    // 带 Range 也不能走 416：文件在、就是空的，回 200 空 body 才准确
+    const ranged = await fetchLike(file, size, 'bytes=0-1023');
+    assert.equal(ranged.status, 200);
+    assert.equal(ranged.body.byteLength, 0);
+
+    const open = await fetchLike(file, size, 'bytes=0-');
+    assert.equal(open.status, 200);
+    assert.equal(open.body.byteLength, 0);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('mediaResponse 按 Range 回 206，字节数与 Content-Range 都对', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'media-response-'));
   const file = path.join(dir, 'sample.mp4');
