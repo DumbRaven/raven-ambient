@@ -15,6 +15,7 @@ const { mediaResponse } = require('./media-response.cjs');
 // 桌面放映窗。窗口本身住在 desktop-stage.cjs，这里只是把页面的请求转过去。
 // 两边的 require 不会成环：那边不认识 media.cjs。
 const { desktopStage } = require('./desktop-stage.cjs');
+const { MediaGrants, isWithin, realpathOf } = require('./media-grants.cjs');
 
 const SCHEME = 'media';
 const OUTBOX = 'window.__ravenMediaOutbox';
@@ -39,34 +40,57 @@ function registerMediaScheme() {
   ]);
 }
 
-/** 允许读取的目录。用户选过的目录才会进来，别的一律 403。 */
-const allowed = new Set();
 /**
- * 单独导入的文件。
+ * 谁能读什么，这里只有一份权威来源：`MediaGrants` 台账。
  *
- * 和「整目录加入」分开记：用户挑了一张图，不该顺带把他整个素材盘放进来，
- * 也不该在来源列表里冒出一个他从没选过的文件夹。
+ * 曾经是三个内存 Set，重启就清空，靠页面在启动时用 `restore` 把它们递回来。
+ * 那条路的致命处不是「页面参与恢复」，而是主进程**没有能力分辨**递来的是
+ * 「用户以前授权过的路径」还是「页面现在编的路径」——`statSync` 只证明它存在，
+ * 不证明用户同意过。于是 `restore` 事实上是「让页面自己给自己发授权」，
+ * `media://` 就成了任意文件读取后门。
+ *
+ * 现在的分工：用户点对话框 = 唯一的授权动作，主进程把结果写进台账文件；
+ * 重启后主进程自己读回来。页面只负责说「我想看这些」，不再决定「这些能看」。
  */
-const looseFiles = new Set();
+let grants = null;
+/** 壁纸库根目录。位置是固定的（Steam 创意工坊），不需要用户授权、也不进台账。 */
+const wallpaperAllowed = new Set();
 
-/** 把目录加进白名单。 */
+/** 懒建台账：必须先等 `app.setPath('userData')` 生效，否则会写进默认目录。 */
+function grantsOf() {
+  if (grants) return grants;
+  const { app } = require('electron');
+  grants = new MediaGrants(path.join(app.getPath('userData'), 'media-grants.json')).load();
+  return grants;
+}
+
+/** 把 `media://` 的读取范围连同壁纸库根目录一起算出来（给 `ready` 用）。 */
+function allowedDirs() {
+  const wallpaper = new Set(wallpaperRoots().map(root => path.resolve(root).toLowerCase()));
+  return [...grantsOf().dirs].filter(dir => !wallpaper.has(path.resolve(dir).toLowerCase()));
+}
+
+/** 把目录加进白名单。**只给探针和主进程内部用**；页面来的路径走不到这里。 */
 function allowDir(dir) {
-  if (typeof dir === 'string' && dir) allowed.add(path.resolve(dir));
+  if (grantsOf().addDir(dir)) grantsOf().save();
 }
 
-/** 把单个文件加进白名单。 */
+/** 把单个文件加进白名单。同上，只给探针和主进程内部用。 */
 function allowFile(file) {
-  if (typeof file === 'string' && file) looseFiles.add(path.resolve(file));
+  if (grantsOf().addFile(file)) grantsOf().save();
 }
 
+/**
+ * 目标在不在授权范围内。
+ *
+ * 判定逻辑本身在 `media-grants.cjs` 里（`isWithin`），原因有两方面：
+ * 它要处理 junction / 符号链接的真实路径解析，是最容易写错的一段，
+ * 而那段代码不碰 electron API，可以对着临时目录直接跑单元测试。
+ */
 function insideAllowed(target) {
-  const resolved = path.resolve(target);
-  if (looseFiles.has(resolved)) return true;
-  for (const dir of allowed) {
-    const rel = path.relative(path.resolve(dir), resolved);
-    if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return true;
-  }
-  return false;
+  const g = grantsOf();
+  if (g.files.has(path.resolve(target)) || g.files.has(realpathOf(target))) return true;
+  return isWithin(target, [...g.dirs, ...wallpaperAllowed]);
 }
 
 /** media://local/<编码后的绝对路径> 与 file:// 之间的一层壳。 */
@@ -269,8 +293,7 @@ class MediaBridge {
     if (type === 'ping') {
       // 壁纸库的根目录不是用户加的，混进来源列表会显示成「431960」这种 Steam 目录名。
       // 页面自己知道壁纸库读了多少件，那里有单独的 chip，所以这里把它们剔掉。
-      const wallpaper = new Set(wallpaperRoots().map(root => path.resolve(root).toLowerCase()));
-      this.push(webContents, { type: 'ready', dirs: [...allowed].filter(dir => !wallpaper.has(path.resolve(dir).toLowerCase())) });
+      this.push(webContents, { type: 'ready', dirs: allowedDirs() });
       return;
     }
 
@@ -284,7 +307,15 @@ class MediaBridge {
       });
       if (picked.canceled || !picked.filePaths.length) return;
       const dir = path.resolve(picked.filePaths[0]);
-      allowed.add(dir);
+      // 用户点了「确定」，这是**唯一**的授权动作。登记台账并立刻落盘：
+      // 万一用户在扫描完之前就关掉应用，重启后这条授权不该丢。
+      if (!grantsOf().addDir(dir)) {
+        // 被 looksLikeFolder 挡住（盘根、系统目录）。不静默吞掉——用户选了半天
+        // 却什么也没发生，那是最难查的一类「坏掉」。
+        this.push(webContents, { type: 'rejected', path: dir, reason: 'system' });
+        return;
+      }
+      grantsOf().save();
       const files = scan(dir);
       this.push(webContents, { type: 'scan', dir, files, url: files.map(f => ({ ...f, src: mediaUrl(f.path) })) });
       return;
@@ -313,9 +344,10 @@ class MediaBridge {
           size = stat.size;
           mtime = stat.mtimeMs;
         } catch { continue; }
-        looseFiles.add(file);
         files.push({ path: file, name: path.basename(file), kind, size, mtime });
       }
+      for (const file of files) grantsOf().addFile(file.path);
+      grantsOf().save();
       if (!files.length) return;
       this.push(webContents, { type: 'files', files, url: files.map(file => ({ ...file, src: mediaUrl(file.path) })) });
       return;
@@ -323,9 +355,19 @@ class MediaBridge {
 
     if (type === 'rescan') {
       const dir = typeof action.dir === 'string' ? path.resolve(action.dir) : '';
-      if (!dir || !allowed.has(dir)) return;
+      // 壁纸库根目录也算合法来源，它不进台账（位置固定、由主进程自己发现）。
+      if (!dir || !(grantsOf().dirs.has(dir) || wallpaperAllowed.has(dir))) return;
       const files = scan(dir);
       this.push(webContents, { type: 'scan', dir, files, url: files.map(f => ({ ...f, src: mediaUrl(f.path) })) });
+      return;
+    }
+
+    if (type === 'forget') {
+      // 用户点了「移出这个目录」。授权必须跟着撤——只从页面收藏里删掉、
+      // 台账里留着的话，那个目录仍然可以被 `media://` 读到，等于「移出」没生效。
+      const dir = typeof action.dir === 'string' ? path.resolve(action.dir) : '';
+      if (dir) { grantsOf().removeDir(dir); grantsOf().save(); }
+      this.push(webContents, { type: 'ready', dirs: allowedDirs() });
       return;
     }
 
@@ -336,7 +378,7 @@ class MediaBridge {
       const found = [];
       for (const dir of dirs) {
         if (!fs.existsSync(dir)) continue;
-        allowed.add(path.resolve(dir));
+        wallpaperAllowed.add(path.resolve(dir));
         const items = scanWallpaper(dir);
         if (items.length) found.push({ dir: path.resolve(dir), items });
       }
@@ -367,28 +409,22 @@ class MediaBridge {
     }
 
     if (type === 'restore') {
-      // 上次记下的目录重新进白名单。只登记、不重扫：条目已经在收藏里，
-      // 重扫会推一串 scan 回来又写一次盘。用户想刷新时自己点重扫。
-      for (const dir of Array.isArray(action.dirs) ? action.dirs : []) {
-        if (typeof dir !== 'string' || !dir) continue;
-        const resolved = path.resolve(dir);
-        try { if (fs.statSync(resolved).isDirectory()) allowed.add(resolved); } catch { /* 目录没了就跳过，卡片点开会是 404，界面上会显示重扫按钮 */ }
+      // 页面在启动时把收藏里记的目录报过来。**这些路径不构成授权**，只是
+      // 「我以前用过这些地方，你要是记得就恢复一下」。
+      //
+      // 台账文件已经存在 = 授权已经在主进程自己手里，这里什么都不用做：
+      // 目录是不是合法、要不要放行，全部由 `insideAllowed` 对着台账判断。
+      // 文件不存在 = 用户刚从没有台账的旧版本升上来，收藏里有目录、台账里空着。
+      // 这时候补登记一次（`migrate` 内部的 `existed` 守卫保证只走一次），
+      // 否则升级后整个媒体库全是 403，用户得把每个目录重选一遍。
+      const count = grantsOf().migrate(action.dirs, action.files);
+      if (count) grantsOf().save();
+      // 壁纸库根目录不进台账，但每次启动都要补一遍：Steam 目录可能刚装上。
+      for (const root of wallpaperRoots()) {
+        try { if (fs.statSync(root).isDirectory()) wallpaperAllowed.add(path.resolve(root)); } catch { /* 没装就是没装 */ }
       }
-      // 单独导入的文件也要补回来。它们不在任何 allowed 目录里，
-      // 少了这一步，重启之后那几张图会全部 403。
-      for (const file of Array.isArray(action.files) ? action.files : []) {
-        if (typeof file !== 'string' || !file) continue;
-        const resolved = path.resolve(file);
-        try { if (fs.statSync(resolved).isFile()) looseFiles.add(resolved); } catch { /* 文件被挪走或删了，跳过 */ }
-      }
-      // 壁纸库的条目路径在 Steam 目录下，不在 mediaDirs 里。这里补登记一遍，
-      // 否则重启之后那一百多张壁纸全是 403。只是几次 statSync，不扫 project.json。
-      const wallpaper = wallpaperRoots().map(root => path.resolve(root).toLowerCase());
-      for (const root of wallpaper) {
-        try { if (fs.statSync(root).isDirectory()) allowed.add(path.resolve(root)); } catch { /* 没装就是没装 */ }
-      }
-      // 回给页面的来源列表同样剔掉壁纸库根目录，见 ping 那段
-      this.push(webContents, { type: 'ready', dirs: [...allowed].filter(dir => !wallpaper.includes(path.resolve(dir).toLowerCase())) });
+      this.push(webContents, { type: 'ready', dirs: allowedDirs() });
+      return;
     }
   }
 

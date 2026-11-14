@@ -21,7 +21,7 @@ import RollNumber from './roll-number';
 import { LineIn, lineInError } from './line-in';
 import { appLabel, emptyNowPlaying, hasTrack, parseNowPlaying, playbackHint, type NowPlaying } from './now-playing';
 import { askNowPlaying, commandNowPlaying, listenNowPlaying } from './now-playing-bridge';
-import { askMedia, dropWallpapers, listenMedia, looseMedia, mergeMedia, pickMediaFiles, pickMediaFolder, replaceMediaDir, replaceWallpapers, rescanMediaFolder, restoreMediaDirs, scanWallpapers, toMediaItem, toWallpaperItem, type MediaMessage } from './media';
+import { askMedia, dropWallpapers, forgetMediaDir as forgetMediaDirGrant, listenMedia, looseMedia, mergeMedia, pickMediaFiles, pickMediaFolder, replaceMediaDir, replaceWallpapers, rescanMediaFolder, restoreMediaDirs, scanWallpapers, toMediaItem, toWallpaperItem, type MediaMessage } from './media';
 import MediaRoom from './MediaRoom';
 import type { StageNow } from './TemplateStage';
 import { useDialogMotion, useFilterMotion, usePageMotion } from './use-motion';
@@ -255,6 +255,12 @@ export default function App() {
       // 在这之前渲染 <img>/<video> 会拿到 403，而且是永久失败——浏览器不会因为
       // 后来白名单变了就重试同一个地址，格子会一直空着。所以等这一拍。
       if (message.type === 'ready') { setMediaDirs(message.dirs); setMediaReady(true); return; }
+      if (message.type === 'rejected') {
+        // 盘根、系统目录这类位置主进程不收。必须说出来：用户选了、点了确定、
+        // 然后界面毫无反应，他会以为软件卡住了，再试几次还是一样。
+        notify(message.reason === 'system' ? '这个位置不能收：请选你的素材文件夹，别选磁盘根目录或系统目录。' : '这个位置不能用。');
+        return;
+      }
       if (message.type === 'wallpapers') {
         // 壁纸库是「一次全量读」，所以整体替换：在 Wallpaper Engine 里取消订阅的作品
         // 这里也该跟着消失。只动 source 非空的条目，用户自己加的文件夹不受影响。
@@ -696,6 +702,9 @@ export default function App() {
       && !item.path.toLowerCase().startsWith(dir.replace(/[\\/]+$/, '').toLowerCase() + '/'));
     setMediaDirs(dirs => dirs.filter(item => item !== dir));
     change({ media: keep, mediaDirs: cabinetRef.current.mediaDirs.filter(item => item !== dir) });
+    // 主进程那边的读取授权也要撤掉。只删前端的条目，`media://` 照样读得到
+    // 那个目录——「移出」就成了纯视觉的，用户以为删了其实权限还在。
+    forgetMediaDirGrant(dir);
   }
   // 移出壁纸库：只清壁纸读进来的那批（带 source 的）。
   // 自己加的文件夹、单独导入的文件都不属于壁纸库，一件都不能动。

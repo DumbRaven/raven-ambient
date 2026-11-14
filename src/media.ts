@@ -37,6 +37,13 @@ export type MediaMessage =
   | { type: 'scan'; dir: string; files: Omit<ScannedFile, 'src'>[]; url: ScannedFile[] }
   | { type: 'files'; files: Omit<ScannedFile, 'src'>[]; url: ScannedFile[] }
   | { type: 'wallpapers'; roots: { dir: string; count: number }[]; items: WallpaperFile[] }
+  /**
+   * 选的目录被主进程拒了（盘根、系统目录）。
+   *
+   * 有这一条是因为「选了半天什么也没发生」是最难查的一类坏掉：用户会以为是
+   * 软件卡了，然后反复重试。主进程不静默吞掉，页面负责说清为什么。
+   */
+  | { type: 'rejected'; path: string; reason: 'system' }
 
 /** 壁纸库里的一件。key 是作品目录，比标题和文件名都稳。 */
 export type WallpaperFile = ScannedFile & { key: string; note: string };
@@ -47,7 +54,7 @@ export function listenMedia(onMessage: (message: MediaMessage) => void): () => v
   const receiver = (raw: unknown) => {
     if (!raw || typeof raw !== 'object') return;
     const message = raw as MediaMessage;
-    if (message.type !== 'ready' && message.type !== 'scan' && message.type !== 'files' && message.type !== 'wallpapers') return;
+    if (message.type !== 'ready' && message.type !== 'scan' && message.type !== 'files' && message.type !== 'wallpapers' && message.type !== 'rejected') return;
     onMessage(message);
   };
   bridge.__ravenMedia = receiver;
@@ -102,6 +109,17 @@ export function pickMediaFiles() {
 /** 重新扫一遍某个已经放行的目录。 */
 export function rescanMediaFolder(dir: string) {
   push({ type: 'rescan', dir });
+}
+
+/**
+ * 把某个目录移出媒体库，并**撤销主进程的读取授权**。
+ *
+ * 两件事必须一起做：页面这边删掉收藏条目只是界面不再显示，那个目录仍然在
+ * 主进程的台账里，`media://` 照样读得到。只做前者，用户以为东西删了，
+ * 其实权限还在——「移出」就只是视觉上的。
+ */
+export function forgetMediaDir(dir: string) {
+  push({ type: 'forget', dir });
 }
 
 /** 让窗口进/出真全屏。页面铺满只能盖住内容区，任务栏和窗口边框要主进程来收。 */
