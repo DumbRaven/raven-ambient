@@ -1,0 +1,311 @@
+/* ==========================================================================
+ * shelf.css —— 唱片柜：卡片、掀开动作、右侧介绍
+ *
+ * 层叠顺序 3/10（接在 shell.css 之后，controls.css 接在后面）。
+ * 顺序由 skin-bold.css 里的 @import 决定，改顺序会改变渲染结果。
+ * 本文件由 tools/probe/split-css.mjs 从单文件切出，切分时逐属性比对过
+ * 12 份计算样式快照（无差异），所以内容与原文件等价。
+ * ========================================================================== */
+/* ---------- 唱片柜：扁平白卡 ---------- */
+.cabinet-layout { grid-template-columns: minmax(0, 1fr) 188px; gap: 28px; }
+
+.cabinet {
+  border: 0;
+  border-radius: 26px;
+  background: var(--bold-surface);
+  box-shadow: none;
+  backdrop-filter: none;
+  padding: 22px 20px 0;
+}
+.cabinet::before { display: none; }
+.cabinet-corners { display: none; }
+
+.shelf-label {
+  font: 600 10px/1 "Inter", sans-serif;
+  letter-spacing: 1.4px;
+  color: var(--bold-faint);
+  padding: 2px 4px 18px;
+  text-transform: uppercase;
+}
+.shelf-label > span:last-child { font-size: 11px; letter-spacing: 0; color: var(--bold-ink); }
+
+.record-grid {
+  column-gap: 18px;
+  row-gap: 26px;
+  padding: 0 2px;
+}
+
+/* ---------- 唱片卡：纯色大圆角块 ---------- */
+.record-card { padding-bottom: 10px; }
+.record-card::after { display: none; }
+.record-preview { padding: 0; perspective: 900px; }
+
+.record-case {
+  border-radius: 20px;
+  filter: none;
+  transition: transform .3s cubic-bezier(.2,.7,.3,1);
+}
+.case-back { display: none; }
+.case-front {
+  border: 0;
+  border-radius: 20px;
+  background: var(--bold-surface);
+  box-shadow: 0 0 0 1px #00000008, 0 2px 10px #0000000a;
+  transform-origin: 50% 50%;
+  transition: transform .5s cubic-bezier(.2,.7,.3,1), opacity .4s;
+  backface-visibility: visible;
+  overflow: hidden;
+}
+.case-front::after { display: none; }
+.case-spine { display: none; }
+
+/* 点击决定的开关，优先级要压过 :hover：
+   'closed' 是刚合上、鼠标还停在卡片上的那一瞬间，必须强制合上；
+   'open' 是把悬停状态钉住，鼠标移开也不弹回去。 */
+.record-card[data-flip="closed"] .case-front { transform: none !important; opacity: 1 !important; }
+.record-card[data-flip="closed"] .disc-pocket { transform: none !important; }
+.record-card[data-flip="closed"] .record-case { transform: none !important; }
+
+.record-card[data-flip="open"] .case-front { transform: rotateY(-72deg); opacity: .9; }
+.record-card[data-flip="open"] .disc-pocket { transform: translateX(17%) rotate(9deg); }
+.record-card[data-flip="open"] .record-case { transform: translateY(-5px) rotate(-3deg); }
+
+/* 悬停时封面卡像书页一样掀开，黑胶从右边滑出来——幅度与原版一致 */
+.case-front { transform-origin: 0 50%; }
+.disc-pocket {
+  position: absolute;
+  inset: 6%;
+  transition: transform .7s cubic-bezier(.22,.7,.22,1);
+}
+.record-card:hover .disc-pocket,
+.record-card:focus-within .disc-pocket { transform: translateX(17%) rotate(9deg); }
+.record-card:hover .case-front,
+.record-card:focus-within .case-front {
+  transform: rotateY(-72deg);
+  opacity: .9;
+}
+.record-card:hover .record-case,
+.record-card:focus-within .record-case { transform: translateY(-5px) rotate(-3deg); }
+
+/* 用 background-color 而不是 background 简写：简写会把 styles.css 里的
+   background-size:cover / background-position:center 重置成 auto，
+   用户上传的封面图就不再铺满了。 */
+.cover-art {
+  inset: 0;
+  border: 0;
+  border-radius: 20px;
+  background-color: var(--record-color);
+  background-size: cover;
+  background-position: center;
+}
+/* 参考图的四块亮色：按唱片自身颜色映射过去，每张仍各不相同 */
+.cover-art[class*="sleeve-"] {
+  background-color: var(--cover-from, var(--record-color));
+  background-image: none;
+}
+.cover-art[class*="sleeve-"]::after { display: none; }
+
+/* 随机封套的装饰形状全部收掉，只留纯色 */
+.cover-orbit, .cover-sun, .sleeve-glow, .sleeve-disc, .sleeve-sky,
+.sleeve-line, .sleeve-gate, .ripple-ring, .sleeve-band { display: none; }
+
+.cover-border { display: none; }
+
+.cover-edition {
+  top: 16px;
+  left: 17px;
+  right: 17px;
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: .8px;
+  color: var(--bold-ink);
+  opacity: .42;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cover-title {
+  left: 17px;
+  right: 17px;
+  top: auto;
+  bottom: 34px;
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.24;
+  letter-spacing: -0.4px;
+  color: var(--bold-ink);
+  text-shadow: none;
+  -webkit-line-clamp: 2;
+}
+.cover-bottom {
+  left: 17px;
+  right: 17px;
+  bottom: 15px;
+  font: 600 9px/1 "Inter", sans-serif;
+  letter-spacing: .4px;
+  color: var(--bold-ink);
+  opacity: .38;
+  text-transform: uppercase;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 卡片下方说明 ---------- */
+.record-caption { margin-top: 11px; gap: 8px; }
+.record-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bold-ink);
+  letter-spacing: -0.1px;
+  line-height: 1.5;
+}
+.select-record {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--bold-line);
+  background: var(--bold-surface);
+  color: var(--bold-ink);
+  padding: 0;
+}
+.select-record:not(:disabled):hover { background: var(--bold-hover); color: var(--bold-ink); }
+.select-record[aria-pressed="true"] {
+  background: var(--bold-ink);
+  border-color: var(--bold-ink);
+  color: var(--bold-on-dark);
+  box-shadow: none;
+}
+.record-card > p {
+  font-size: 11px;
+  color: var(--bold-muted);
+  gap: 7px;
+  margin-top: 4px;
+}
+.playing-bars i { background: var(--bold-ink); }
+
+/* ---------- 加入条 / 柜底 ---------- */
+.add-to-shelf {
+  margin: 22px 0 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bold-soft);
+  padding: 13px;
+  border: 1px dashed #d8d6cf;
+  border-radius: 14px;
+  background: transparent;
+}
+.add-to-shelf:not(:disabled):hover { background: var(--bold-page); color: var(--bold-ink); border-color: var(--bold-ink); }
+
+.cabinet-base {
+  font: 600 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.2px;
+  color: var(--bold-faint);
+  height: 34px;
+  border-top: 1px solid var(--bold-line);
+  margin: 0 -20px;
+  padding: 0 20px;
+  border-radius: 0 0 26px 26px;
+}
+.cabinet-base > span:first-child { font: 700 10px "Inter", sans-serif; color: var(--bold-ink); }
+.cabinet-base i { background: var(--bold-ink); box-shadow: none; width: 5px; height: 5px; }
+
+/* ---------- 右侧介绍 ---------- */
+.record-notes { padding-top: 14px; }
+.notes-eyebrow {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.4px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.notes-eyebrow > span { font-size: 12px; }
+.notes-disc { display: none; }
+
+.record-type {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.3px;
+  color: var(--bold-faint);
+  margin: 18px 0 8px;
+  text-transform: uppercase;
+}
+.record-notes h2 {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1.24;
+  letter-spacing: -0.6px;
+  color: var(--bold-ink);
+}
+.artist { font-size: 12px; color: var(--bold-muted); margin-top: 7px; }
+.fine-rule { background: var(--bold-line); width: 100%; margin: 20px 0; height: 1px; }
+.record-description {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 12px;
+  line-height: 1.9;
+  letter-spacing: 0;
+  color: #55554f;
+}
+.text-button {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bold-ink);
+  gap: 6px;
+}
+.text-button:not(:disabled):hover { color: var(--bold-solid); }
+.edit-notes { font-size: 11px; }
+/* 「编辑 / 试听 / 移除」排成一行。移除缩到最右边，和常用动作拉开距离——
+   它不是每天都会点的事，但也不该藏进弹窗第二层。 */
+.notes-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+.notes-actions .text-button { margin-right: auto; }
+.notes-preview,
+.notes-remove {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50%;
+  color: var(--bold-muted);
+  background: transparent;
+  border: 1px solid var(--bold-line);
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+.notes-preview:not(:disabled):hover,
+.notes-remove:not(:disabled):hover { background: var(--bold-page); color: var(--bold-ink); }
+/* 试听中：实心黑，一眼看出现在响的是试听 */
+.notes-preview.on { background: var(--bold-ink); color: var(--bold-on-dark); border-color: var(--bold-ink); }
+.notes-preview.on:not(:disabled):hover { background: var(--bold-solid); color: var(--bold-on-dark); }
+/* 第一下变红，第二下才删。红色只在这一步出现，平时不吓人。 */
+.notes-remove.armed { background: var(--bold-danger); color: var(--bold-on-dark); border-color: var(--bold-danger); }
+.notes-remove.armed:not(:disabled):hover { background: var(--bold-danger-deep); color: var(--bold-on-dark); border-color: var(--bold-danger-deep); }
+
+
+.record-meta { margin: 20px 0 16px; }
+.record-meta > div {
+  font: 500 11px/1 "Inter", sans-serif;
+  margin: 10px 0;
+}
+.record-meta dt { color: var(--bold-faint); }
+.record-meta dd { color: var(--bold-ink); }
+
+.notes-select {
+  padding: 12px;
+  border: 1px solid var(--bold-line);
+  border-radius: 999px;
+  background: var(--bold-surface);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bold-ink);
+  gap: 7px;
+}
+.notes-select:not(:disabled):hover { background: var(--bold-page); color: var(--bold-ink); }
+.notes-select.chosen {
+  background: var(--bold-ink);
+  border-color: var(--bold-ink);
+  color: var(--bold-on-dark);
+}
+.notes-select.chosen:hover { background: var(--bold-solid); color: var(--bold-on-dark); }

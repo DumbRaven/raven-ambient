@@ -1,0 +1,636 @@
+/* ==========================================================================
+ * widgets.css —— 滚字计数器、播放台、设置里的开关与滑杆
+ *
+ * 层叠顺序 6/10（接在 rooms.css 之后，modern.css 接在后面）。
+ * 顺序由 skin-bold.css 里的 @import 决定，改顺序会改变渲染结果。
+ * 本文件由 tools/probe/split-css.mjs 从单文件切出，切分时逐属性比对过
+ * 12 份计算样式快照（无差异），所以内容与原文件等价。
+ * ========================================================================== */
+/* ============================================================
+   A1 计数滚动联动
+   ============================================================ */
+
+/* 必须是 <number>。<integer> 会逐档跳变，不逐帧插值。 */
+@property --roll {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.roll-number {
+  display: inline-flex;
+  align-items: flex-start;
+  /* 让视觉隐藏的 .roll-text 锚定在这里，不会跑到别处去撑出滚动条 */
+  position: relative;
+  height: 1.2em;
+  overflow: hidden;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  vertical-align: baseline;
+  margin-right: .5px;
+}
+
+/* vertical-align 用 baseline：实测四个接线点里 flex/grid 父级下这条属性
+   根本不生效（位置由 align-items 决定），块级父级下 baseline 偏差最小
+   （shelf-label 0.01px、queue-number 0.33px）。换成 middle 会让 queue-number
+   下沉 1.3px，肉眼可见。 */
+
+/* 数字列的外层容器：真正参与排版的是它 */
+.roll-digits {
+  display: inline-flex;
+  align-items: flex-start;
+}
+
+.roll-col {
+  display: block;
+  height: 1.2em;
+  transform: translateY(calc(var(--roll, 0) * -1.2em));
+}
+
+.roll-col > b {
+  display: block;
+  height: 1.2em;
+  line-height: 1.2em;
+  min-width: .58em;
+  text-align: center;
+  font-weight: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* 只有挂载后的一帧之后才允许过渡，避免首帧从 0 滚到真实值 */
+.roll-number[data-roll-ready="true"] .roll-col {
+  transition: --roll 260ms cubic-bezier(.2, .7, .3, 1);
+}
+
+/* 屏幕阅读器读真实文本，不读那十个视觉数字 */
+.roll-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 「正在听」tab 的小圆点：出现时轻微长大，不做弹跳 */
+.tab-dot {
+  transform-origin: 50% 50%;
+  animation: tab-dot-in 180ms cubic-bezier(.2, .7, .3, 1) both;
+}
+@keyframes tab-dot-in {
+  from { opacity: 0; transform: scale(.2); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 全局已经 animation:none / transition:none，这里只是把时序也归零 */
+  .roll-number .roll-col { transition: none !important; }
+  .tab-dot { animation: none !important; opacity: 1; transform: none; }
+}
+
+/* ============================================================
+   A2 拖拽落位后画线
+   顺序：卡片停稳 → 线从中心向两端展开 → 停留 → 淡出
+   ============================================================ */
+
+.music-queue.reorder-queue > .queue-item.settled::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--bold-ink);
+  transform: scaleX(0);
+  transform-origin: 50% 50%;
+  pointer-events: none;
+  animation: queue-drop-line 460ms cubic-bezier(.2, .7, .3, 1) both;
+}
+
+@keyframes queue-drop-line {
+  0%   { transform: scaleX(0); opacity: 0; }
+  8%   { transform: scaleX(0); opacity: 1; }
+  38%  { transform: scaleX(1); opacity: 1; }
+  62%  { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 全局 animation:none 会杀掉上面的关键帧，所以这里直接给终态：
+     线立刻出现、460ms 后随 settled 类一起消失。反馈仍然可辨，只是没有生长过程。 */
+  .music-queue.reorder-queue > .queue-item.settled::after {
+    animation: none !important;
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+/* ============================================================
+   A3 表单错误反馈
+   ============================================================ */
+
+.text-field[data-invalid="true"] input {
+  border-color: var(--bold-danger);
+  background: #fdf6f4;
+  outline: none;
+}
+
+.text-field[data-invalid="true"] input:focus {
+  outline: 2px solid var(--bold-danger);
+  outline-offset: 0;
+  background: var(--bold-surface);
+}
+
+.field-error {
+  display: block;
+  margin-top: 7px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.6;
+  color: var(--bold-danger);
+  letter-spacing: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 抖动由 JS 判断并跳过；这里只确保颜色反馈仍在 */
+  .text-field[data-invalid="true"] input {
+    border-color: var(--bold-danger);
+    background: #fdf6f4;
+  }
+}
+
+/* ============================================================
+   C 播放按钮按压与图标切换
+   ============================================================ */
+
+/* 基态就把 transform 的过渡声明好，否则松手时会瞬间弹回 */
+.main-play {
+  transition: transform 120ms cubic-bezier(.2, .7, .3, 1),
+              background .2s,
+              color .2s;
+}
+
+/* :not(:disabled) 不能省：实测 disabled 的 <button> 上 :active 仍然命中
+   （el.matches(':active') === true），不加限定的话没选唱片时按下去照样缩放。 */
+.main-play:not(:disabled):active {
+  transform: scale(.9);
+}
+
+/* .main-play 的 display 是 grid，这层也用 grid 保持居中 */
+.main-play-icon {
+  display: grid;
+  place-items: center;
+  animation: play-icon-in 200ms cubic-bezier(.2, .7, .3, 1) both;
+}
+
+@keyframes play-icon-in {
+  from { opacity: 0; transform: scale(.7) rotate(-14deg); }
+  to   { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 全局已经 animation:none / transition:none；
+     这里确保按压不再缩放，图标直接切换 */
+  .main-play { transition: none !important; }
+  .main-play:not(:disabled):active { transform: none; }
+  .main-play-icon { animation: none !important; opacity: 1; transform: none; }
+}
+
+/* ==========================================================================
+   外部音乐输入（虚拟声卡）
+   音乐从别的播放器进到 CABLE，再从这里抓回来，和本地唱片共用同一套避让。
+   ========================================================================== */
+
+.line-in-select {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.line-in-select > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bold-muted);
+  flex: none;
+}
+
+/* 沿用 .sleep-select 的胶囊下拉，宽度吃满以便放得下设备名 */
+.line-in-select select {
+  flex: 1;
+  min-width: 0;
+  background: var(--bold-page);
+  border: 1px solid var(--bold-line);
+  border-radius: 999px;
+  color: var(--bold-ink);
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.line-in-empty {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--bold-faint);
+  margin: 4px 0 0;
+}
+
+/* 电平条：一条细槽，绿色填充随外部音乐起伏 */
+.line-in-meter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.line-in-meter > span {
+  position: relative;
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--bold-sunken);
+  overflow: hidden;
+}
+
+.line-in-meter > span::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--level, 0%);
+  border-radius: 999px;
+  background: var(--bold-mint);
+  transition: width 90ms linear;
+}
+
+.line-in-meter small {
+  flex: none;
+  font-size: 11px;
+  color: var(--bold-muted);
+}
+
+.line-in-error {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--bold-danger);
+}
+
+/* 复选框：方形小勾，不用系统默认样式，避免在纯白底上显脏 */
+.line-in-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--bold-muted);
+  cursor: pointer;
+}
+
+.line-in-auto input {
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border: 1px solid var(--bold-line);
+  border-radius: 5px;
+  background: var(--bold-surface);
+  cursor: pointer;
+  transition: background .16s, border-color .16s;
+}
+
+.line-in-auto input:checked {
+  background: var(--bold-ink);
+  border-color: var(--bold-ink);
+}
+
+.line-in-auto input:checked::after {
+  content: "";
+  display: block;
+  width: 7px;
+  height: 4px;
+  margin: 4px auto 0;
+  border-left: 1.5px solid var(--bold-edge);
+  border-bottom: 1.5px solid var(--bold-edge);
+  transform: rotate(-45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line-in-meter > span::after { transition: none; }
+  .line-in-auto input { transition: none; }
+}
+
+/* ==========================================================================
+   外部音乐模式（第十二批）
+   开关 + 写死的 CABLE 设备 + 独立音量 + 避让状态。
+   原来的设备下拉不再出现，因为设备是程序自己按名字找的。
+   ========================================================================== */
+
+/* 开关：整行可点，左边是标题说明，右边是胶囊开关 */
+.line-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--bold-page);
+  cursor: pointer;
+  transition: background .2s;
+}
+
+.line-mode-toggle:hover { background: #f2f1ec; }
+
+/* 真正的 checkbox 藏起来，但仍然参与焦点与无障碍 */
+.line-mode-toggle > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.line-mode-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.line-mode-copy b {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bold-ink);
+}
+
+.line-mode-copy small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--bold-muted);
+  line-height: 1.5;
+}
+
+/* 胶囊开关本体 */
+.line-mode-switch {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: #dedcd4;
+  transition: background .22s cubic-bezier(.2, .7, .3, 1);
+}
+
+.line-mode-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bold-surface);
+  box-shadow: 0 1px 3px #00000024;
+  transition: transform .22s cubic-bezier(.2, .7, .3, 1);
+}
+
+.line-mode-toggle > input:checked ~ .line-mode-switch { background: var(--bold-ink); }
+.line-mode-toggle > input:checked ~ .line-mode-switch::after { transform: translateX(18px); }
+.line-mode-toggle > input:focus-visible ~ .line-mode-switch { outline: 2px solid var(--bold-ink); outline-offset: 3px; }
+
+/* 外部音乐音量：和主音量同一套滑杆手感，但更宽、带百分比 */
+.line-volume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.line-volume > span {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bold-muted);
+}
+
+.line-volume > input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.line-volume > small {
+  flex: none;
+  width: 34px;
+  text-align: right;
+  font: 600 11px "Inter", sans-serif;
+  color: var(--bold-ink);
+}
+
+.line-in-hint {
+  margin: 14px 0 0;
+  font-size: 11px;
+  line-height: 1.75;
+  color: var(--bold-faint);
+}
+
+/* 环境音队列：没有「正在播这一首」，所以标题是静态文本，序号换成圈数 */
+.music-queue.ambient-queue li { border-bottom: 1px solid var(--bold-line); }
+
+.queue-title.static {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bold-ink);
+  text-align: left;
+  cursor: default;
+}
+
+.queue-title.static small {
+  display: block;
+  color: var(--bold-muted);
+  font-size: 11px;
+  font-weight: 400;
+  margin-top: 4px;
+}
+
+/* 环境音单独开关：和 X 一样贴在行尾，但状态要一眼看出来 */
+.queue-toggle {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--bold-sunken);
+  color: var(--bold-faint);
+  transition: background .2s, color .2s, transform .16s;
+}
+
+.queue-toggle.on {
+  background: var(--bold-ink);
+  color: var(--bold-bg);
+}
+
+.queue-toggle:not(:disabled):hover {
+  transform: scale(1.08);
+}
+
+.queue-title.static.is-muted {
+  color: var(--bold-faint);
+}
+
+/* 被单独暂停的那一路：整行压低，和还在响的拉开层次 */
+.music-queue.ambient-queue li:has(.queue-title.is-muted) {
+  opacity: .55;
+}
+
+.music-queue.ambient-queue li:has(.queue-title.is-muted) .queue-number {
+  background: var(--bold-line);
+  color: var(--bold-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queue-toggle:not(:disabled):hover { transform: none; }
+}
+
+/* 正在听页脚提示：外部音乐模式下说明声音从哪来 */
+.line-mode-hint {
+  margin: 16px 0 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--bold-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line-mode-toggle,
+  .line-mode-switch,
+  .line-mode-switch::after { transition: none; }
+}
+
+@media (max-width: 599px) {
+  .line-mode-toggle { padding: 12px 14px; gap: 12px; }
+  .line-mode-copy b { font-size: 12px; }
+  .line-mode-copy small { font-size: 10px; }
+  .line-volume { gap: 10px; }
+  .line-volume > small { width: 30px; }
+}
+
+.now-playing-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--bold-page);
+  animation: now-playing-in 260ms cubic-bezier(.2, .7, .3, 1) both;
+}
+
+@keyframes now-playing-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.now-playing-cover {
+  position: relative;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--bold-ink);
+  box-shadow: 0 6px 16px #0000001f;
+}
+
+.now-playing-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 没有封面时用一圈唱片沟槽占位，别留个黑方块 */
+.now-playing-cover.empty {
+  display: grid;
+  place-items: center;
+  background:
+    repeating-radial-gradient(circle at center, #1c1c1c 0, #1c1c1c 1px, #0d0d0d 1px, #232323 2px, #111 3px);
+}
+
+.now-playing-cover.empty::after {
+  content: "";
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bold-lemon);
+}
+
+.now-playing-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+
+.now-playing-copy > small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--bold-faint);
+}
+
+.now-playing-copy > b {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--bold-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.4;
+}
+
+.now-playing-copy > span {
+  font-size: 11px;
+  color: var(--bold-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.now-playing-card.idle .now-playing-copy > b { color: var(--bold-muted); font-weight: 600; }
+
+.now-playing-state {
+  flex: none;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  background: var(--bold-ink);
+  color: var(--bold-on-dark);
+}
+
+.now-playing-state.paused { background: #dedcd4; color: var(--bold-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .now-playing-card { animation: none; }
+}
+
+@media (max-width: 599px) {
+  .now-playing-card { gap: 12px; padding: 13px; border-radius: 16px; }
+  .now-playing-cover { width: 52px; height: 52px; border-radius: 12px; }
+  .now-playing-copy > b { font-size: 13px; }
+}

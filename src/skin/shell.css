@@ -1,0 +1,231 @@
+/* ==========================================================================
+ * shell.css —— 应用外壳：品牌条、首屏标题、页签导航、工具条
+ *
+ * 层叠顺序 2/10（接在 base.css 之后，shelf.css 接在后面）。
+ * 顺序由 skin-bold.css 里的 @import 决定，改顺序会改变渲染结果。
+ * 本文件由 tools/probe/split-css.mjs 从单文件切出，切分时逐属性比对过
+ * 12 份计算样式快照（无差异），所以内容与原文件等价。
+ * ========================================================================== */
+/* ---------- 外壳 ---------- */
+.portrait-shell {
+  max-width: 760px;
+  padding: 0 28px 96px;
+}
+
+.masthead {
+  height: 84px;
+  border-bottom: 0;
+}
+
+.brand { gap: 10px; }
+.brand > svg { color: var(--bold-ink); }
+.brand > span {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--bold-ink);
+}
+.brand i {
+  font-size: 14px;
+  font-weight: 400;
+  font-style: normal;
+  color: #b6b5ae;
+  margin-left: 4px;
+  letter-spacing: 0;
+}
+
+.header-actions { gap: 6px; }
+.icon-button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--bold-ink);
+  border: 1px solid var(--bold-line);
+  background: var(--bold-surface);
+}
+.icon-button:not(:disabled):hover { background: var(--bold-hover); color: var(--bold-ink); }
+
+.local-status {
+  font: 600 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.1px;
+  color: var(--bold-faint);
+  margin-right: 8px;
+}
+.local-status i { background: var(--bold-ink); box-shadow: none; width: 5px; height: 5px; }
+
+/* ---------- 首屏标题 ---------- */
+.intro { padding: 26px 2px 30px; }
+.edition {
+  font: 600 10px/1 "Inter", sans-serif;
+  letter-spacing: 1.6px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.intro-title { margin-top: 18px; }
+.intro h1 {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 46px;
+  line-height: 1.14;
+  letter-spacing: -1.4px;
+  font-weight: 800;
+  color: var(--bold-ink);
+}
+.intro h1 em {
+  font-style: normal;
+  font-weight: 800;
+  color: var(--bold-ink);
+}
+.intro > p {
+  color: var(--bold-muted);
+  font-size: 13px;
+  letter-spacing: 0;
+  line-height: 1.7;
+  margin-top: 18px;
+}
+
+/* ---------- 导航：一块黑底滑块弹过去 ---------- */
+.view-tabs {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 0;
+  min-height: 0;
+  padding: 5px;
+  border-radius: 999px;
+  background: var(--bold-sunken);
+  width: fit-content;
+  /* 胶囊自身有 5px 内边距，往左退同样多，第一个页签的起点才和下面的内容对齐 */
+  margin-left: -5px;
+  margin-bottom: 22px;
+}
+
+/* 黑色滑块：位置和宽度由 use-view-layout 写进变量，切换时滑过去并轻微回弹 */
+.view-tabs > .nav-marker {
+  display: block;
+  position: absolute;
+  left: 0;
+  top: 5px;
+  /* 基础样式把它当下划线（height:2px / bottom:-1px），这里必须一起盖回来 */
+  bottom: 5px;
+  height: auto;
+  width: var(--nav-marker-width, 0px);
+  transform: translateX(var(--nav-marker-x, 0px));
+  border-radius: 999px;
+  background: var(--bold-ink);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 滑过去时带上一点回弹（曲线的 y 超过 1：先冲过去再退回来）。
+ *
+ * 为什么选择器要写得这么长、还要带 `[data-marker-ready="true"]`：
+ * 原版 `styles.css:426` 写的是 `.view-tabs[data-marker-ready="true"]>.nav-marker`
+ * （0,3,0），比这里原来的 `.view-tabs > .nav-marker`（0,2,0）更具体，
+ * 于是 180ms 那条一直在赢——实测点一次页签，滑块 147ms 走完 174px，
+ * 肉眼就是瞬移。用户 m13292 说的「切换栏没动画」就是这么来的。
+ * 这两条必须和原版同样具体，才能覆盖掉它。 */
+.view-tabs[data-marker-ready="true"] > .nav-marker {
+  transition: transform 430ms cubic-bezier(.3, 1.32, .48, 1), width 430ms cubic-bezier(.3, 1.32, .48, 1);
+}
+
+/* 第一帧还没量好位置，别让它从 0 滑过来 */
+.view-tabs:not([data-marker-ready="true"]) > .nav-marker { transition: none; }
+
+.view-tabs > button {
+  position: relative;
+  z-index: 1;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--bold-soft);
+  gap: 6px;
+  background: transparent;
+  transition: color .22s ease;
+}
+.view-tabs > button.active {
+  background: transparent;
+  color: var(--bold-on-dark);
+}
+.view-tabs > button.active svg { color: var(--bold-on-dark); }
+.view-tabs > button.active:hover { color: var(--bold-on-dark); }
+.view-tabs > button:not(.active):hover { color: var(--bold-ink); background: #ffffffb0; }
+.view-tabs small {
+  font: 600 10px/1 "Inter", sans-serif;
+  color: inherit;
+  opacity: .5;
+  margin-left: 1px;
+}
+.tab-dot { background: var(--bold-coral); width: 6px; height: 6px; margin-left: 2px; }
+
+/* ---------- 工具条 ---------- */
+.collection-toolbar { margin: 0 0 20px; }
+.filter-tabs {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--bold-sunken);
+  width: fit-content;
+}
+
+/* 黑色滑块：跟页签栏是同一套动作（JS 写 --flip-x / --flip-width） */
+.filter-tabs > .flip-marker {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: var(--flip-width, 0px);
+  transform: translateX(var(--flip-x, 0px));
+  border-radius: 999px;
+  background: var(--bold-ink);
+  pointer-events: none;
+  z-index: 0;
+  transition: transform 380ms cubic-bezier(.3, 1.28, .48, 1), width 380ms cubic-bezier(.3, 1.28, .48, 1);
+}
+
+.filter-tabs:not([data-ready="true"]) > .flip-marker { transition: none; }
+
+.filter-tabs button {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bold-soft);
+  padding: 7px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  transition: color .22s ease;
+}
+
+.filter-tabs button.active {
+  background: transparent;
+  border-color: transparent;
+  color: var(--bold-on-dark);
+  box-shadow: none;
+}
+
+.filter-tabs button.active:hover { color: var(--bold-on-dark); }
+.filter-tabs button:not(.active):hover { color: var(--bold-ink); background: transparent; }
+
+.search {
+  gap: 7px;
+  color: var(--bold-faint);
+  max-width: 168px;
+  background: var(--bold-surface);
+  border: 1px solid var(--bold-line);
+  border-radius: 999px;
+  padding: 8px 14px;
+}
+.search input {
+  font-size: 12px;
+  color: var(--bold-ink);
+  padding: 0;
+}
+.search input::placeholder { color: var(--bold-faint); }

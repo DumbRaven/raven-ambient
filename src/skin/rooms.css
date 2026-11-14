@@ -1,0 +1,361 @@
+/* ==========================================================================
+ * rooms.css —— 正在听、专注、队列拖拽，以及它们的断点
+ *
+ * 层叠顺序 5/10（接在 controls.css 之后，widgets.css 接在后面）。
+ * 顺序由 skin-bold.css 里的 @import 决定，改顺序会改变渲染结果。
+ * 本文件由 tools/probe/split-css.mjs 从单文件切出，切分时逐属性比对过
+ * 12 份计算样式快照（无差异），所以内容与原文件等价。
+ * ========================================================================== */
+/* ---------- 正在听 ---------- */
+.listening-room { padding-top: 8px; }
+
+.turntable {
+  aspect-ratio: 1.62;
+  max-width: 460px;
+  border-radius: 28px;
+  background: var(--bold-ink);
+  border: 0;
+  box-shadow: 0 20px 50px #0000001f;
+  overflow: hidden;
+}
+.turntable::before { display: none; }
+.turntable-label {
+  top: 22px;
+  left: 26px;
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.5px;
+  color: #ffffff5c;
+  text-transform: uppercase;
+}
+.platter {
+  left: 8%;
+  top: 17%;
+  width: 45%;
+  box-shadow: none;
+}
+.platter .vinyl-label > span { font: 600 9px/1.7 "Inter", sans-serif; letter-spacing: .6px; }
+.platter .vinyl-label small { font: 500 6px "Inter", sans-serif; }
+.platter-disc { border-radius: 50%; }
+
+/* 黑胶盘面：底色与沟槽保持中性深色，但绝不覆盖彩胶工艺的取色层。
+   彩胶的 .pressing-* 只设置 background-color / background-image，
+   这里只补沟槽纹理的明暗，让工艺色透出来。 */
+.vinyl {
+  box-shadow: 0 0 0 1px #ffffff14, 0 10px 24px #00000066;
+}
+.vinyl::before {
+  background: conic-gradient(from 30deg, transparent, #ffffff1f 14%, transparent 24%, #00000040 45%, #ffffff2b 64%, transparent 76%, #ffffff14 91%, transparent);
+}
+/* 没有彩胶工艺时（无封面取色）才用中性黑盘 */
+.vinyl:not([class*="pressing-"]) {
+  background: repeating-radial-gradient(circle at center, #1c1c1c 0, #1c1c1c 1px, #0d0d0d 1px, #232323 2px, #111 3px);
+}
+/* 彩胶盘面加一层极淡的沟槽压纹，保留唱片质感又不吃掉颜色 */
+.vinyl[class*="pressing-"] {
+  background-blend-mode: normal;
+  box-shadow: 0 0 0 1px #ffffff1f, 0 10px 24px #00000059;
+}
+.vinyl-label {
+  box-shadow: 0 0 0 1px #ffffff26;
+  color: var(--bold-ink);
+}
+
+.tonearm {
+  border: 0;
+  background: linear-gradient(90deg, #3a3a3a, #b9b9b4, #4a4a4a);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px #00000059;
+}
+.tonearm > span {
+  border: 0;
+  background: radial-gradient(#e8e8e3, #9a9a95);
+  box-shadow: 0 0 0 3px #ffffff1a, 0 3px 8px #00000059;
+}
+.tonearm > i {
+  background: linear-gradient(90deg, #6a6a66, #cfcfca, #6a6a66);
+  border-radius: 4px;
+  box-shadow: 0 3px 8px #0000004d;
+}
+.power-light { background: #ffffff2e; box-shadow: none; }
+.power-light.on { background: var(--bold-mint); box-shadow: 0 0 12px var(--bold-mint); }
+.rpm {
+  color: #ffffff52;
+  font: 600 15px "Inter", sans-serif;
+  right: 28px;
+  bottom: 24px;
+  text-align: right;
+  line-height: 1.2;
+}
+.rpm small {
+  font: 700 8px "Inter", sans-serif;
+  letter-spacing: 1.4px;
+  display: block;
+  margin-top: 3px;
+}
+
+.playing-title { margin: 30px 0 34px; }
+.playing-title > span {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.5px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.playing-title h2 {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.24;
+  letter-spacing: -0.9px;
+  color: var(--bold-ink);
+  margin-top: 10px;
+}
+
+/* 队列 */
+.queue-heading {
+  border-bottom: 1px solid var(--bold-line);
+  margin-top: 26px;
+  padding-bottom: 13px;
+}
+.queue-heading h3 { font-size: 13px; font-weight: 700; color: var(--bold-ink); letter-spacing: -0.1px; }
+.queue-heading > span { font: 600 10px "Inter", sans-serif; color: var(--bold-faint); letter-spacing: .3px; }
+
+.music-queue li {
+  border-bottom: 1px solid var(--bold-line);
+  padding: 15px 10px;
+  border-radius: 12px;
+  gap: 12px;
+}
+.music-queue li.current { background: var(--bold-page); }
+.queue-number { font: 600 10px "Inter", sans-serif; color: var(--bold-faint); width: 26px; }
+.queue-title { font-size: 13px; font-weight: 600; color: var(--bold-ink); }
+.queue-title small { color: var(--bold-muted); font-size: 11px; margin-top: 4px; font-weight: 400; }.queue-remove:hover { color: var(--bold-danger); }
+.queue-empty { font-size: 12px; color: var(--bold-muted); line-height: 1.8; margin-top: 16px; }
+
+.ambient-chips { gap: 9px; padding-top: 15px; }
+.ambient-chips button {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bold-ink);
+  border: 1px solid var(--bold-line);
+  border-radius: 999px;
+  padding: 9px 15px;
+  background: var(--bold-surface);
+  gap: 8px;
+}
+.ambient-chips button:hover { background: var(--bold-page); color: var(--bold-ink); }
+.ambient-mark { width: 15px; height: 15px; }
+
+.back-cabinet { margin: 28px 0 4px; font-size: 12px; }
+
+/* ---------- 专注 ---------- */
+.focus-room { padding-top: 8px; }
+.focus-layout { gap: 28px; }
+.focus-stage {
+  border: 0;
+  border-radius: 28px;
+  background: var(--bold-surface);
+  box-shadow: none;
+  backdrop-filter: none;
+  padding: 26px 22px 26px;
+}
+.focus-head { margin-bottom: 4px; }
+.focus-head > .notes-eyebrow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 700 10px/1 "Inter", sans-serif;
+  letter-spacing: 1.4px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.focus-head > .notes-eyebrow > span {
+  font: 700 10px/1 "Inter", sans-serif;
+  letter-spacing: .6px;
+  color: var(--bold-ink);
+}
+.focus-mode {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.4px;
+  color: var(--bold-ink);
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 13px;
+  background: var(--bold-mint);
+  text-transform: uppercase;
+}
+
+.focus-dial { width: min(280px, 74vw); margin: 20px auto 6px; }
+.focus-track { stroke: var(--bold-sunken); stroke-width: 10; }
+.focus-progress { stroke: var(--bold-ink); stroke-width: 10; stroke-linecap: round; }
+.focus-dial.is-break .focus-progress { stroke: var(--bold-lilac); }
+
+.focus-phase {
+  font: 700 10px/1 "Inter", sans-serif;
+  letter-spacing: 2px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.focus-time {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  font-size: 62px;
+  font-weight: 800;
+  letter-spacing: -2.5px;
+  color: var(--bold-ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.focus-dial.is-running .focus-time { color: var(--bold-ink); }
+.focus-caption { font-size: 11px; color: var(--bold-muted); letter-spacing: 0; }
+
+.focus-actions { gap: 10px; margin-top: 20px; }
+.focus-actions .primary-button { min-width: 132px; }
+.focus-actions .secondary-button { padding: 13px 15px; }
+.focus-hint {
+  border-top: 1px solid var(--bold-line);
+  margin-top: 18px;
+  padding-top: 14px;
+  font-size: 11px;
+  color: var(--bold-muted);
+  line-height: 1.8;
+}
+
+.focus-notes h3 {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--bold-ink);
+  margin: 16px 0 4px;
+}
+.focus-numbers { gap: 30px; margin: 16px 0 10px; }
+.focus-numbers strong {
+  font: 800 36px/1 "Inter", sans-serif;
+  color: var(--bold-ink);
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+.focus-numbers span {
+  font: 600 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.1px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.focus-line { font-size: 11px; line-height: 1.9; color: var(--bold-muted); }
+.focus-presets { gap: 7px; margin-top: 11px; }
+.focus-presets button {
+  padding: 9px 15px;
+  border: 1px solid var(--bold-line);
+  border-radius: 999px;
+  background: var(--bold-surface);
+  color: var(--bold-ink);
+  font-size: 11px;
+  font-weight: 600;
+}
+.focus-presets button:hover { background: var(--bold-page); color: var(--bold-ink); }
+.focus-presets button.chosen {
+  border-color: var(--bold-ink);
+  box-shadow: 0 0 0 1px var(--bold-ink);
+  background: var(--bold-page);
+  color: var(--bold-ink);
+}
+.focus-switch > span { font-size: 12px; font-weight: 500; color: var(--bold-ink); gap: 3px; }
+.focus-switch small { font-size: 10px; color: var(--bold-muted); }
+.focus-clear { font-size: 11px; }
+
+/* ---------- 队列拖拽（原版是奶白玻璃质感，这里换成纯白卡片） ----------
+   注意：原版「第十批」用 .music-queue.reorder-queue > .queue-item.dragging（0,3,0）
+   和 --queue-y 变量，选择器必须同等具体，否则覆盖不到。 */
+.music-queue.reorder-queue::before {
+  border: 1px dashed #10101033;
+  border-radius: 12px;
+  background: #10101008;
+}
+.music-queue.reorder-queue > .queue-item.dragging {
+  background: var(--bold-surface);
+  border-radius: 12px;
+  box-shadow: 0 10px 26px #0000001f, 0 0 0 1px var(--bold-ink);
+}
+.queue-item.drop-before::before {
+  left: 2px;
+  right: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--bold-ink);
+}
+.queue-remove { color: var(--bold-faint); }
+
+/* ---------- 断点 ---------- */
+@media (min-width: 800px) {
+  .app {
+    max-width: 820px;
+    margin: 26px auto;
+    min-height: calc(100vh - 52px);
+    border: 1px solid #eceae5;
+    border-radius: 34px;
+    box-shadow: 0 18px 60px #0000000a;
+    background: var(--bold-surface);
+  }
+  .background-wash, .paper-grain { position: absolute; }
+  .portrait-shell { padding-left: 40px; padding-right: 40px; }
+  .toast, .motion-notice { bottom: 160px; }
+}
+
+@media (max-width: 599px) {
+  .portrait-shell { padding: 0 20px 80px; }
+  .masthead { height: 72px; }
+  .intro { padding-top: 20px; }
+  .intro h1 { font-size: 38px; letter-spacing: -1.2px; }
+  .edition { font-size: 9px; letter-spacing: 1.3px; }
+  .brand > span { font-size: 14px; }
+  .view-tabs { padding: 4px; gap: 3px; }
+  .view-tabs > button { padding: 8px 12px; font-size: 11px; }
+  .cabinet-layout { grid-template-columns: minmax(0, 1fr) 148px; gap: 20px; }
+  .cabinet { padding: 18px 15px 0; border-radius: 22px; }
+  .cabinet-base { margin: 0 -15px; padding: 0 15px; border-radius: 0 0 22px 22px; }  .cover-title { font-size: 15px; left: 14px; right: 14px; bottom: 28px; }
+  .cover-edition { font-size: 8px; top: 13px; left: 14px; right: 14px; }
+  .cover-bottom { font-size: 8px; left: 14px; right: 14px; bottom: 12px; }
+  .record-name { font-size: 12px; }
+  .record-notes h2 { font-size: 21px; }
+  .record-description { font-size: 11px; }
+  .dock-record strong { max-width: 150px; font-size: 12px; }
+  .main-play { width: 42px; height: 42px; }
+  .transport .icon-button, .order-button, .channel-button { width: 30px; height: 30px; }
+  .turntable { aspect-ratio: 1.5; }
+  .playing-title h2 { font-size: 24px; }
+  .focus-time { font-size: 52px; }
+  .focus-dial { width: min(240px, 76vw); }
+  .toast, .motion-notice { bottom: 150px; font-size: 11px; padding: 12px 18px; }
+}
+
+@media (max-width: 440px) {
+  .portrait-shell { padding-left: 16px; padding-right: 16px; }
+  .intro h1 { font-size: 34px; }
+  .intro > p { font-size: 12px; }
+  .view-tabs { width: 100%; justify-content: space-between; }
+  .view-tabs > button { padding: 8px 10px; font-size: 10px; }
+  .cabinet-layout { grid-template-columns: 1fr; gap: 26px; }
+  .record-grid { column-gap: 14px; row-gap: 24px; padding: 0; }
+  .cabinet { padding: 18px 14px 0; }
+  .cabinet-base { margin: 0 -14px; padding: 0 14px; }
+  .cover-title { font-size: 17px; }
+  .record-notes { border-top: 1px solid var(--bold-line); padding-top: 22px; display: block; }
+  .record-notes > .fine-rule { display: none; }
+  .notes-disc { display: none; }
+  .dock-record strong { max-width: 128px; font-size: 11px; }
+  .main-play { width: 40px; height: 40px; }
+  .transport { gap: 0; }
+  .transport .icon-button, .order-button, .channel-button { width: 28px; height: 28px; }
+  .channel-buttons { gap: 2px; margin-left: 2px; }
+  .toast, .motion-notice { bottom: 132px; }
+  .modal-content { padding: 26px 22px; }
+  .modal h2 { font-size: 23px; }
+  .focus-time { font-size: 46px; letter-spacing: -2px; }
+  .playing-title h2 { font-size: 22px; }
+}
+
+@media (hover: none) {
+  .record-card[data-flip="open"] .case-front { transform: rotateY(-65deg); opacity: .9; }
+  .record-card[data-flip="closed"] .case-front { transform: none !important; }
+  .record-card.inspected .disc-pocket { transform: translateX(17%); }
+  .record-card.inspected .record-case { transform: rotate(-3deg); }
+}

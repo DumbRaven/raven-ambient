@@ -1,0 +1,692 @@
+/* ==========================================================================
+ * modern.css —— 第十三~二十批：Today 式头部、导航展开、封面网格、换页、播放卡
+ *
+ * 层叠顺序 7/10（接在 widgets.css 之后，gallery.css 接在后面）。
+ * 顺序由 skin-bold.css 里的 @import 决定，改顺序会改变渲染结果。
+ * 本文件由 tools/probe/split-css.mjs 从单文件切出，切分时逐属性比对过
+ * 12 份计算样式快照（无差异），所以内容与原文件等价。
+ * ========================================================================== */
+/* ---------- 第十三批：Today 式头部与列表 ---------- */
+
+/* 头部：左对齐超大标题，右上角期号与大号计数 */
+.today-head {
+  padding: 30px 0 26px;
+}
+
+.today-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.today-title {
+  margin: 0;
+  font-size: 62px;
+  line-height: 0.96;
+  letter-spacing: -3px;
+  font-weight: 800;
+  color: var(--bold-ink);
+}
+
+.today-stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  padding-top: 8px;
+  text-align: right;
+}
+
+.today-stamp > span:first-child {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  color: var(--bold-faint);
+}
+
+.today-stamp > i {
+  width: 22px;
+  height: 1px;
+  background: var(--bold-line);
+}
+
+.today-count {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -1.2px;
+  color: var(--bold-ink);
+}
+
+.today-count small {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  color: var(--bold-faint);
+}
+
+/* 标题下面那一行：英文小标签 + 分隔竖线 + 中文一句话 */
+.today-tag {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+
+.today-tag > i {
+  width: 1px;
+  height: 10px;
+  background: var(--bold-line);
+}
+
+.today-tag > span {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--bold-muted);
+  text-transform: none;
+}
+
+
+/* ---------- 第十四批：导航胶囊展开 ---------- */
+
+/* 未选中：图标 + 英文，中文收起 */
+/* 只有中文：选中项靠字重与字号撑开，滑块宽度自然跟着变 */
+.view-tabs > button .tab-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+  transition: font-weight .18s ease, letter-spacing .18s ease;
+}
+
+.view-tabs > button.active .tab-label {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+/* 选中项图标也加粗一点，跟文字一起「压下去」 */
+.view-tabs > button.active svg {
+  stroke-width: 2.1;
+}
+
+@media (max-width: 599px) {
+  .view-tabs {
+    gap: 2px;
+    padding: 4px;
+  }
+
+  .view-tabs > button {
+    gap: 5px;
+    padding: 8px 9px;
+  }
+
+  .view-tabs > button.active {
+    gap: 5px;
+    padding-right: 11px;
+  }
+
+  .view-tabs > button .tab-label {
+    font-size: 10px;
+  }
+
+  .view-tabs > button svg {
+    width: 13px;
+    height: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-tabs > button .tab-label {
+    transition: none;
+  }
+}
+
+/* ---------- 第十五批：封面网格 ---------- */
+
+/* 网格卡片上的名字行 */
+.select-record > span { font: 600 11px/1 "Inter", sans-serif; }
+
+/* 名字跟在选中圈后面 */
+.record-card > p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.record-card .record-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bold-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.record-card { list-style: none; }
+
+.record-card .playing-bars { margin-left: 0; }
+.record-card .playing-bars i { background: var(--bold-ink); }
+
+/* 网格：明亮版保持两列，和大圆角块的气质一致 */
+.record-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 18px;
+  row-gap: 26px;
+  padding: 0 2px;
+}
+
+/* 封面网格里，唱片盒沿用原有的掀开动作，只是圆角和阴影换成明亮版的 */
+.record-card .record-case {
+  border-radius: 20px;
+  filter: none;
+}
+
+.record-card .case-front {
+  border: 0;
+  border-radius: 20px;
+  box-shadow: 0 0 0 1px #00000008, 0 2px 10px #0000000a;
+  overflow: hidden;
+}
+
+.record-card.selected .record-case {
+  filter: drop-shadow(2px 7px 5px #4b67482b);
+}
+
+@media (max-width: 599px) {
+  .record-grid { column-gap: 13px; row-gap: 22px; }
+  .record-card .record-name { font-size: 11px; }
+}
+
+/* ---------- 第十六批：圆形扩散换页 ---------- */
+
+/*
+ * 点页签时，新页面从指尖按下处像墨水一样铺开，盖住整个内容区。
+ * 圆心和半径由 App.tsx 的 selectView 量好写进 --wipe-x / --wipe-y / --wipe-r，
+ * 半径取到内容区最远的那个角，扩散结束时一定盖满，不会留一角。
+ *
+ * 旧页面只负责快速退场，新页面负责铺开——两个动作错开，不叠成一团。
+ */
+.view-stage {
+  position: relative;
+}
+
+.view-stage[data-motion="exit"] {
+  animation: page-wipe-out 130ms cubic-bezier(.4, 0, 1, 1) both;
+}
+
+.view-stage[data-motion="enter"] {
+  animation: page-wipe-in 520ms cubic-bezier(.3, .72, .22, 1) both;
+}
+
+@keyframes page-wipe-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes page-wipe-in {
+  from {
+    opacity: 1;
+    clip-path: circle(0 at var(--wipe-x, 50%) var(--wipe-y, 0%));
+    transform: scale(.994);
+  }
+  62% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    clip-path: circle(var(--wipe-r, 140%) at var(--wipe-x, 50%) var(--wipe-y, 0%));
+    transform: scale(1);
+  }
+}
+
+/* 唱片柜内部的筛选切换：同一套扩散，但作用域只有唱片柜那一块 */
+.cabinet-layout { position: relative; }
+.cabinet-layout[data-motion="exit"] { animation: page-wipe-out 130ms cubic-bezier(.4, 0, 1, 1) both; }
+.cabinet-layout[data-motion="enter"] {
+  animation: page-wipe-in 520ms cubic-bezier(.3, .72, .22, 1) both;
+}
+
+/* 顶部大字：换页时旧字轻轻退、新字从下方追上来。
+   比下面那块慢一拍，观感上是「先换名字，再换内容」。 */
+.today-title {
+  animation: title-swap 460ms cubic-bezier(.2, .9, .25, 1) both;
+}
+@keyframes title-swap {
+  from { opacity: 0; transform: translateY(14px); filter: blur(4px); }
+  55% { opacity: 1; filter: blur(0); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cabinet-layout[data-motion="exit"],
+  .cabinet-layout[data-motion="enter"],
+  .today-title { animation: none !important; }
+  .view-stage[data-motion="exit"],
+  .view-stage[data-motion="enter"] {
+    animation: none !important;
+    clip-path: none !important;
+    transform: none !important;
+  }
+
+  .view-tabs > .nav-marker {
+    transition: none !important;
+  }
+}
+
+/* ---------- 第十七批：连续曲率圆角 ----------
+   胶囊和卡片的 corner 都是「标准圆角」：一段半径恒定的圆弧，接到直边时
+   曲率从 1/r 一下掉到 0，眼睛能看出那个折点，尤其在大尺寸的底栏上。
+   苹果的图标和 macOS 控件用的是连续曲率（超椭圆），没有这个折点。
+
+   只在支持 corner-shape 的浏览器生效：不支持的照旧是标准圆角，不会变形。
+   半径为 50% 的纯圆形（播放键、通道键、唱片）不在此列——超椭圆会把它们
+   变成圆角方形，那就不是圆了。
+
+   档位说明：squircle 约等于超椭圆 n=4（苹果图标用的那档）。实测在 638×97 的
+   底栏上，n=4 的端点收得太快，看上去偏方；n=1.2 的轮廓落在标准圆角与 n=4 的
+   正中间，直边到弧线的过渡最自然。 */
+@supports (corner-shape: superellipse(1.2)) {
+  /* 胶囊：页签、筛选、搜索框、按钮、底栏 */
+  .view-tabs,
+  .view-tabs > .nav-marker,
+  .view-tabs > button,
+  .filter-tabs button,
+  .search,
+  .notes-select,
+  .primary-button,
+  .secondary-button,
+  .sleep-select select,
+  .line-in-select select,
+  .ambient-chips button,
+  .focus-mode,
+  .focus-presets button,
+  .queue-toggle,
+  .now-playing-state,
+  .toggle,
+  .line-mode-switch,
+  .toast,
+  .motion-notice,
+  /* 播放卡：浮在页面上的一颗大胶囊 */
+  .play-card,
+  /* 卡片与面板 */
+  .modal,
+  .turntable,
+  .focus-stage,
+  .cabinet,
+  .record-case,
+  .case-front,
+  .cover-art,
+  .now-playing-card,
+  .now-playing-cover,
+  .add-to-shelf,
+  .music-queue li,
+  .transition-options button,
+  .import-types button,
+  .text-field input,
+  .text-field textarea {
+    corner-shape: superellipse(1.2);
+  }
+}
+
+/* ---------- 圆碟与播放卡（第十九批） ---------- */
+
+/* 圆碟：贴在页签栏右边外侧。页签栏本身是 width:fit-content，加在它内部会把页签撑松，
+   所以用绝对定位挂在外面，页签栏宽度一点不变。 */
+.dock-disc-slot {
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+}
+
+.view-tabs {
+  position: relative;
+}
+
+.dock-disc {
+  position: relative;
+  display: block;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: var(--bold-bg);
+  background-color: var(--bold-ink);
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 6px 18px #1010102e, 0 0 0 1px #10101014;
+  /* 暂停时回正：不在半路上停住，看着像卡住 */
+  transition: transform 320ms cubic-bezier(.3, 1.3, .5, 1), box-shadow 220ms ease,
+    scale 260ms cubic-bezier(.3, 1.3, .5, 1), opacity 200ms ease;
+}
+
+.dock-disc:hover { box-shadow: 0 8px 22px #1010103d, 0 0 0 1px #1010101f; }
+.dock-disc:focus-visible { outline: 2px solid var(--bold-ink); outline-offset: 3px; }
+
+/* 播放时上下浮动。2.4s 一周期、只走 3px：慢到不抢眼，又能看出「在转」。 */
+.dock-disc.playing { animation: dock-float 2400ms ease-in-out infinite; }
+@keyframes dock-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* 在转的时候外面套一圈细高光，比整块转起来轻 */
+.dock-disc.playing::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1px solid #1010101f;
+  animation: dock-halo 2400ms ease-in-out infinite;
+}
+@keyframes dock-halo {
+  0%, 100% { opacity: .35; transform: scale(1); }
+  50% { opacity: .8; transform: scale(1.04); }
+}
+
+/* 睡眠倒计时的角标：原来在底栏最右边那行小字，底栏删了得有地方去 */
+.dock-disc-sleep {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bold-lemon, #d9eb6c);
+  box-shadow: 0 0 0 2px var(--bold-bg);
+}
+
+/* 播放卡：从屏幕底部弹出来，像系统窗口那样「展开」而不是「滑入」。
+   原来是从圆碟正下方展开的，会盖住唱片柜右侧的介绍面板 —— 那块正是用户
+   要一边看一边挑的。改成底部抽屉：水平居中、贴住下沿，向上让出 18px 呼吸位。 */
+.play-card-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: transparent;
+}
+.play-card-veil.is-leaving { pointer-events: none; }
+
+.play-card {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: 41;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  padding: 18px 18px 14px;
+  border-radius: 26px;
+  background: var(--bold-ink);
+  color: var(--bold-bg);
+  box-shadow: 0 24px 60px #00000047, 0 0 0 1px #ffffff14;
+  /* 从底边中点长出来，而不是从中心放大：卡片贴着屏幕下沿，
+     以中心缩放会看起来「浮起来」，以底边缩放才是「从这里展开」。 */
+  transform-origin: 50% 100%;
+  animation: card-rise 420ms cubic-bezier(.32, .72, 0, 1) both;
+}
+/* 缩放幅度要够大才看得出来（0.94 几乎等于没动），但不必从 0 开始 ——
+   从 0.82 起步，前 40% 就把不透明度走完，剩下的时间只做「稳住」。 */
+@keyframes card-rise {
+  0% { opacity: 0; transform: translate(-50%, 26px) scale(.82); }
+  40% { opacity: 1; }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+/* 收回：比打开快一半，缩回原处并淡出。
+   窗口关闭动画总是比打开短 —— 收东西时人不想等。 */
+.play-card.is-leaving {
+  animation: card-fall 200ms cubic-bezier(.4, 0, 1, 1) both;
+}
+@keyframes card-fall {
+  0% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, 12px) scale(.9); }
+}
+
+/* 圆碟在卡片弹出时缩一下，把视线从它身上交出去。
+   用 :has 判断卡片是否开着 —— 圆碟和卡片不在同一个父节点里，没有别的抓手。
+   这里必须用独立的 scale 属性而不是 transform：.playing 的浮动动画占着 transform，
+   animation 优先级高于普通声明，写 transform 会被整条盖掉。
+   :not(.is-leaving) 是必须的：否则收回动画期间圆碟会提前弹回来，两件事同时动。 */
+body:has(.play-card:not(.is-leaving)) .dock-disc {
+  scale: .86;
+  opacity: .55;
+}
+
+.play-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.play-card-cover {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 12px;
+  background-color: #ffffff1f;
+  background-size: cover;
+  background-position: center;
+  color: #ffffff8c;
+}
+
+.play-card-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.play-card-copy b { font-size: 14px; font-weight: 700; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.play-card-copy small { font-size: 11px; color: #ffffff8c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.play-card-close {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff14;
+  color: #ffffffb3;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease;
+}
+.play-card-close:hover { background: #ffffff26; color: var(--bold-bg); }
+
+/* 波形：48 根柱子，高度由 JS 每帧写 --h（0–1） */
+.play-card-wave {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 46px;
+  margin: 16px 0 12px;
+}
+.play-card-wave > span {
+  flex: 1;
+  min-width: 2px;
+  height: calc(var(--h, 0) * 100%);
+  min-height: 2px;
+  border-radius: 2px;
+  background: var(--bold-bg);
+  opacity: calc(.35 + var(--h, 0) * .65);
+  transition: height 90ms linear, opacity 90ms linear;
+}
+
+.play-card-progress {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #ffffff73;
+  font-variant-numeric: tabular-nums;
+}
+.play-card-progress > span { flex: none; min-width: 30px; }
+.play-card-progress > span:last-of-type { text-align: right; }
+.play-card-progress input[type='range'] { flex: 1; }
+
+.play-card-transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 14px 0 12px;
+}
+
+/* 卡里的圆形按钮统一白底黑字，和外面的黑底白字反过来 */
+.play-card .icon-button {
+  background: #ffffff14;
+  color: var(--bold-bg);
+}
+.play-card .icon-button:hover:not(:disabled) { background: #ffffff26; }
+.play-card .icon-button:disabled { opacity: .35; }
+.play-card .main-play {
+  width: 44px;
+  height: 44px;
+  background: var(--bold-bg);
+  color: var(--bold-ink);
+}
+.play-card .icon-button.on { background: var(--bold-bg); color: var(--bold-ink); }
+.play-card .order-button { opacity: .7; }
+
+.play-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-top: 12px;
+  border-top: 1px solid #ffffff1a;
+  font-size: 10px;
+  color: #ffffff73;
+}
+.play-card-foot .master-slider { flex: 1; }
+.play-card-order { flex: none; font-weight: 600; letter-spacing: .02em; }
+
+/* 卡里的浅色滑杆：外部是黑底，轨道与填充都要换 */
+.play-card input[type='range'] {
+  background: linear-gradient(to right, var(--bold-bg) 0 var(--fill, 0%), #ffffff33 var(--fill, 0%) 100%);
+  height: 3px;
+}
+/* 卡里的通道按钮：斜线是绝对定位的，按钮自己必须是定位上下文，否则会跑到卡片中心 */
+.play-card .channel-toggle {
+  position: relative;
+}
+
+.play-card input[type='range']::-webkit-slider-thumb {
+  width: 11px;
+  height: 11px;
+  background: var(--bold-bg);
+  border: 0;
+}
+
+@media (max-width: 520px) {
+  .play-card { width: calc(100vw - 24px); padding: 16px 14px 12px; }
+  .play-card-wave { height: 34px; }
+  .dock-disc-slot { left: calc(100% + 8px); }
+  .dock-disc { width: 38px; height: 38px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dock-disc.playing,
+  .dock-disc.playing::after { animation: none; }
+  .play-card { animation: none; }
+  .play-card-wave > span { transition: none; }
+  .dock-disc { transition: none; }
+  /* 卡片弹出时圆碟那一下缩放也去掉，只留透明度提示 */
+  body:has(.play-card) .dock-disc { scale: none; }
+}
+
+/* 窄屏：页签栏本身就占满一行，圆碟挂在外面会顶出屏幕。
+   先把页签栏的上限压住（留出圆碟 + 间距），再收起唱片柜后面那个计数给它腾地方。 */
+@media (max-width: 599px) {
+  .view-tabs { max-width: calc(100% - 46px); }
+  .view-tabs > button { padding: 8px 8px; gap: 4px; }
+  .view-tabs > button small { display: none; }
+  .dock-disc-slot { left: calc(100% + 8px); }
+  .dock-disc { width: 38px; height: 38px; }
+}
+
+/* ---------- 添加按钮的反馈（第二十批） ---------- */
+
+/* 两个「加一个声音」的入口：唱片柜底部那条虚线，和每张唱片名前面的小圆圈。
+   都是加法，反馈就统一成「按下去缩一下、松开的时候转半圈」——
+   转的方向和唱片的转向一致，看起来像把新唱片放上转盘。 */
+
+.add-to-shelf {
+  /* 单独把 transform 拿出来，避免动到基础样式里的布局属性 */
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.16s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.add-to-shelf:not(:disabled):active {
+  transform: scale(0.985);
+}
+/* 图标本身在被按下时转一点，按钮整体不动，读起来更轻 */
+.add-to-shelf > svg {
+  transition: transform 0.22s cubic-bezier(0.23, 1, 0.32, 1);
+}
+.add-to-shelf:not(:disabled):hover > svg {
+  transform: rotate(90deg);
+}
+.add-to-shelf:not(:disabled):active > svg {
+  transform: rotate(135deg);
+}
+
+/* 圆圈加号：用一条会收放的十字线，不用字符，这样不同浏览器里粗细一致。
+   未选中时是「+」，选中后变成对勾或序号，所以只在未选中态画十字。 */
+.select-record {
+  position: relative;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.16s cubic-bezier(0.23, 1, 0.32, 1);
+}
+/* 加进去时荡开的淡环，由 RecordCard 用 WAAPI 创建和移除 */
+.select-ring {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1px solid var(--bold-ink);
+  pointer-events: none;
+}
+.select-record:not(:disabled):active {
+  transform: scale(0.88);
+}
+/* 悬停时圆圈微微放大，暗示「这里可以点」 */
+@media (hover: hover) and (pointer: fine) {
+  .select-record:not(:disabled):hover {
+    transform: scale(1.08);
+  }
+}
+
+/* 刚加进队列的那一下：圆圈弹一下、外面荡开一圈淡环，告诉用户「已经进去了」。
+   触发不用 class 切换而用 Web Animations（在 RecordCard 里调），
+   因为 CSS animation 在同一个元素上重加一次同名 class 不会重播，
+   而用户完全可能连着点两下同一张。 */
+
+/* 减少动画：只留下颜色变化，去掉位移、缩放与扩散环 */
+@media (prefers-reduced-motion: reduce) {
+  .add-to-shelf,
+  .add-to-shelf > svg,
+  .select-record {
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+  }
+  .add-to-shelf:not(:disabled):active,
+  .add-to-shelf:not(:disabled):hover > svg,
+  .select-record:not(:disabled):active,
+  .select-record:not(:disabled):hover {
+    transform: none;
+  }
+}

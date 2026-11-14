@@ -1,0 +1,400 @@
+/* ==========================================================================
+ * controls.css —— 通用控件：滑杆、开关、按钮、分页、弹窗、提示条
+ *
+ * 层叠顺序 4/10（接在 shelf.css 之后，rooms.css 接在后面）。
+ * 顺序由 skin-bold.css 里的 @import 决定，改顺序会改变渲染结果。
+ * 本文件由 tools/probe/split-css.mjs 从单文件切出，切分时逐属性比对过
+ * 12 份计算样式快照（无差异），所以内容与原文件等价。
+ * ========================================================================== */
+/* ---------- 滑杆 ---------- */
+.slider-field > span {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--bold-muted);
+}
+.slider-field output { font: 600 11px "Inter", sans-serif; color: var(--bold-ink); }
+
+/* 数字：平时是一行文字，点上去才变成输入框。
+   原来常驻一个带 padding 的 number input，会自己撑出一块方框、和标签挤在一起；
+   改成「只读文本 → 点击变输入」，安静得多。 */
+.slider-field .slider-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  margin-left: auto;
+}
+.slider-field .slider-read {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: 600 11px "Inter", sans-serif;
+  color: var(--bold-ink);
+  font-variant-numeric: tabular-nums;
+  cursor: text;
+  border-radius: 5px;
+  transition: background 0.14s ease;
+}
+.slider-field .slider-read:hover { background: var(--bold-sunken); }
+.slider-field .slider-read:focus-visible { outline: 2px solid var(--bold-ink); outline-offset: 2px; }
+
+/* 编辑态：贴着数字原来的位置长出一个同样大小的输入框，宽度由字符数决定，
+   不用固定 38px —— 那会把「0」也撑成一格宽，和百分号之间空出一大块。 */
+.slider-field .slider-number {
+  width: 3.2ch;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: var(--bold-sunken);
+  font: 600 11px "Inter", sans-serif;
+  color: var(--bold-ink);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 1.5px var(--bold-ink);
+  /* 去掉数字框自带的两条上下箭头：这里一格就是 1，用键盘上下键更准 */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.slider-field .slider-number::-webkit-outer-spin-button,
+.slider-field .slider-number::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
+.slider-field .slider-number:focus { outline: none; }
+.slider-field > span em {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--bold-muted);
+  margin-left: 1px;
+}
+input[type="range"] {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--bold-ink) 0 var(--fill), #eceae5 var(--fill) 100%);
+  margin: 14px 0 8px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  width: 15px;
+  height: 15px;
+  background: var(--bold-ink);
+  border: 3px solid var(--bold-edge);
+  border-radius: 50%;
+  box-shadow: 0 1px 4px #0000002e;
+}
+.dock-bottom input[type="range"] {
+  background: linear-gradient(to right, var(--bold-bg) 0 var(--fill), #ffffff2e var(--fill) 100%);
+}
+.dock-bottom input[type="range"]::-webkit-slider-thumb {
+  background: var(--bold-ink);
+  border-color: var(--bold-edge);
+  box-shadow: none;
+}
+
+/* ---------- 声音微调 ---------- */
+.sound-tweaks { border-top: 1px solid var(--bold-line); margin-top: 20px; padding-top: 14px; }
+.sound-tweaks summary {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bold-muted);
+}
+.sound-tweaks summary:hover { color: var(--bold-ink); }
+.tweak-help { font-size: 10px; line-height: 1.8; color: var(--bold-faint); }
+
+/* ---------- 开关 ---------- */
+.toggle {
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  padding: 3px;
+  background: #e4e2dc;
+}
+.toggle span {
+  width: 20px;
+  height: 20px;
+  background: var(--bold-surface);
+  box-shadow: 0 1px 3px #00000026;
+}
+.toggle.on { background: var(--bold-ink); }
+.toggle.on span { transform: translateX(18px); }
+
+/* ---------- 底部致谢 ---------- */
+.dedication { padding: 26px 0 18px; }
+.dedication > span:first-child {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.6px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.dedication p {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--bold-muted);
+  margin: 12px 0 14px;
+}
+.dedication-signature { font: 500 11px "Inter", sans-serif; color: var(--bold-faint); }
+
+/* ---------- 空状态 ---------- */
+.empty-cabinet { padding: 30px 4px 26px; }
+.empty-art { width: 158px; margin: 0 auto 24px; perspective: none; }
+.showcase-case { transform: none; }
+.showcase-case .case-front { transform: none; }
+.showcase-case .cover-title { font: 700 26px/1.2 "Inter", sans-serif; letter-spacing: -0.8px; top: auto; bottom: 34px; }
+.shelf-line {
+  height: 1px;
+  background: var(--bold-line);
+  box-shadow: none;
+  margin: 0 0 26px;
+}
+.empty-copy > span {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.6px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.empty-copy h2 {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.4;
+  letter-spacing: -0.4px;
+  color: var(--bold-ink);
+  margin: 12px 0 10px;
+}
+.empty-copy p { font-size: 12px; color: var(--bold-muted); line-height: 1.8; }
+
+.empty-notes { padding-top: 6px; }
+.empty-notes > svg { color: var(--bold-faint); margin: 34px 0 22px; }
+.empty-notes > p {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: -0.4px;
+  color: var(--bold-ink);
+}
+.empty-notes em { font-style: normal; color: var(--bold-faint); }
+.empty-notes small { font-size: 11px; line-height: 2; color: var(--bold-muted); }
+
+.no-results { padding: 44px 5px; color: var(--bold-faint); min-height: 240px; }
+.no-results p { font-size: 13px; color: var(--bold-muted); margin: 18px 0; }
+
+/* ---------- 分页 ---------- */
+.shelf-pager { gap: 8px; margin: 20px 0 4px; }
+/* 票根的翻页条。按钮样式直接复用下面这套圆钮，这里只补排布——
+   styles.css 里 `.shelf-pager` 才带 display:flex，票根这层得自己给。 */
+.ticket-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 20px 0 4px;
+}
+.pager-arrow {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--bold-ink);
+  border: 1px solid var(--bold-line);
+  background: var(--bold-surface);
+}
+.pager-arrow:not(:disabled):hover { background: var(--bold-ink); color: var(--bold-on-dark); border-color: var(--bold-ink); }
+.pager-numbers { gap: 6px; }
+.pager-numbers button {
+  min-width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  font: 600 12px "Inter", sans-serif;
+  color: var(--bold-muted);
+  border: 1px solid transparent;
+  background: transparent;
+}
+.pager-numbers button.active {
+  background: var(--bold-ink);
+  color: var(--bold-on-dark);
+  border-color: var(--bold-ink);
+}
+.pager-numbers button:not(.active):hover { background: var(--bold-sunken); color: var(--bold-ink); }
+
+/* ---------- 按钮 ---------- */
+.primary-button,
+.secondary-button {
+  padding: 13px 22px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 8px;
+}
+.primary-button {
+  background: var(--bold-ink);
+  color: var(--bold-on-dark);
+  border: 1px solid var(--bold-ink);
+  box-shadow: none;
+}
+.primary-button:not(:disabled):hover {
+  background: var(--bold-solid);
+  color: var(--bold-on-dark);
+  box-shadow: none;
+}
+.secondary-button {
+  border: 1px solid var(--bold-line);
+  background: var(--bold-surface);
+  color: var(--bold-ink);
+}
+.secondary-button:not(:disabled):hover { background: var(--bold-page); color: var(--bold-ink); border-color: #d8d6cf; }
+
+/* ---------- 弹窗 ---------- */
+.modal {
+  background: var(--bold-surface);
+  color: var(--bold-ink);
+  border: 0;
+  outline: 0;
+  border-radius: 28px;
+  box-shadow: 0 30px 90px #0000002b;
+  max-width: 470px;
+  max-height: 88dvh;
+}
+.modal::backdrop { background: #10101040; backdrop-filter: blur(6px); }
+.modal-content { padding: 32px 30px; }
+.modal-close {
+  right: 18px;
+  top: 18px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--bold-line);
+  background: var(--bold-surface);
+  color: var(--bold-ink);
+}
+.modal-close:not(:disabled):hover { background: var(--bold-ink); color: var(--bold-on-dark); border-color: var(--bold-ink); }
+.eyebrow {
+  font: 700 9px/1 "Inter", sans-serif;
+  letter-spacing: 1.5px;
+  color: var(--bold-faint);
+  text-transform: uppercase;
+}
+.modal h2 {
+  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.7px;
+  color: var(--bold-ink);
+  margin-top: 14px;
+}
+.modal-lead { font-size: 12px; color: var(--bold-muted); margin-top: 8px; line-height: 1.7; }
+
+.import-types { gap: 12px; margin: 24px 0 20px; }
+.import-types button {
+  padding: 18px 16px;
+  border: 1px solid var(--bold-line);
+  border-radius: 18px;
+  background: var(--bold-surface);
+  color: var(--bold-ink);
+}
+.import-types button:hover { background: var(--bold-page); color: var(--bold-ink); }
+.import-types button.selected {
+  border-color: var(--bold-ink);
+  background: var(--bold-page);
+  box-shadow: 0 0 0 1px var(--bold-ink);
+  color: var(--bold-ink);
+}
+.import-types strong { font-size: 13px; font-weight: 700; margin-top: 12px; color: var(--bold-ink); }
+.import-types small { font-size: 11px; color: var(--bold-muted); margin-top: 6px; line-height: 1.6; }
+
+.import-help { font-size: 11px; line-height: 1.9; color: var(--bold-faint); margin-top: 18px; }
+.import-report {
+  background: var(--bold-page);
+  border: 0;
+  border-radius: 14px;
+  padding: 14px;
+  margin-top: 16px;
+  color: #55554f;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.text-field { font-size: 11px; color: var(--bold-muted); margin: 18px 0; font-weight: 500; }
+.text-field input,
+.text-field textarea {
+  border: 1px solid var(--bold-line);
+  border-radius: 14px;
+  background: #f9f8f5;
+  padding: 13px;
+  color: var(--bold-ink);
+  font-size: 13px;
+  line-height: 1.7;
+  margin-top: 8px;
+}
+.text-field input:focus,
+.text-field textarea:focus {
+  outline: 2px solid var(--bold-ink);
+  outline-offset: 0;
+  background: var(--bold-surface);
+}
+.text-field textarea::placeholder { color: var(--bold-faint); }
+.remove-record { color: var(--bold-danger); margin-top: 24px; }
+.remove-record:hover { color: var(--bold-danger-deep); }
+
+.settings-group { border-bottom: 1px solid var(--bold-line); padding-bottom: 22px; margin-top: 24px; }
+.settings-group h3 { font-size: 13px; font-weight: 700; color: var(--bold-ink); letter-spacing: -0.1px; }
+.settings-group > p { font-size: 11px; color: var(--bold-muted); margin: 8px 0 12px; line-height: 1.7; }
+.settings-group > .text-button { margin-top: 14px; }
+
+.sleep-select { font-size: 12px; color: var(--bold-muted); margin-top: 16px; }
+.sleep-select select {
+  background: var(--bold-page);
+  border: 1px solid var(--bold-line);
+  border-radius: 999px;
+  color: var(--bold-ink);
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.guide-steps { margin-top: 24px; }
+.guide-steps p { font-size: 12px; line-height: 1.8; color: var(--bold-muted); padding-bottom: 20px; padding-left: 34px; }
+.guide-steps strong { font-size: 13px; font-weight: 700; color: var(--bold-ink); margin-bottom: 5px; }
+.guide-steps p > span { font: 700 10px "Inter", sans-serif; color: var(--bold-faint); }
+
+/* 换唱片的方式：三选一胶囊 */
+.transition-options { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.transition-options button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 13px 16px;
+  border: 1px solid var(--bold-line);
+  border-radius: 16px;
+  background: var(--bold-surface);
+  text-align: left;
+  color: var(--bold-ink);
+}
+.transition-options button:hover { background: var(--bold-page); color: var(--bold-ink); }
+.transition-options button[aria-checked="true"],
+.transition-options button.chosen {
+  border-color: var(--bold-ink);
+  box-shadow: 0 0 0 1px var(--bold-ink);
+  background: var(--bold-page);
+}
+.transition-options strong { font-size: 13px; font-weight: 700; }
+.transition-options small { font-size: 11px; color: var(--bold-muted); line-height: 1.6; }
+
+/* ---------- 提示条 ---------- */
+.toast,
+.motion-notice {
+  bottom: 152px;
+  background: var(--bold-ink);
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 10px 30px #00000033;
+  padding: 14px 24px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--bold-on-dark);
+  backdrop-filter: none;
+}
+.toast svg, .motion-notice svg { color: var(--bold-on-dark); }

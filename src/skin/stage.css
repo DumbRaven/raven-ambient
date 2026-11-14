@@ -1,0 +1,1452 @@
+/* ==========================================================================
+ * stage.css —— 放映：三套版式、换件换碟、透明模式、雨、乌鸦
+ *
+ * 层叠顺序 9/10（接在 gallery.css 之后，collage.css 接在后面）。
+ * 顺序由 skin-bold.css 里的 @import 决定，改顺序会改变渲染结果。
+ * 本文件由 tools/probe/split-css.mjs 从单文件切出，切分时逐属性比对过
+ * 12 份计算样式快照（无差异），所以内容与原文件等价。
+ * ========================================================================== */
+/* ---------- 放映：三套版式 ---------- */
+
+/* 台面本身要有高度。模板是 position:absolute 铺满的，它撑不开父元素，
+   所以父元素必须自己定高——用 aspect-ratio 定比例，再用 max-height 按视口收，
+   否则在 900 高的窗口里播放台会把下面全挤出屏幕。
+
+   注意只写 aspect-ratio 不写 width 时，宽度是 auto，浏览器会反过来用 max-height
+   倒推宽度（实测被压到 543px，右边露一块黑底）。所以 width 必须显式 100%。 */
+.media-room .media-theater .theater-screen {
+  position: relative;
+  /* 锁死 16:9。版式的比例是画的一部分——窗口一变高变矮整块排版就散了，
+     所以宁可让下面滚动，也不让台面自己改比例。
+     宽度吃满、高度由宽度推出来，任何窗口比例下版式都长一样。 */
+  width: 100%;
+  background: transparent;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  /* 只有视口特别矮时才收一档，否则 16:9 的台面会高到把控制条顶出屏幕。
+     这一档按「宽度优先」算：min 里取小的那个，收的是极端情况。 */
+  max-height: min(70vh, calc(100vw * 9 / 16));
+  overflow: hidden;
+}
+
+/* 版式套在播放台里面，铺满 .theater-screen。
+   三套共用同一个外框，只在里面长不同的东西，所以切换时不会跳布局。 */
+.media-theater .theater-screen > .template {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--tpl-base, var(--bold-ink));
+}
+
+/* 拼贴里每一块都是一张「裁好的照片」，不是「完整展示的图」。
+   所以一律 cover——选 contain 会在块里留下黑边，那套版式的语法就散了。
+   选择器带 .template 前缀，压过前面那条给普通图片留的 contain。 */
+/* 选择器必须比 .media-theater[data-kind='image'] .theater-screen img（0,3,1）更长，
+   否则 width:100% / height:auto 那套会盖过来，图按原比例缩在块中间、两侧留黑边。 */
+.media-theater .template .tpl-block-media img,
+.media-theater .template .tpl-block-media video,
+.media-theater .template .tpl-photo-media img,
+.media-theater .template .tpl-photo-media video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* ---------- 换件：画面淡入 + 轻微推近 ----------
+   换图/换视频时 React 会按 `key`（item.id）整块重挂载，这条动画自然从头播一次，
+   所以不需要状态类，也不用管「什么时候移除类名」。
+
+   为什么是「淡入 + 从 1.03 推回 1」而不是滑入：画面是一整块裁好的照片，
+   横向滑进来会让人以为是列表在翻页；放大着落定才像「聚焦到这一张」。
+
+   一帧都不能从黑底开始——原来换件时旧图先卸载、新图还在解码，中间会闪一下底色。
+   淡入从 0 起，正好盖住解码那一下。 */
+@keyframes tpl-media-in {
+  from {
+    opacity: 0;
+    scale: 1.03;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+.media-theater .template .tpl-media {
+  animation: tpl-media-in 420ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  /* 放大那一下会超出块边界，裁掉；父级本来就有 overflow: hidden，
+     但拼贴的画面块圆角是靠父级裁的，这里不裁会在圆角外侧露出一条边。 */
+  will-change: opacity, scale;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-theater .template .tpl-media {
+    animation: none;
+  }
+}
+
+
+/* 三块内容各自钉死在自己的格子里。缝本身不画东西，露出底下的画布色。 */
+.template-collage .tpl-block {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tpl-block-media {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+
+/* 信息条只有 105px 高（305 的 27.4%），三组内容必须压得很紧才放得下。
+   实测按默认间距排，「PLAYLIST」那行会被控制条压住。 */
+
+
+.tpl-block-bar .tpl-fields { gap: 0; }
+.tpl-block-bar .tpl-fields > div { gap: 0; }
+.tpl-block-bar .tpl-fields span { font-size: 11px; line-height: 1.2; }
+.tpl-block-bar .tpl-list { padding-right: 0; gap: 0; }
+.tpl-block-bar .tpl-list span { font-size: 8.5px; line-height: 1.3; }
+
+/* 右列：一整条竖面板，从顶到底，跨越上下两行。 */
+
+
+.tpl-dot-tl { top: 10px; left: 10px; }
+.tpl-dot-tr { top: 10px; right: 10px; }
+.tpl-dot-bl { bottom: 10px; left: 10px; }
+.tpl-dot-br { bottom: 10px; right: 10px; }
+
+
+/* with + 三个平台 + 三个小图标 */
+.tpl-with {
+  margin: 16px 0 0;
+  display: grid;
+  gap: 1px;
+  font-size: 8.5px;
+  line-height: 1.45;
+  opacity: 0.72;
+}
+
+/* 窗口态下这块只有 220px 宽，8.5px 已经到可读下限；
+   再小就只剩灰点，看不出是字。 */
+
+.tpl-with i { font-style: normal; }
+.tpl-with em {
+  display: block;
+  font-style: normal;
+  letter-spacing: 0.26em;
+  margin-top: 4px;
+  opacity: 0.8;
+}
+
+/* pick by vanilla soda：左对齐小字，靠底部但不贴边——右下角要留给彩胶。 */
+/* 圆压在面板下半截，pick by 只能缩在它左侧那一窄条里。
+   原版就是这么处理的——字很轻，压在画面边上，不抢圆。 */
+/* 圆从面板 48% 高度起、往左下伸出 -10%，所以左下这块只有很窄一条安全区。
+   pick by 缩在那一窄条里，字很小、很轻，压在画面边上，不抢圆。 */
+/* 紧跟在 with 下面，不是被推到面板底部——原版就是一路排下来的，
+   底部那大片空白是留给彩胶的。 */
+.tpl-pick {
+  margin: 26px 0 0;
+  width: auto;
+  font-size: 7px;
+  line-height: 1.55;
+  opacity: 0.72;
+  position: relative;
+  z-index: 6;
+}
+
+
+/* 星的位置统一在文件末尾那套 `.template-collage .tpl-star-*` 里定义。
+   这里原来是 px 写法（`top: 42px; right: 6px`），非 collage 版式用不上，
+   而 collage 版式下它会被末尾那套按实测换来的百分比覆盖，属于死规则。 */
+
+
+.tpl-fields > div {
+  display: grid;
+  gap: 2px;
+}
+
+.tpl-fields b,
+.tpl-list b {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.62;
+}
+
+.tpl-fields span {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.tpl-list span {
+  font-size: 9px;
+  line-height: 1.4;
+  opacity: 0.7;
+}
+
+
+/* 内圈：正在放的那张封面。拿不到封面就只留盘面，不画空洞。 */
+.tpl-disc-label {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 38%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background-color: var(--disc-groove);
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px #ffffff40;
+}
+
+/* 中心孔 */
+.tpl-disc-hole {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4.5%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--tpl-panel);
+  box-shadow: 0 0 0 1px #ffffff33;
+}
+
+
+/* 唱片跟着音乐转。原版（唱片柜里的 .vinyl）是 10s 一圈、用 animation-play-state
+   控制启停；这里沿用同一节奏。
+
+   有个坑必须写下来：唱片是靠 `transform: translate(-50%, -50%)` 居中的，
+   而 keyframes 里如果写 `transform: rotate(...)`，整个 transform 会被替换掉，
+   唱片会瞬间跳到右下去——这也是之前它一直不转的原因之一（keframes 定义了，
+   但没有一条规则引用它，所以没人发现这层冲突）。
+   所以旋转动画走**独立的 `rotate` 属性**：它和 `transform` 相加，不会互相覆盖。 */
+@keyframes tpl-disc-spin {
+  from { rotate: 0deg; }
+  to { rotate: 360deg; }
+}
+
+/* 启停不写在这里：`.spinning` 只改 animation-play-state，
+   具体挂哪两条动画见下面「换碟」那一段末尾——两处都写 animation 会互相顶掉。 */
+
+/* ---------- 换碟：入场 + 高光扫过 ----------
+   新碟从逆时针 90° 转回来、略小一点、淡入，520ms 落定；
+   落定的同时一道高光从左扫到右，像唱片被放到转盘上时反的那一下光。
+   不位移、不改版式尺寸——右上那块和面板的圆弧咬得很紧，一动就会露缝。
+
+   触发方式：TemplateStage 把 `key` 挂在唱片身份上（唱片 id / 外部曲目名），
+   换碟时 React 重建这个节点，动画自然从头播一次。所以这里不需要状态类，
+   也不需要用 JS 加/删类名——那种做法还得管「什么时候移除」。
+
+   三个属性都用独立的 `rotate` / `scale`：它们和 `transform`（居中用的
+   translate(-50%,-50%)）相加而不是覆盖，所以碟不会跳到右下角去。 */
+@keyframes tpl-disc-enter {
+  /* 只写 from 的 opacity，让 to 取元素自己的值——
+     待机态是 0.72、有碟时是 1，同一条动画两种亮度都对。
+     写死 to { opacity: 1 } 会让待机碟在动画期间亮一下再暗回去。 */
+  from { opacity: 0; rotate: -90deg; scale: 0.94; }
+  to { rotate: 0deg; scale: 1; }
+}
+
+@keyframes tpl-disc-sheen {
+  from { opacity: 0; transform: translateX(-42%); }
+  40% { opacity: 1; }
+  to { opacity: 0; transform: translateX(42%); }
+}
+
+/* 唱片上永远挂两条动画：入场（只播一次）和自转。
+   自转用 animation-play-state 而不是加/删 animation——原版 .vinyl 就是这么做的。
+   这样暂停时碟停在当前角度，续播从那个角度接着转，不会跳回 0°。
+   入场之后自转才起步（delay 520ms），两条动画各自改各自的属性，不打架。 */
+.template-collage .tpl-disc {
+  animation:
+    tpl-disc-enter 520ms cubic-bezier(0.22, 0.61, 0.36, 1) 1,
+    tpl-disc-spin 10s linear infinite 520ms;
+  animation-play-state: running, paused;
+}
+
+.template-collage .tpl-disc.spinning {
+  animation-play-state: running, running;
+}
+
+/* 高光：叠在沟槽层之上的薄薄一条斜光，只在入场那 300ms 出现。 */
+.template-collage .tpl-disc::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(100deg, #ffffff00 36%, #ffffff5c 50%, #ffffff00 64%);
+  opacity: 0;
+  animation: tpl-disc-sheen 300ms ease-out;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .template-collage .tpl-disc { animation: none; }
+  .template-collage .tpl-disc::after { animation: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .template-collage .tpl-disc,
+  .template-collage .tpl-disc.spinning,
+  .template-collage .tpl-disc::after { animation: none; }
+  .template-collage .tpl-disc.spinning { rotate: none; }
+}
+
+/* ---------- 相集：整张铺满，一个字都没有 ----------
+   原来这里还有手写体标题、署名、右下曲目列，以及为了「白字在任何画面上都读得出来」
+   而压的一层由下往上的暗角。用户 m12760 要的是「保持纯净，不要加文字，让用户自己
+   加组件」，所以三块字全撤，暗角也跟着撤——没有字要托，再压一层就只是在弄脏照片。 */
+
+.template-photo {
+  background: #0d0d0d;
+}
+
+.tpl-photo-media {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---------- 透明：没有底，桌面壁纸就是底 ---------- */
+
+/* 这一套版式自己不画任何东西：画面、底色、裁切全部交给桌面。
+   窗口在 Electron 里是 `transparent: true`，所以 `.template` 那层
+   `background: var(--tpl-base)` 必须在这里让出来，否则整块会被一块
+   深色底盖住，壁纸根本透不上来。
+
+   注意作用域：只落在 `.template-desktop` 上。拼贴和照片两套版式
+   照旧吃那条 `--tpl-base` 兜底。 */
+.template-desktop,
+.media-theater .theater-screen > .template.template-desktop {
+  background: transparent;
+  /* 圆角和溢出裁切也不需要——没有画面块可裁 */
+  border-radius: 0;
+  overflow: visible;
+}
+
+/* 主窗口里的预览：那扇窗不透明，透明区域会露出窗口底色（`.theater-screen`
+   自己是黑的）。铺一层近黑幕布，让「这里是空的」一眼看得出来；
+   真正放到桌面时才由窗口透明性接上壁纸。
+
+   选择器必须和上面那条 transparent 一样长：两条都是 0,4,0，
+   靠「后加载的赢」分胜负。只写 `.template-desktop`（0,1,0）会被它压过去，
+   实测预览里看不到这层幕布，只有一片纯黑。 */
+.media-theater .theater-screen > .template.template-desktop {
+  background: radial-gradient(120% 90% at 50% 40%, #1b1f27 0%, #0b0e13 62%, #05070a 100%);
+}
+
+/* 放到桌面时把这块幕布也去掉——那扇窗自己透明。 */
+.desktop-stage .template-desktop,
+.desktop-stage .media-theater .theater-screen > .template.template-desktop {
+  background: transparent;
+}
+
+/* ---------- 透明模式的组件 ---------- */
+
+/* 一整层铺满，里面的组件按比例坐标定位。
+   整层不接指针（它只是画），能拖的是每块组件自己——
+   否则空白处的点击会被这层吃掉，桌面图标就点不了了。 */
+.desktop-widgets {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.desktop-widgets-empty {
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.desktop-widgets-empty p {
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: #0000003d;
+  border: 1px solid #ffffff1f;
+  color: #ffffffb8;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+/* 每一块：按中心点摆（--wx/--wy 是中心的比例坐标）。
+   用 translate(-50%,-50%) 而不是给 left/top 减半宽高——
+   宽高是按内容算的，预先不知道。 */
+.dw {
+  position: absolute;
+  left: var(--wx);
+  top: var(--wy);
+  translate: -50% -50%;
+  color: var(--bold-bg);
+  /* 压在壁纸上的字必须自带一层底：壁纸可能是白雪山也可能是黑森林，
+     单靠字色在任何一边都会有一半读不出来。
+     做法是「细描边 + 柔和阴影」而不是加背景板——背景板会遮住壁纸。 */
+  text-shadow:
+    0 0 1px #000000b8,
+    0 1px 2px #000000a6,
+    0 2px 14px #0000008f;
+  -webkit-text-stroke: 0.012em #00000059;
+  paint-order: stroke fill;
+  user-select: none;
+  opacity: 0;
+  animation: dw-enter 420ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+}
+
+.dw[data-editable='true'] {
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.dw.is-dragging {
+  cursor: grabbing;
+  /* 拖动时抬一点、加一层投影：手指按住的那块要「离屏幕更近」 */
+  translate: -50% -50%;
+  scale: 1.03;
+  filter: drop-shadow(0 8px 24px #00000080);
+}
+
+@keyframes dw-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 时钟：这一层最大的数字，靠字号撑主角感。 */
+.dw-clock {
+  display: block;
+  font-family: "SF Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  font-size: calc(86px * var(--wscale));
+  font-weight: 300;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.dw-date {
+  display: block;
+  font-size: calc(17px * var(--wscale));
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.86;
+}
+
+.dw-title {
+  display: block;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-size: calc(30px * var(--wscale));
+  font-weight: 700;
+  letter-spacing: 0.004em;
+  line-height: 1.15;
+  max-width: 62vw;
+  text-align: center;
+}
+
+.dw-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "SF Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  font-size: calc(20px * var(--wscale));
+  font-variant-numeric: tabular-nums;
+}
+
+.dw-timer i {
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  background: #ff8a5c;
+  box-shadow: 0 0 10px #ff8a5c9e;
+}
+
+.dw-now {
+  display: block;
+  font-size: calc(14px * var(--wscale));
+  letter-spacing: 0.05em;
+  opacity: 0.9;
+  max-width: 44vw;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 唱片：黑胶带彩胶质感，和放映台那枚同一套语汇，只是更简。
+   直径跟屏幕高度挂钩，缩放才跟着 --wscale 走。 */
+.dw-disc {
+  display: block;
+  width: var(--disc-size);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #0d0d0f 0 6%, #17181b 6% 8%, #0d0d0f 8% 36%, #17181b 36% 37.4%, #0d0d0f 37.4% 100%);
+  box-shadow:
+    0 0 0 1px #ffffff1f,
+    0 12px 36px #0000008a;
+  position: relative;
+  rotate: 0deg;
+  animation: dw-enter 420ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards, dw-spin 12s linear infinite paused;
+}
+
+.dw-disc.is-spinning {
+  animation-play-state: running, running;
+}
+
+.dw-disc-label {
+  position: absolute;
+  inset: 30%;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: #9a8b78;
+  box-shadow: inset 0 0 0 1px #ffffff24;
+}
+
+.dw-disc-hole {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3.2%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #0b0c0e;
+  translate: -50% -50%;
+}
+
+@keyframes dw-spin {
+  to { rotate: 360deg; }
+}
+
+/* 删除按钮：只在可编辑时出现，悬停才显形。
+   一直挂着会像图钉，压在整个桌面上太吵。 */
+.dw-kill {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #101010d9;
+  color: #ffffffcc;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  box-shadow: 0 2px 8px #00000073;
+}
+
+.dw[data-editable='true']:hover .dw-kill,
+.dw-kill:focus-visible {
+  opacity: 1;
+}
+
+.dw-kill:hover {
+  background: #b3392be6;
+  color: var(--bold-bg);
+}
+
+/* 缩放手柄：右下角一颗小圆点，往外拖变大、往里拖变小。
+   平时不显示，悬停那块才出来——六块元素各挂一颗常驻的圆点，
+   铺在桌面上就成了图钉阵。 */
+.layer-grip {
+  position: absolute;
+  right: -18px;
+  bottom: -14px;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #ffffff59;
+  border-radius: 50%;
+  background: #101010d9;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  touch-action: none;
+  box-shadow: 0 2px 8px #00000073;
+}
+
+/* 右下角那个小折角就是「这里能拖大」的图示，不用箭头省得和图钉抢眼 */
+.layer-grip::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid #ffffffcc;
+  border-bottom: 1.5px solid #ffffffcc;
+  translate: -1px -1px;
+}
+
+.overlay:hover .layer-grip,
+.dw[data-editable='true']:hover .layer-grip,
+.layer-grip:focus-visible {
+  opacity: 1;
+}
+
+.layer-grip:hover {
+  border-color: #ffffffb3;
+  background: #2a2a2ae6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dw,
+  .dw-disc {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* ---------- 窄屏：拼贴改上下排 ---------- */
+
+/* 窄屏第一处：拼贴压成单列——已删除。
+   拼贴版是固定比例排版，窗口小的时候整体等比缩，不改结构；
+   压成单列会让右列两轨变成 0px，面板和唱片直接不渲染。 */
+@media (max-width: 760px) {
+  .tpl-block-media {
+    grid-column: 1;
+    grid-row: 1;
+  }
+}
+
+
+.media-room.is-expanded .tpl-note { font-size: 15px; margin-top: 26px; }
+.media-room.is-expanded .tpl-with { font-size: 15px; margin-top: 30px; }
+.media-room.is-expanded .tpl-with em { font-size: 14px; margin-top: 8px; }
+
+
+.media-room.is-expanded .tpl-pick { font-size: 13px; width: 22%; }
+.media-room.is-expanded .tpl-fields b,
+.media-room.is-expanded .tpl-list b { font-size: 13px; }
+.media-room.is-expanded .tpl-fields span { font-size: 17px; max-width: 30ch; }
+.media-room.is-expanded .tpl-list span { font-size: 15px; }.media-room.is-expanded .tpl-block-bar { padding: 4% 14% 4% 3%; }
+.media-room.is-expanded .tpl-block-panel { padding: 34px 30px 38px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .template * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- 放映：叠加元素 ---------- */
+
+/* 铺满整个画面的一块透明层，里面的每块元素按自己的百分比坐标定位。
+   坐标存的是 0–1 的比例，换个窗口大小位置才不会跑。 */
+.overlay-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.overlay {
+  position: absolute;
+  left: var(--ox, 50%);
+  top: var(--oy, 50%);
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  /* 底下可能是任何颜色的画面，所以文字统一靠阴影立住，不靠底色块 */
+  text-shadow: 0 2px 18px #00000073, 0 1px 3px #00000059;
+  transition: opacity 160ms ease;
+}
+
+.overlay.is-dragging {
+  cursor: grabbing;
+  opacity: 0.86;
+}
+
+/* 悬停时给一圈虚线，告诉用户「这块能拖」。平时不显示，免得压画面。 */
+.overlay::after {
+  content: '';
+  position: absolute;
+  inset: -10px -14px;
+  border: 1px dashed #ffffff00;
+  border-radius: 10px;
+  transition: border-color 160ms ease;
+}
+
+.overlay:hover::after {
+  border-color: #ffffff5c;
+}
+
+.overlay.is-dragging::after {
+  border-color: #ffffffa6;
+}
+
+.overlay-clock .ov-clock {
+  display: block;
+  font-family: "Segoe UI", Inter, system-ui, sans-serif;
+  /* 外层那个 clamp 是「这个窗口该多大」，后面的 --oscale 是「用户自己调了多大」。
+     两者相乘：换窗口不会丢掉用户的调整，调了也不会因为换窗口被打回原样。 */
+  font-size: calc(clamp(38px, 5.2vw, 76px) * var(--oscale, 1));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: var(--bold-bg);
+}
+
+.overlay-title .ov-title {
+  display: block;
+  max-width: 62vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Segoe Script", "Bradley Hand", "Ink Free", cursive;
+  font-size: calc(clamp(18px, 2.2vw, 34px) * var(--oscale, 1));
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--bold-bg);
+}
+
+.overlay-date .ov-date {
+  display: block;
+  font-size: calc(clamp(10px, 0.95vw, 13px) * var(--oscale, 1));
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ffffffd9;
+}
+
+/* 番茄钟：左边一颗小圆点，读数和专注页一致 */
+.overlay-timer .ov-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px 7px 10px;
+  border-radius: 999px;
+  background: #101010a8;
+  backdrop-filter: blur(10px);
+  font-size: calc(clamp(11px, 1.05vw, 15px) * var(--oscale, 1));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  color: var(--bold-bg);
+  text-shadow: none;
+}
+
+.overlay-timer .ov-timer i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--bold-mint, #a8e6c1);
+}
+
+/* 唱片与曲目：这两块原来只有透明版式有，现在图层只有一份，
+   拼贴/照片也能加。样式照搬 .dw-disc 那一套，只把尺寸换成跟着全屏档走——
+   透明版式的直径是相对屏高算的，这里没有 --disc-size 可用。 */
+.overlay-disc .ov-disc {
+  display: block;
+  position: relative;
+  width: calc(clamp(64px, 9vw, 148px) * var(--oscale, 1));
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #0d0d0f 0 6%, #17181b 6% 8%, #0d0d0f 8% 36%, #17181b 36% 37.4%, #0d0d0f 37.4% 100%);
+  box-shadow:
+    0 0 0 1px #ffffff1f,
+    0 12px 36px #0000008a;
+  rotate: 0deg;
+  animation: dw-spin 12s linear infinite paused;
+}
+
+.overlay-disc .ov-disc.is-spinning {
+  animation-play-state: running;
+}
+
+.overlay-disc .ov-disc-label {
+  position: absolute;
+  inset: 30%;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: #9a8b78;
+  box-shadow: inset 0 0 0 1px #ffffff24;
+}
+
+.overlay-disc .ov-disc-hole {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3.2%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #0b0c0e;
+  translate: -50% -50%;
+}
+
+.overlay-now .ov-now {
+  display: block;
+  max-width: 62vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(clamp(10px, 1vw, 14px) * var(--oscale, 1));
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #ffffffd9;
+}
+
+.overlay-layer[data-big='true'] .ov-now {
+  font-size: calc(clamp(13px, 1.3vw, 20px) * var(--oscale, 1));
+}
+
+/* 全屏时整体放大一档：那一屏才是真拿来看的。
+   --oscale 也要跟着乘，否则全屏下用户调过的倍率会被这一档吃掉。 */
+.overlay-layer[data-big='true'] .ov-clock {
+  font-size: calc(clamp(64px, 8vw, 148px) * var(--oscale, 1));
+}
+
+.overlay-layer[data-big='true'] .ov-title {
+  font-size: calc(clamp(26px, 3vw, 56px) * var(--oscale, 1));
+  max-width: 54vw;
+}
+
+.overlay-layer[data-big='true'] .ov-date {
+  font-size: calc(clamp(12px, 1.2vw, 19px) * var(--oscale, 1));
+}
+
+.overlay-layer[data-big='true'] .ov-timer {
+  font-size: calc(clamp(14px, 1.5vw, 24px) * var(--oscale, 1));
+  padding: 10px 18px 10px 13px;
+}
+
+.overlay-layer[data-big='true'] .ov-disc {
+  width: calc(clamp(88px, 12vw, 220px) * var(--oscale, 1));
+}
+
+.overlay-layer[data-big='true'] .ov-timer i {
+  width: 8px;
+  height: 8px;
+}
+
+/* ---------- 放映：叠加元素 / 组件开关 ---------- */
+
+/* 透明版式的「组件」和另外两套版式的「叠加元素」共用这一颗按钮，
+   菜单内容由组件自己按版式决定（见 src/TheaterLayers.tsx）。
+   所以这里只有一套样式，不再分名。 */
+
+.theater-overlays {
+  position: relative;
+  display: inline-flex;
+}
+
+.theater-overlay-toggle.on {
+  background: var(--bold-bg);
+  color: var(--bold-ink);
+}
+
+.theater-overlay-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.theater-overlay-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 71;
+  width: 232px;
+  display: grid;
+  gap: 1px;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--bold-bg);
+  border: 1px solid var(--bold-line);
+  box-shadow: 0 18px 44px #10101033;
+}
+
+.theater-overlay-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--bold-ink);
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.theater-overlay-menu > button:hover {
+  background: #f4f2ee;
+}
+
+.theater-overlay-menu > button > span:last-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.theater-overlay-menu b {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.theater-overlay-menu small {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--bold-faint);
+}
+
+/* 开关点：关着是空心圈，开着是实心黑 */
+.overlay-dot {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1.5px solid #b6b5ae;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.overlay-dot.on {
+  background: var(--bold-ink);
+  border-color: var(--bold-ink);
+}
+
+.theater-overlay-tip {
+  margin: 6px 4px 2px;
+  font-size: 10px;
+  line-height: 1.45;
+  color: var(--bold-faint);
+}
+
+@media (max-width: 599px) {
+  .theater-overlay-menu {
+    width: min(232px, calc(100vw - 48px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .overlay::after,
+  .overlay-dot {
+    transition: none;
+  }
+}
+
+/* ---------- 放映：全屏时把窗口态的高度上限清掉 ---------- */
+
+/* 这里必须写这么长的选择器。
+   窗口态那条是 .media-room .media-theater .theater-screen（0,4,0），
+   而原来的全屏规则只有 .media-room.is-expanded .theater-screen（0,3,0）——
+   特异性输了，max-height: none 根本没生效，全屏后版式只占上半屏，下半屏全黑。
+   实测：3840×2160 的截图里画面只铺到 y≈770。 */
+.media-room.is-expanded .media-theater .theater-screen {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  min-height: 0;
+  aspect-ratio: auto;
+  /* 窗口态给了 16px 圆角（见 .theater-screen 本体），全屏这条特异性最高，
+     所以直角也只能在这里收回——只在 0,3,0 那条写是不够的。 */
+  border-radius: 0;
+}
+
+/* 图片那条上限同理，也要一起清掉，否则图还是按窗口态封顶。 */
+.media-room.is-expanded .media-theater[data-kind='image'] .theater-screen img {
+  max-height: none;
+}
+
+@media (max-height: 700px) {
+  .media-room.is-expanded .media-theater .theater-screen {
+    max-height: none;
+    min-height: 0;
+  }
+}
+
+/* ---------- 放映：全屏时藏掉工具条（特异性补丁） ---------- */
+
+/* 上面那条「藏掉除播放台以外的一切」写的是 .media-room.is-expanded .collection-toolbar（0,3,0），
+   而工具条重排那条是 .media-room .collection-toolbar.media-toolbar（0,3,0）——
+   特异性一样、但后者写在后面，display: flex 把 display: none 盖了回来。
+   实测全屏后左上角还残留「图片 / 视频」两个按钮。
+   这条是 0,4,0，稳赢。 */
+.media-room.is-expanded .collection-toolbar.media-toolbar {
+  display: none;
+}
+
+/* 全屏时控制条贴底不留缝。窗口态底下有页面 padding，全屏后那块 padding 还在，
+   黑带就浮在离底边 20px 的位置，看着像没贴住。
+
+   ——以上是通栏黑带时候的判断。现在控制条改成了离底的玻璃胶囊（见上方
+   `.media-room.is-expanded .theater-bar` 的说明），"贴底"反而会让圆角被屏幕边缘切掉，
+   所以这里不再覆盖 bottom 与 border-radius，只留一条：**不让页面 padding 影响它**。
+   这条原本就是干这个的，改胶囊之后唯一还需要的就是别让页面 padding 把它往上顶。 */
+.media-room.is-expanded .theater-bar {
+  margin-bottom: 0;
+}
+
+/* ---------- 放映：空库时的占位台面 ---------- */
+
+/* 库空着时台面也要能看。占位画面是一块渐变，不是真图片——
+   目的是让人一眼看出「这里以后会放东西」，同时不干扰版式本身的判断。 */
+.tpl-blank {
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(120% 90% at 22% 18%, #6b7f8c 0%, #3f4d57 46%, #262f36 100%),
+    #262f36;
+}
+
+/* 渐变上再压一层很淡的斜纹，避免大片纯色看着像加载失败 */
+.tpl-blank::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(135deg, #ffffff08 0 2px, #ffffff00 2px 9px);
+}
+
+
+/* ---------- 放映：雨 ---------- */
+
+/* 两层水叠在画面上。都是 pointer-events: none——雨不该挡住拖动叠加元素。 */
+/* 雨丝的置换图载体：尺寸为 0，但必须留在文档流里（display:none 会让 filter 引用失效）。 */
+.rain-defs {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rain-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  overflow: hidden;
+  opacity: var(--rain-opacity, 0.7);
+  pointer-events: none;
+}
+
+/* 雨丝：两条重复的斜向渐变，靠平移制造「一直在下」。
+   不用元素画是因为雨丝要密到看不出个体，用元素反而更贵。 */
+
+
+@keyframes rain-sweep {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: -26px 92px, -14px 74px; }
+}
+
+/* 水珠：每颗自己滑，靠 animation-delay 错开出发时间。
+   关键帧不是匀速的——真实水珠一段一段挪，中途会挂住。 */
+.rain-drops {
+  position: absolute;
+  inset: 0;
+}
+
+.rain-drops > i {
+  position: absolute;
+  display: block;
+  border-radius: 50% 50% 47% 47%;
+  /* 凸透镜的观感靠三样叠出来，缺一样就像贴纸：
+     ① backdrop-filter 把背后的画面放大提亮——这是「透过水珠看」；
+     ② 一层极淡的白色渐变给中心高光；
+     ③ 内外两道阴影压出厚度（上沿亮、下沿暗），让它不是平的。 */
+  backdrop-filter: blur(0.4px) brightness(1.12) saturate(1.15) contrast(1.05);
+  -webkit-backdrop-filter: blur(0.4px) brightness(1.12) saturate(1.15) contrast(1.05);
+  background:
+    radial-gradient(58% 52% at 36% 26%, #ffffffc4 0%, #ffffff3d 38%, #ffffff00 72%),
+    radial-gradient(120% 120% at 50% 50%, #ffffff00 62%, #ffffff1f 100%);
+  box-shadow:
+    inset 0 -0.12vh 0.18vh #ffffff4d,
+    inset 0 0.10vh 0.14vh #ffffff59,
+    0 0.10vh 0.22vh #00000033;
+  opacity: 0;
+  animation-name: drop-fall;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
+  animation-iteration-count: infinite;
+  will-change: transform, opacity;
+  /* AE 里那颗珠子会拖出一条竖直的变形痕。用竖向压扁的投影近似。 */
+  filter: drop-shadow(0 0.25vh 0.2vh #0000001f);
+}
+
+@keyframes drop-fall {
+  0% { transform: translateY(0) scale(0.9); opacity: 0; }
+  6% { opacity: 0.95; }
+  /* 挂住的那一下：只走一点点，然后突然放开 */
+  42% { transform: translateY(14vh) scale(1); opacity: 0.95; }
+  46% { transform: translateY(15vh) scale(1.02); opacity: 0.95; }
+  88% { transform: translateY(78vh) scale(0.92); opacity: 0.7; }
+  100% { transform: translateY(96vh) scale(0.8); opacity: 0; }
+}
+
+/* 控制条上的雨按钮与菜单 */
+.theater-rain {
+  position: relative;
+  display: inline-flex;
+}
+
+.theater-rain-toggle.on {
+  background: var(--bold-bg);
+  color: var(--bold-ink);
+  border-color: var(--bold-bg);
+}
+
+.theater-rain-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 71;
+  width: 232px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--bold-bg);
+  border: 1px solid var(--bold-line);
+  box-shadow: 0 18px 44px #10101026, 0 1px 2px #1010100f;
+  animation: add-menu-in 160ms cubic-bezier(.2,.7,.3,1) both;
+}
+
+.rain-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bold-ink);
+}
+
+.rain-modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 3px;
+  border-radius: 11px;
+  background: #f4f2ee;
+}
+
+.rain-modes > button {
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--bold-muted);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.rain-modes > button.on {
+  background: var(--bold-ink);
+  color: var(--bold-bg);
+}
+
+.rain-slider {
+  display: grid;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--bold-muted);
+}
+
+.rain-slider input[type='range'] {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  accent-color: var(--bold-ink);
+}
+
+/* 全屏时菜单跟着放大一点，别在 4K 上像颗纽扣 */
+.media-room.is-expanded .theater-rain-menu {
+  width: 280px;
+  padding: 16px;
+  border-radius: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rain-streak,
+  .rain-drops > i {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* ---------- 放映：版式与控制条的四处修正 ---------- */
+
+/* 1. 控制条挤成一条：版式胶囊是 block 显示（宽 114 却按行内排版），
+   而且控制条本身没有 flex 约束，右侧几个按钮全被压到一起。
+   实测版式按钮的 y 是 691、控制条 y 是 674（高 52）——按钮跑出了控制条的可视区。 */
+.media-theater .theater-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+.media-theater .theater-bar .theater-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.media-theater .theater-bar .theater-copy b,
+.media-theater .theater-bar .theater-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 版式胶囊：内联 flex，别再按 block 排 */
+.media-theater .theater-templates {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  margin: 0 6px 0 0;
+  padding: 3px;
+  border-radius: 999px;
+  background: #ffffff14;
+}
+
+/* 滑过去的那颗白底。位置由 TheaterTemplates 量出来写进变量。
+   为什么不用「选中的那颗自己变白」：三套版式换的是整块画面，底跟着换
+   只是换了个色块；滑过去才能把那一下和刚看到的画面变化连起来。
+   缓动带一点过冲（1.28），和唱片柜的筛选胶囊、导航条是同一套手感。 */
+.media-theater .theater-templates > .template-marker {
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  z-index: 0;
+  width: var(--marker-width, 0px);
+  transform: translateX(var(--marker-x, 0px));
+  border-radius: 999px;
+  background: var(--bold-bg);
+  pointer-events: none;
+  transition:
+    transform 380ms cubic-bezier(0.3, 1.28, 0.48, 1),
+    width 380ms cubic-bezier(0.3, 1.28, 0.48, 1);
+}
+
+/* 第一次量完之前不许有过渡，否则滑块会从最左边飞过来 */
+.media-theater .theater-templates:not([data-ready='true']) > .template-marker {
+  transition: none;
+}
+
+.media-theater .theater-templates > button {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #ffffffb8;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+
+.media-theater .theater-templates > button:hover {
+  color: var(--bold-bg);
+}
+
+/* 底已经由滑块画了，这里只改字色。写 background 会在滑块上再盖一层，
+   两块白叠起来边缘会发灰。 */
+.media-theater .theater-templates > button.on {
+  background: transparent;
+  color: var(--bold-ink);
+}
+
+/* 右侧三个图标键（叠加 / 雨 / 全屏）排成一簇，别互相挤 */
+.media-theater .theater-bar .theater-overlays,
+.media-theater .theater-bar .theater-rain {
+  display: inline-flex;
+  flex: none;
+}
+
+.media-theater .theater-bar .theater-controls {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+}
+
+.media-theater .theater-bar .theater-expand {
+  flex: none;
+}
+
+/* 2. 空库提示条压在信息条上。挪到台面顶部——底部永远有控制条，
+   提示放上面不会和任何东西打架。 */
+
+
+/* 3. 乌鸦压住 pick by 那三行字。乌鸦再往右下挪、缩小，
+   并且给它一个深色底托，别在浅色面板上糊成一团。 */
+
+
+/* 4. pick by 在面板左下角，和圆形/乌鸦都不碰 */
+.tpl-pick {
+  max-width: 40%;
+  font-size: 7.5px;
+}
+
+@media (max-width: 900px) {
+  .media-theater .theater-templates > button {
+    padding: 0 7px;
+    font-size: 9px;
+  }
+}
+
+/* ---------- 放映：拼贴版三处位置修正 ---------- */
+
+
+/* 雨丝在深色画面上几乎看不见：原来两条渐变最亮只到 #ffffff52，
+   再乘 rain-layer 的 opacity 就没了。提亮，并把间距收紧一点让它更密。 */
+
+
+/* 空库提示条压在画面正中偏上，盖住了画面本身。
+   挪到画面底部——那里只有渐变，且离开控制条还有一段距离。 */
+
+
+/* ---------- 放映：拼贴版与雨层的第二轮修正 ---------- */
+
+
+/* 空库提示条还是压在信息条上（它相对 .theater-screen 定位，而信息条也在底部）。
+   挪到画面正上方——那里是纯画面，没有版式元素。 */
+
+
+/* 雨丝：改成「一个超高元素 + translateY」。
+   原来用 background-position 动画，位移距离和图案周期对不齐，视觉上是在闪而不是在落。
+   现在位移正好等于图案周期（20px），循环无缝，而且方向就是往下。 */
+
+
+@keyframes rain-fall {  to { transform: translateY(20px); }
+}
+
+/* ---------- 放映：乌鸦 / 雨丝 / 空库提示（定稿） ---------- */
+
+.media-room.is-expanded /* 雨丝。
+   上一版用 background-position 动画，位移距离和图案周期对不齐，
+   看起来是在闪而不是在落。改成「一个超高元素 + translateY(一个周期)」，
+   循环无缝，方向也确实朝下。
+   亮度：原来最亮 #ffffff52 再乘 opacity 就没了，提到 #ffffffa6。 */
+.rain-streak {
+  /* 折射：feTurbulence 当置换图把斜纹推成不规则的雨脚（见 RainLayer 里的 filter）。
+     注意：filter 引用的是同文档里的 SVG 元素，RainLayer 把它挂在 .rain-layer 内。 */
+  filter: url(#rain-streak-warp);
+  -webkit-filter: url(#rain-streak-warp);
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  top: -60%;
+  height: 220%;
+  background-image:
+    repeating-linear-gradient(
+      15deg,
+      #ffffff00 0,
+      #ffffff00 6px,
+      #ffffffb0 6px,
+      #ffffffb0 7px,
+      #ffffff00 7px,
+      #ffffff00 19px
+    ),
+    repeating-linear-gradient(
+      15deg,
+      #ffffff00 0,
+      #ffffff00 2.5px,
+      #ffffff70 2.5px,
+      #ffffff70 3.2px,
+      #ffffff00 3.2px,
+      #ffffff00 10px
+    );
+  animation: rain-fall 0.46s linear infinite, rain-fall 0.83s linear infinite;
+  opacity: calc(0.6 + var(--rain-strength, 0.55) * 0.4);
+}
+
+@keyframes rain-fall {
+  from { transform: translateY(0); }
+  to { transform: translateY(19px); }
+}
+
+/* 空库提示。相对 .theater-screen 定位，而信息条也在底部——
+   放底部一定打架。挪到画面正上方。 */
+.theater-blank-hint {
+  top: 14px;
+  bottom: auto;
+}
+
+.media-room.is-expanded .theater-blank-hint {
+  top: 26px;
+  bottom: auto;
+}
+
+/* 空库提示要压在雨层之上。雨层 z-index 是 7，提示原来是 9，
+   但它是 .theater-screen 的直接子元素，而雨层也是——两者同级时
+   后写的赢。显式抬到 12。 */
+.theater-blank-hint {
+  z-index: 12;
+}
+
+
+/* 这里原本有三条 `top: 7% / 34% / bottom: 5%` 的星位置。
+   选择器带 `.media-room.is-expanded`（4 类），比文件末尾那套
+   `.template-collage .tpl-star-a`（2 类）更具体，于是全屏时它一直赢——
+   文件末尾反复调的百分比从来没生效过，这就是「星星怎么摆都错位」的第二半原因。
+   星的位置现在只在文件末尾定义一处，这里删掉。 */
+
+
+.media-room.is-expanded .tpl-with { font-size: 14px; margin-top: 26px; }
+.media-room.is-expanded .tpl-pick { font-size: 13px; max-width: 42%; }
+
+/* 信息条：全屏下两行字段之间的空隙拉大，别挤成一小坨。 */
+.media-room.is-expanded .tpl-fields { gap: 0; }
+.media-room.is-expanded .tpl-list { padding-right: 0; }
+
+
+/* 窄屏：拼贴改成上下排，右列面板和彩胶都不画——屏幕太窄，
+   硬塞进去只会把画面挤没。 */
+/* 窄屏第二处：拼贴压成单列——已删除。
+   拼贴版是固定比例排版，窗口小的时候整体等比缩，不改结构；
+   压成单列会让右列两轨变成 0px，面板和唱片直接不渲染。 */
+
+
+.template-collage > .tpl-block {
+  border-radius: 0;
+}
+
+
+/* 文字。参考图里通篇是衬线体（Georgia/Times 那一路），
+   小标题是大写 + 宽字距，值是斜体。 */
+.template-collage .tpl-block-bar,
+.template-collage .tpl-block-panel {
+  font-family: "Noto Serif SC", "Source Han Serif SC", "Source Han Serif", "Songti SC", "SimSun", "Noto Serif SC", "Source Han Serif SC", "Source Han Serif", "Songti SC", "SimSun", Georgia, serif;
+}
