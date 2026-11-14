@@ -1,13 +1,8 @@
-/* ==========================================================================
- * shelf.css —— 唱片柜：卡片、掀开动作、右侧介绍
- *
- * 层叠顺序 3/10（接在 shell.css 之后，controls.css 接在后面）。
- * 顺序由 skin-bold.css 里的 @import 决定，改顺序会改变渲染结果。
- * 本文件由 tools/probe/split-css.mjs 从单文件切出，切分时逐属性比对过
- * 12 份计算样式快照（无差异），所以内容与原文件等价。
- * ========================================================================== */
-/* ---------- 唱片柜：扁平白卡 ---------- */
-.cabinet-layout { grid-template-columns: minmax(0, 1fr) 188px; gap: 28px; }
+.cabinet-layout {
+  grid-template-columns: minmax(0, 1fr) 188px;
+  gap: 28px;
+  position: relative;
+}
 
 .cabinet {
   border: 0;
@@ -35,8 +30,10 @@
   padding: 0 2px;
 }
 
-/* ---------- 唱片卡：纯色大圆角块 ---------- */
-.record-card { padding-bottom: 10px; }
+.record-card {
+  padding-bottom: 10px;
+  list-style: none;
+}
 .record-card::after { display: none; }
 .record-preview { padding: 0; perspective: 900px; }
 
@@ -51,7 +48,7 @@
   border-radius: 20px;
   background: var(--bold-surface);
   box-shadow: 0 0 0 1px #00000008, 0 2px 10px #0000000a;
-  transform-origin: 50% 50%;
+  transform-origin: 0 50%;
   transition: transform .5s cubic-bezier(.2,.7,.3,1), opacity .4s;
   backface-visibility: visible;
   overflow: hidden;
@@ -70,8 +67,6 @@
 .record-card[data-flip="open"] .disc-pocket { transform: translateX(17%) rotate(9deg); }
 .record-card[data-flip="open"] .record-case { transform: translateY(-5px) rotate(-3deg); }
 
-/* 悬停时封面卡像书页一样掀开，黑胶从右边滑出来——幅度与原版一致 */
-.case-front { transform-origin: 0 50%; }
 .disc-pocket {
   position: absolute;
   inset: 6%;
@@ -169,6 +164,8 @@
   background: var(--bold-surface);
   color: var(--bold-ink);
   padding: 0;
+  position: relative;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.16s cubic-bezier(0.23, 1, 0.32, 1);
 }
 .select-record:not(:disabled):hover { background: var(--bold-hover); color: var(--bold-ink); }
 .select-record[aria-pressed="true"] {
@@ -185,7 +182,6 @@
 }
 .playing-bars i { background: var(--bold-ink); }
 
-/* ---------- 加入条 / 柜底 ---------- */
 .add-to-shelf {
   margin: 22px 0 20px;
   font-size: 12px;
@@ -195,6 +191,7 @@
   border: 1px dashed #d8d6cf;
   border-radius: 14px;
   background: transparent;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.16s cubic-bezier(0.23, 1, 0.32, 1);
 }
 .add-to-shelf:not(:disabled):hover { background: var(--bold-page); color: var(--bold-ink); border-color: var(--bold-ink); }
 
@@ -282,7 +279,6 @@
 /* 第一下变红，第二下才删。红色只在这一步出现，平时不吓人。 */
 .notes-remove.armed { background: var(--bold-danger); color: var(--bold-on-dark); border-color: var(--bold-danger); }
 .notes-remove.armed:not(:disabled):hover { background: var(--bold-danger-deep); color: var(--bold-on-dark); border-color: var(--bold-danger-deep); }
-
 
 .record-meta { margin: 20px 0 16px; }
 .record-meta > div {

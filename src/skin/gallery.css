@@ -136,20 +136,9 @@
     drop-shadow(0 3px 12px #4a3f2b5c);
 }
 
-/* 播放台上那一张：抬得更高、影子最深，一眼能认出在放谁。
-   2026-11-12 用户要求去掉外描边（`0 0 0 1.8px` 那层看着像选中框），
-   只留位置与影子。
-
-   影子同样从三层 box-shadow 换成 drop-shadow（理由见上面 hover 那条）：
-   常驻的方影虽不跳变，但四个角一直露在票外，和悬停时看到的是同一类问题。
-   这里保留三层是为了补回原来 `0 18px 40px` 那层落地感；层数在这一层安全 —
-   — 早先「层数一变字被冲白」的读数后来查明是探针没等重绘的假象
-    （见 .ticket 上的注释与 tools/probe/ticket-timing.cjs）。 */
 .ticket.is-current {
-  filter:
-    drop-shadow(0 0 1.8px #2a2318c2)
-    drop-shadow(0 3px 11px #4a3f2b73)
-    drop-shadow(0 7px 22px #6b5f4533);
+  filter: drop-shadow(0 0 1.8px #2a2318c2) drop-shadow(0 3px 11px #4a3f2b73) drop-shadow(0 7px 22px #6b5f4533);
+  transform: translateY(-3px);
 }
 
 /* 正在播放那张被悬停时取「更深的那一组」，不要退回 hover 的浅影——否则鼠标
@@ -895,12 +884,12 @@
 
 .ticket-stack > span + span {
   padding-top: 0.5cqw;
+  border-top: 1px solid var(--ticket-rule);
+  opacity: 0.99;
 }
 
-/* stack 版专属收紧：它比别的版式多一层「三组纵排」，横向信息量大、纵向
-   却没有额外预算。这三条只在 stack 上生效，不影响其它三版。 */
 .ticket-panel[data-layout='stack'] .ticket-code {
-  margin-top: 0;
+  margin-top: 0.48cqw;
 }
 
 /* stack 版的段距全部照参考图逐段量（.qa/ref-rows3.py 的 y 带），
@@ -925,21 +914,12 @@
   margin-top: 0.65cqw;
 }
 
-.ticket-panel[data-layout='stack'] .ticket-code {
-  margin-top: 0.48cqw;
-}
-
 .ticket-panel[data-layout='stack'] .ticket-bars {
   margin-top: 0.73cqw;
 }
 
 .ticket-panel[data-layout='stack'] .ticket-venue {
   margin-top: 0.65cqw;
-}
-
-.ticket-stack > span + span {
-  border-top: 1px solid var(--ticket-rule);
-  opacity: 0.99;
 }
 
 /* stack 版的三组字段是**两行**：标签在上、值在下，两行都靠左对齐，
@@ -1077,15 +1057,6 @@
   }
 }
 
-/* 播放台上那一张：抬起来、影子更深，一眼能认出在放谁。
-   早先走的是 `box-shadow: inset 0 0 0 2px #101010`。票根面板的左缘没有
-   mask（只有外缘那一侧有扇贝），所以那条内描边在左边完整显示成一条 2px
-   的黑边，压在撕口暗带上就成了中性灰的硬线（实测 rgb(133,133,133)），
-   参考图上没有这道框。改成用位置和影子区分，不动纸面本身。 */
-.ticket.is-current {
-  transform: translateY(-3px);
-}
-
 /* ── 浮起来的那一张 ─────────────────────────────────────────────
    点击之后票从中缝对折处抬起来，铺在页面中间放大；撕开才继续。
    底下压一层磨砂暗幕：不压暗的话票与背后的票挤在一起，看不出「浮起来」。
@@ -1127,39 +1098,21 @@
 }
 
 .ticket-lift {
-  /* 形变进度 0~1：已经过成「前段绷住、后段加速」的曲线，由 MediaTickets
-     每次 pointermove 写。卷曲角度与票面淡化都读它，两处同源才不会各走各的。 */
   --bend: 0;
-  /* 右半切成几条。真值从 ticket-tear.ts 的 CURL_SEGMENTS 传进来，这里只是
-     兜底——没传时也还画得出来。 */
   --seg-count: 6;
-  /* 掀开角度的上限，只给 prefers-reduced-motion 的降级态用（那时不做 3D 卷曲）。
-     真值从 TEAR_HINGE_DEG 传进来。 */
   --hinge: 12deg;
-  /* 卷轴的倾斜角上限（度）。真值从 ticket-tear.ts 的 TEAR_CURL_TILT_DEG 传进来。
-     斜着撕是用户 m03899 选的：卷轴不能是水平的，要像从右上角拎起一角。
-     这个数越大接缝顶端张得越开，18 度是「看得出斜」与「缝别裂太明显」之间
-     的取舍，改之前先看一眼 .ticket-lift-panel 那段注释里的代价说明。 */
   --curl-tilt: 18deg;
   position: relative;
-  /* 列表里的票受外壳 760px 限制只有约 680 宽，浮起来要明显大一圈才叫「放大」。
-     1040 是 1920 窗口下不顶到边的上限；窄屏按 92vw 退让。
-     高度跟列表里那张同一个比例，靠 aspect-ratio 撑出来。
-
-     它也是容器：浮层里的字号跟着这个宽度走，和列表里那张是同一套 cqw，
-     所以放大之后票面比例不会散。 */
   display: flex;
-  /* 接缝咬合，不留缝——与列表里那张一致。 */
   gap: 0;
-  /* 与列表里同一套比例：高度 = 宽 × 0.4785（画面 16:9 + 上下纸边）。 */
   aspect-ratio: 100 / 47.85;
   width: min(1040px, 92vw);
   padding: 0;
   background: transparent;
   container-type: inline-size;
-  /* 两块都带 mask，box-shadow 会被 mask 裁掉，阴影走 filter。 */
   filter: drop-shadow(0 24px 54px #1a140c6b);
   animation: ticket-lift-up 320ms cubic-bezier(0.22, 0.72, 0.3, 1) both;
+  transition: filter 220ms ease;
 }
 
 @keyframes ticket-lift-up {
@@ -1354,15 +1307,6 @@
 .ticket-lift[data-holding='true'] .ticket-fold,
 .ticket-lift[data-holding='true'] .ticket-fold > .ticket-panel {
   transition: none;
-}
-
-/* 拖过 42%（松手就断）时整张票微微提亮：提示「现在可以松手了」，不用试错。
-
-   提亮只能加在 .ticket-lift 这一层。加到 .ticket-lift-panel 上会踩「filter
-   与 mask 同链」那条老坑——那块纸自己带撕线孔遮罩，Chromium 会把内容卷进
-   滤镜链重算，票根上的字会被冲成一片白（见 .ticket-panel 那段注释）。 */
-.ticket-lift {
-  transition: filter 220ms ease;
 }
 
 .ticket-lift[data-tearable='true'] {

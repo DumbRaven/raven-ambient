@@ -27,6 +27,7 @@
   letter-spacing: -3px;
   font-weight: 800;
   color: var(--bold-ink);
+  animation: title-swap 460ms cubic-bezier(.2, .9, .25, 1) both;
 }
 
 .today-stamp {
@@ -96,7 +97,6 @@
   text-transform: none;
 }
 
-
 /* ---------- 第十四批：导航胶囊展开 ---------- */
 
 /* 未选中：图标 + 英文，中文收起 */
@@ -112,11 +112,6 @@
 .view-tabs > button.active .tab-label {
   font-weight: 700;
   letter-spacing: 0.2px;
-}
-
-/* 选中项图标也加粗一点，跟文字一起「压下去」 */
-.view-tabs > button.active svg {
-  stroke-width: 2.1;
 }
 
 @media (max-width: 599px) {
@@ -174,8 +169,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.record-card { list-style: none; }
 
 .record-card .playing-bars { margin-left: 0; }
 .record-card .playing-bars i { background: var(--bold-ink); }
@@ -257,18 +250,11 @@
   }
 }
 
-/* 唱片柜内部的筛选切换：同一套扩散，但作用域只有唱片柜那一块 */
-.cabinet-layout { position: relative; }
 .cabinet-layout[data-motion="exit"] { animation: page-wipe-out 130ms cubic-bezier(.4, 0, 1, 1) both; }
 .cabinet-layout[data-motion="enter"] {
   animation: page-wipe-in 520ms cubic-bezier(.3, .72, .22, 1) both;
 }
 
-/* 顶部大字：换页时旧字轻轻退、新字从下方追上来。
-   比下面那块慢一拍，观感上是「先换名字，再换内容」。 */
-.today-title {
-  animation: title-swap 460ms cubic-bezier(.2, .9, .25, 1) both;
-}
 @keyframes title-swap {
   from { opacity: 0; transform: translateY(14px); filter: blur(4px); }
   55% { opacity: 1; filter: blur(0); }
@@ -356,10 +342,6 @@
   top: 50%;
   transform: translateY(-50%);
   z-index: 3;
-}
-
-.view-tabs {
-  position: relative;
 }
 
 .dock-disc {
@@ -623,16 +605,6 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   .dock-disc { width: 38px; height: 38px; }
 }
 
-/* ---------- 添加按钮的反馈（第二十批） ---------- */
-
-/* 两个「加一个声音」的入口：唱片柜底部那条虚线，和每张唱片名前面的小圆圈。
-   都是加法，反馈就统一成「按下去缩一下、松开的时候转半圈」——
-   转的方向和唱片的转向一致，看起来像把新唱片放上转盘。 */
-
-.add-to-shelf {
-  /* 单独把 transform 拿出来，避免动到基础样式里的布局属性 */
-  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.16s cubic-bezier(0.23, 1, 0.32, 1);
-}
 .add-to-shelf:not(:disabled):active {
   transform: scale(0.985);
 }
@@ -647,12 +619,6 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   transform: rotate(135deg);
 }
 
-/* 圆圈加号：用一条会收放的十字线，不用字符，这样不同浏览器里粗细一致。
-   未选中时是「+」，选中后变成对勾或序号，所以只在未选中态画十字。 */
-.select-record {
-  position: relative;
-  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.16s cubic-bezier(0.23, 1, 0.32, 1);
-}
 /* 加进去时荡开的淡环，由 RecordCard 用 WAAPI 创建和移除 */
 .select-ring {
   position: absolute;

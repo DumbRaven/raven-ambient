@@ -76,11 +76,6 @@
   border: 0;
 }
 
-/* 「正在听」tab 的小圆点：出现时轻微长大，不做弹跳 */
-.tab-dot {
-  transform-origin: 50% 50%;
-  animation: tab-dot-in 180ms cubic-bezier(.2, .7, .3, 1) both;
-}
 @keyframes tab-dot-in {
   from { opacity: 0; transform: scale(.2); }
   to   { opacity: 1; transform: scale(1); }

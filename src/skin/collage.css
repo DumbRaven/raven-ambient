@@ -1,17 +1,8 @@
-/* ==========================================================================
- * collage.css —— 拼贴版式的 AE 对齐（这段靠书写顺序覆盖，见文件头）
- *
- * 层叠顺序 10/10（接在 stage.css 之后，最后一个）。
- * 顺序由 skin-bold.css 里的 @import 决定，改顺序会改变渲染结果。
- * 本文件由 tools/probe/split-css.mjs 从单文件切出，切分时逐属性比对过
- * 12 份计算样式快照（无差异），所以内容与原文件等价。
- * ========================================================================== */
-
-/* 信息条：TITLE 在左 1/3，PHOTOGRAPHY 从 1/3 处开始，PLAYLIST 独占下面一行。 */
 .template-collage .tpl-fields {
   grid-template-columns: 1fr 2fr;
-  gap: 0;
-  align-items: baseline;
+  gap: 2cqw;
+  align-items: start;
+  display: grid;
 }
 
 .template-collage .tpl-fields > div > b {
@@ -22,10 +13,11 @@
 }
 
 .template-collage .tpl-fields > div > span {
-  font-size: clamp(7px, 1.4vw, 10.5px);
+  font-size: 2.2cqw;
   font-style: italic;
   letter-spacing: 0.01em;
   opacity: 0.92;
+  margin-top: 0.4cqw;
 }
 
 .template-collage .tpl-list > b {
@@ -47,12 +39,30 @@
   overflow: hidden;
 }
 
-
-.template-collage .tpl-star-a { left: 14%; top: 12%; }
-.template-collage .tpl-star-b { right: 16%; top: 30%; }
-.template-collage .tpl-star-c { left: 22%; bottom: 28%; }
-.template-collage .tpl-star-d { right: 20%; bottom: 10%; }
-
+.template-collage .tpl-star-a {
+  left: 85.0%;
+  top: 3.4%;
+  right: auto;
+  bottom: auto;
+}
+.template-collage .tpl-star-b {
+  right: auto;
+  top: 39.0%;
+  left: 3.9%;
+  bottom: auto;
+}
+.template-collage .tpl-star-c {
+  left: 101.4%;
+  bottom: auto;
+  top: 78.3%;
+  right: auto;
+}
+.template-collage .tpl-star-d {
+  right: auto;
+  bottom: auto;
+  left: 15.4%;
+  top: 96.4%;
+}
 
 /* 信息条的标签与值现在全部走文件末尾那套 cqw —— 容器查询已经把「台面变宽」
    这件事算进去了，这里再写一套 px 只会打架。
@@ -65,16 +75,13 @@
    所以这里只保留 gap。 */
 .media-room.is-expanded .template-collage .tpl-block-bar { gap: 1.1em; }
 
-
 @media (max-width: 760px) {
-  
-  
+
 }
 
 @media (prefers-reduced-motion: reduce) {
-  
-}
 
+}
 
 /* ---------- 放映：拼贴的尺寸全部按容器走 ---------- */
 
@@ -95,17 +102,11 @@
 /* 圆角不在这里设：每个块画自己的对角圆角，
    统一写 0 会把它们全抹掉（这条是 0,2,0，比单类名那条优先级高）。 */
 
-
 /* 信息条：标签、值、曲目段一律按容器宽缩放。 */
 .template-collage .tpl-fields > div > b,
 .template-collage .tpl-list > b {
   font-size: 1.75cqw;
   letter-spacing: 0.18em;
-}
-
-.template-collage .tpl-fields > div > span {
-  margin-top: 0.4cqw;
-  font-size: 2.2cqw;
 }
 
 .template-collage .tpl-list > span {
@@ -121,7 +122,9 @@
 }
 
 .template-collage .tpl-block-panel {
-  padding: 6% 7% 5%;
+  padding: 0;
+  display: block;
+  overflow: hidden;
 }
 
 /* 全屏时不要再单独设字号——容器查询已经把「台面变宽」这件事算进去了。
@@ -348,18 +351,11 @@
   opacity: 0.72;
   margin-bottom: 0.5cqw;
 }
-/* 这里原本有 `.tpl-brand`（`DumbRaven bilibili` 那行署名）的定位与字体。
-   这块已经从 JSX 里删掉：AE 源文件里没有 brand 图层，参考图里也没有它，
-   是早期自行加的，而且正好压在倒影上。品牌在右下的 Produced By 里已有一次。 */
-
-
-/* 标题组只占左边 56%，右边让给竖排胶囊。 */
 .template-collage .tpl-words {
-  /* 标题区：署名下面。参考图里它夹在署名和唱片之间。 */
   position: absolute;
-  left: 7%;
-  top: 47%;
-  width: 56%;
+  left: 7.97%;
+  top: 50.16%;
+  width: 60%;
   margin: 0;
   padding: 0;
   display: grid;
@@ -367,28 +363,25 @@
   min-width: 0;
   font-weight: 800;
   letter-spacing: -0.01em;
-  text-transform: capitalize;
+  text-transform: none;
   z-index: 5;
+  transform: none;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
 }
-
 
 .template-collage .tpl-title-text {
   margin: 0;
-  font-size: 7.4cqw;
-  line-height: 1.1;
+  font-size: 3.0cqw;
+  line-height: 1.16;
   letter-spacing: -0.02em;
   overflow-wrap: anywhere;
 }
 
 .template-collage .tpl-sub {
-  font-size: 3.3cqw;
+  font-size: 3.0cqw;
   letter-spacing: 0.02em;
   opacity: 0.66;
-  /* 曾经是斜体。但 AE 里这三行是**同一个文本图层**
-     （`BEFORE THE LAKE FREEZES\rPicked\rJust for U`，字体
-     PlayfairDisplayRoman-Bold），正体；参考图里也是正体。
-     在这里单独给斜体，等于把同一个图层的三行拆成两种字体，
-     与「三行是同一图层」这条事实矛盾。字号与行距由文件末尾那条统一管。 */
+  margin-top: 0;
 }
 
 /* 标题倒影已删：JSX 里不再渲染 .tpl-title-mirror，AE 里标题图层也没有镜像
@@ -427,49 +420,51 @@
   z-index: 5;
 }
 
-/* 石纹本体：一层 feTurbulence 生成的噪声，用柔光压到凹槽上。
-   单独做成 ::before，是因为 background-image 不能直接吃掉 SVG filter 的输出。 */
 .template-collage .tpl-tag::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: var(--bold-bg);
+  background: hsl(from var(--tpl-panel) h s calc(l * 1.6));
   filter: url(#tpl-marble);
-  mix-blend-mode: soft-light;
-  opacity: 0.85;
+  mix-blend-mode: normal;
+  opacity: 1;
   z-index: -1;
   pointer-events: none;
+  clip-path: inset(0 round 999px);
 }
 
 .template-collage .tpl-badge {
-  display: grid;
+  display: flex;
   justify-items: center;
-  gap: 0;
-  font-size: 8.2cqw;
-  font-weight: 900;
-  line-height: 0.96;
-  letter-spacing: -0.04em;
+  gap: 0.15cqw 0.6cqw;
+  font-size: 10.6cqw;
+  font-weight: 700;
+  line-height: 0.90;
+  letter-spacing: 0;
+  grid-auto-flow: row;
+  align-items: flex-start;
+  grid-template-columns: auto auto auto;
+  color: var(--tpl-gold);
+  text-shadow: 0 0 1.2cqw #e8b84b3d;
+  justify-content: center;
+  column-gap: 0.6cqw;
+  row-gap: 0;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-style: italic;
+  -webkit-text-stroke: 0.025em var(--tpl-gold);
+  paint-order: stroke fill;
+  margin-top: 0;
 }
 
 .template-collage .tpl-star {
   position: absolute;
-  font-size: 2.1cqw;
-  opacity: 0.62;
-  color: var(--tpl-on-panel);
+  font-size: 6.2cqw;
+  opacity: 1;
+  color: var(--tpl-gold);
   pointer-events: none;
-}
-
-.template-collage .tpl-star-a { left: -12%; top: 12%; }
-.template-collage .tpl-star-b { right: -10%; top: 44%; }
-.template-collage .tpl-star-c { left: 4%; bottom: 14%; }
-
-
-.template-collage .tpl-disc {
-  /* 盘面本身：中心到边缘略暗，让它是一个「圆盘」而不是一块黑 */
-  background:
-    radial-gradient(circle at 42% 38%, #ffffff1f 0%, #ffffff00 46%),
-    var(--disc-base, #1d1d1d);
+  line-height: 1;
+  transform: translate(calc(-50% - 0.06em), calc(-50% - 0.12em));
 }
 
 .template-collage .tpl-disc::before {
@@ -513,36 +508,36 @@
   box-shadow: inset 0 0 0 1px #00000030;
 }
 
-
-/* 第二行 `DumbRaven`：参考图里它和第一行**同字号**，只是更粗。
-   注意不要再给它 display:block —— 源码里第一行后面已经有 <br />，
-   两者同时存在会多出一个空行盒，实测把两行行距从 1.84cqw 撑到 2.7cqw。 */
 .template-collage .tpl-produced b {
   font-weight: 700;
+  font-size: inherit;
 }
-
 
 .template-collage .tpl-dot {
   position: absolute;
-  width: 0.9cqw;
-  height: 0.9cqw;
+  width: 0.42cqw;
+  height: 0.42cqw;
   border-radius: 50%;
   background: currentColor;
   opacity: 0.45;
-  z-index: 4;
+  z-index: 2;
 }
 
-.template-collage .tpl-dot-tl { top: 3%; left: 3%; }
-.template-collage .tpl-dot-tr { top: 3%; right: 3%; }
-.template-collage .tpl-dot-bl { bottom: 3%; left: 3%; }
-.template-collage .tpl-dot-br { bottom: 3%; right: 3%; }
-
-
-.template-collage .tpl-fields {
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 2cqw;
-  align-items: start;
+.template-collage .tpl-dot-tl {
+  top: 4.2%;
+  left: 4.4%;
+}
+.template-collage .tpl-dot-tr {
+  top: 4.2%;
+  right: 4.4%;
+}
+.template-collage .tpl-dot-bl {
+  bottom: 4.2%;
+  left: 4.4%;
+}
+.template-collage .tpl-dot-br {
+  bottom: 4.2%;
+  right: 4.4%;
 }
 
 .template-collage .tpl-fields > div > b,
@@ -567,16 +562,18 @@
   opacity: 0.8;
 }
 
-/* 乌鸦：矢量描出的剪影，颜色跟信息条的字走。 */
 .template-collage .tpl-raven {
   position: absolute;
   right: 3.4%;
   bottom: 8%;
-  width: 6.4cqw;
+  width: 10.33%;
   height: auto;
-  color: var(--tpl-on-bar);
-  opacity: 0.92;
+  color: var(--tpl-panel);
+  opacity: 1;
   z-index: 3;
+  left: 85.79%;
+  top: 45.25%;
+  margin: 0;
 }
 
 /* mask 挖洞方案已废弃：这版 Chromium 上 mask-composite: exclude
@@ -601,13 +598,11 @@
   pointer-events: none;
 }
 
-
 /* 让位圈：唱片外面那圈页面底色。
    它坐在面板之上、唱片之下，把面板在唱片周围「切」出一圈缝。
    为什么不用 mask：这版 Chromium 上 mask-composite: exclude 会把整块面板
    连同文字一起抹掉（文字元素在、位置也对，但一个像素都不显示）。
    用一圈实色环盖上去，视觉效果和真的挖洞一样，且不牵连同层内容。 */
-
 
 /* ══════════════════════════════════════════════════════════════
    放映：拼贴版式
@@ -638,7 +633,6 @@
   container-type: size;
 }
 
-/* 画面块：34,34 → 1244,742。只有左上角是圆的（半径 162px = 8.44% 画布宽）。 */
 .template-collage > .tpl-block-media {
   position: absolute;
   left: 1.77%;
@@ -646,10 +640,15 @@
   width: 63.02%;
   height: 65.56%;
   overflow: hidden;
-  border-radius: 8.44% 0 0 0;
+  border-radius: 0;
+  -webkit-mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 708' preserveAspectRatio='none'><path d='M162,0 L1210,0 L1210,708 L0,708 L0,162 Q0,0 162,0 Z' fill='white'/></svg>");
+  mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 708' preserveAspectRatio='none'><path d='M162,0 L1210,0 L1210,708 L0,708 L0,162 Q0,0 162,0 Z' fill='white'/></svg>");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 
-/* 信息条：34,768 → 1244,1042。只有右下角是圆的（半径 131px）。 */
 .template-collage > .tpl-block-bar {
   position: absolute;
   left: 1.77%;
@@ -662,14 +661,18 @@
   gap: 0.45em;
   padding: 2.4% 16% 2.2% 2.4%;
   box-sizing: border-box;
-  /* 信息条也是不规则图形：右下角被斜切掉一块，让给唱片。
-     AE 顶点（+960,+540 后）：(1244,768) (34,768) (34,1042) (1106,1042) (1244,895) (1244,772)。
-     换算到自身外接框就是下面这 6 个百分比——斜边从 (88.6%,100%) 到 (100%,46.4%)。 */
-  clip-path: polygon(100.000% 0.000%, 0.041% 0.182%, 0.000% 100.000%, 88.595% 100.000%, 100.000% 46.350%, 100.000% 1.460%);
+  clip-path: none;
   overflow: hidden;
   background: var(--tpl-bar);
   color: var(--tpl-on-bar);
   z-index: 8;
+  -webkit-mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 274' preserveAspectRatio='none'><path d='M1210,0 L0,0 L0,274 L1062.3,274 A152,152 0 0 0 1210,121.4 L1210,0 Z' fill='white'/></svg>");
+  mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 274' preserveAspectRatio='none'><path d='M1210,0 L0,0 L0,274 L1062.3,274 A152,152 0 0 0 1210,121.4 L1210,0 Z' fill='white'/></svg>");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  padding-right: 24%;
 }
 
 /* 面板：1271,34 → 1886,636。
@@ -694,54 +697,15 @@
   z-index: 2;
 }
 
-
-/* 唱片：圆心 (1582,740) = 82.40% / 68.52%，直径 619.2px = 32.25%。
-   它坐在页面底色上，从面板让出的洞里露出来。 */
-.template-collage .tpl-disc {
-  position: absolute;
-  left: 82.40%;
-  top: 68.52%;
-  width: 32.25%;
-  aspect-ratio: 1;
-  height: auto;
-  /* 居中用独立的 `translate` 属性，不写进 `transform`。
-     `rotate` 和 `transform` 是同一个变换链上的两步：浏览器先按
-     `transform-origin`（默认盒子中心）做 translate，**再**绕原点转。
-     也就是说 `transform: translate(-50%,-50%)` + `rotate: 90deg` 会先把碟
-     挪到左上，然后绕着已经画出去的那个位置转——实测圆心从 82.40% 甩到 114.65%。
-     拆成 `translate` + `rotate` 两个独立属性后，两者在同一个坐标系里叠加，
-     旋转才真的是绕唱片自己的中心。 */
-  translate: calc(-50% + var(--disc-drag, 0px)) -50%;
-  border-radius: 50%;
-  /* 面板是 clip-path 挖洞的，只裁自己、透不出下层。
-     唱片必须压在面板之上（面板 z-index:2），否则看到的还是面板自己的底色。 */
-  z-index: 6;
-  /* 两道阴影：外圈细亮边把碟从面板上"剥"出来，外圈大阴影给厚度。 */
-  box-shadow: 0 0 0 0.35cqw #ffffff1f, 0 2.2cqw 5cqw #00000052;
-}
-
-/* 能滑的时候（库里有不止一首、或外部播放器可切）才接指针。
-   父级 .tpl-disc-layer 是 pointer-events: none——那一层只是占位的画，
-   手势从唱片自己身上进来。`touch-action: none` 不能少：触屏上浏览器
-   会把横滑当成滚动/返回手势吃掉，pen 事件根本到不了这里。
-   cursor 用 grab 而不是 pointer：它不是按钮，是「可以拨动的东西」。 */
 .template-collage .tpl-disc.is-swipable {
   pointer-events: auto;
   touch-action: none;
   cursor: grab;
-}
-
-.template-collage .tpl-disc.is-swiping {
-  cursor: grabbing;
-}
-
-/* 拖动时不能有 `translate` 的过渡，否则手指走一像素碟要追好几帧；
-   松手回位才需要过渡，这一段就作用在「松手之后」那一帧。 */
-.template-collage .tpl-disc.is-swipable {
   transition: translate 220ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 .template-collage .tpl-disc.is-swiping {
+  cursor: grabbing;
   transition: none;
 }
 
@@ -752,33 +716,26 @@
   }
 }
 
-
-/* Produced By：字号 29 / 1920 ≈ 1.51cqw。
-   这里只给字体、行距、字色这些「长相」；left/top 由后面那条
-   「.tpl-produced { left: 87.43%; ... }」定，别在这里写位置。
-   参考图实测（画布 1917×1072）：单行墨迹高 23px = 1.20% 画布宽，
-   两行行顶间距 35px = 3.27% 画布高。1.55cqw ≈ 29.7px，行高 35.1px → 1.18。 */
 .template-collage .tpl-produced {
   position: absolute;
-  right: auto;
+  right: 0;
   bottom: auto;
   margin: 0;
   font-family: "Playfair Display", Georgia, serif;
   font-size: 1.55cqw;
-  /* 参考图用的是 Playfair Display（高对比粗衬线），项目里没这个字体、也不许联网加载，
-     实际回落 Georgia。Georgia 常规体笔画细，同一字号下「实心金」的像素少一半，
-     看上去就发灰，所以压到 700 补回来。 */
   font-weight: 700;
-  /* 参考图两行行顶间距 3.27% 画布高（1440 下 = 47.1px），字号 39.68px，
-     所以行高是 47.1 / 39.68 ≈ 1.19。 */
   line-height: 1.19;
-  /* AE 里 track=126 即 0.126em，但那是 Playfair 的量法；回落 Georgia 后同字距会宽出 3%
-     （实测右端到 99.79%，参考图只到 99.43%），所以收到 0.10em 把宽度补回来。 */
   letter-spacing: 0.10em;
   white-space: nowrap;
-  z-index: 3;
+  z-index: 7;
+  left: 87.43%;
+  top: 82.46%;
+  padding: 0.85cqw 0 1.04cqw 1.36cqw;
+  text-align: left;
+  border-radius: 2.6cqw 0 0 2.6cqw;
+  background: #ffffff42;
+  color: var(--tpl-gold);
 }
-
 
 /* 左上的年月角标。AE 里这层叫「2026 1020」：fs=12、track=81、scale=88%，
    **fill=[1,1,1] 也就是纯白**。
@@ -807,22 +764,6 @@
   text-align: left;
   z-index: 12;
 }
-
-
-/* 面板四角小点。 */
-.template-collage .tpl-dot {
-  position: absolute;
-  width: 0.42cqw;
-  height: 0.42cqw;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.45;
-  z-index: 2;
-}
-.template-collage .tpl-dot-tl { left: 4.4%; top: 4.2%; }
-.template-collage .tpl-dot-tr { right: 4.4%; top: 4.2%; }
-.template-collage .tpl-dot-bl { left: 4.4%; bottom: 4.2%; }
-.template-collage .tpl-dot-br { right: 4.4%; bottom: 4.2%; }
 
 /* ---------- 放映：让 .tpl-disc 也能吃到彩胶花色 ---------- */
 

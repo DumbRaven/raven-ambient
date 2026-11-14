@@ -353,17 +353,6 @@
   display: none;
 }
 
-/* 全屏时控制条贴底不留缝。窗口态底下有页面 padding，全屏后那块 padding 还在，
-   黑带就浮在离底边 20px 的位置，看着像没贴住。
-
-   ——以上是通栏黑带时候的判断。现在控制条改成了离底的玻璃胶囊（见上方
-   `.media-room.is-expanded .theater-bar` 的说明），"贴底"反而会让圆角被屏幕边缘切掉，
-   所以这里不再覆盖 bottom 与 border-radius，只留一条：**不让页面 padding 影响它**。
-   这条原本就是干这个的，改胶囊之后唯一还需要的就是别让页面 padding 把它往上顶。 */
-.media-room.is-expanded .theater-bar {
-  margin-bottom: 0;
-}
-
 /* ---------- 放映：空库时的占位台面 ---------- */
 
 /* 库空着时台面也要能看。占位画面是一块渐变，不是真图片——
@@ -383,7 +372,6 @@
   inset: 0;
   background: repeating-linear-gradient(135deg, #ffffff08 0 2px, #ffffff00 2px 9px);
 }
-
 
 /* ---------- 放映：雨 ---------- */
 
@@ -410,7 +398,6 @@
 
 /* 雨丝：两条重复的斜向渐变，靠平移制造「一直在下」。
    不用元素画是因为雨丝要密到看不出个体，用元素反而更贵。 */
-
 
 @keyframes rain-sweep {
   from { background-position: 0 0, 0 0; }
@@ -666,10 +653,8 @@
 /* 2. 空库提示条压在信息条上。挪到台面顶部——底部永远有控制条，
    提示放上面不会和任何东西打架。 */
 
-
 /* 3. 乌鸦压住 pick by 那三行字。乌鸦再往右下挪、缩小，
    并且给它一个深色底托，别在浅色面板上糊成一团。 */
-
 
 /* 4. pick by 在面板左下角，和圆形/乌鸦都不碰 */
 .tpl-pick {
@@ -686,26 +671,20 @@
 
 /* ---------- 放映：拼贴版三处位置修正 ---------- */
 
-
 /* 雨丝在深色画面上几乎看不见：原来两条渐变最亮只到 #ffffff52，
    再乘 rain-layer 的 opacity 就没了。提亮，并把间距收紧一点让它更密。 */
-
 
 /* 空库提示条压在画面正中偏上，盖住了画面本身。
    挪到画面底部——那里只有渐变，且离开控制条还有一段距离。 */
 
-
 /* ---------- 放映：拼贴版与雨层的第二轮修正 ---------- */
-
 
 /* 空库提示条还是压在信息条上（它相对 .theater-screen 定位，而信息条也在底部）。
    挪到画面正上方——那里是纯画面，没有版式元素。 */
 
-
 /* 雨丝：改成「一个超高元素 + translateY」。
    原来用 background-position 动画，位移距离和图案周期对不齐，视觉上是在闪而不是在落。
    现在位移正好等于图案周期（20px），循环无缝，而且方向就是往下。 */
-
 
 @keyframes rain-fall {  to { transform: translateY(20px); }
 }
@@ -755,11 +734,10 @@
   to { transform: translateY(19px); }
 }
 
-/* 空库提示。相对 .theater-screen 定位，而信息条也在底部——
-   放底部一定打架。挪到画面正上方。 */
 .theater-blank-hint {
   top: 14px;
   bottom: auto;
+  z-index: 12;
 }
 
 .media-room.is-expanded .theater-blank-hint {
@@ -767,28 +745,9 @@
   bottom: auto;
 }
 
-/* 空库提示要压在雨层之上。雨层 z-index 是 7，提示原来是 9，
-   但它是 .theater-screen 的直接子元素，而雨层也是——两者同级时
-   后写的赢。显式抬到 12。 */
-.theater-blank-hint {
-  z-index: 12;
-}
-
-
-/* 这里原本有三条 `top: 7% / 34% / bottom: 5%` 的星位置。
-   选择器带 `.media-room.is-expanded`（4 类），比文件末尾那套
-   `.template-collage .tpl-star-a`（2 类）更具体，于是全屏时它一直赢——
-   文件末尾反复调的百分比从来没生效过，这就是「星星怎么摆都错位」的第二半原因。
-   星的位置现在只在文件末尾定义一处，这里删掉。 */
-
-
-.media-room.is-expanded .tpl-with { font-size: 14px; margin-top: 26px; }
-.media-room.is-expanded .tpl-pick { font-size: 13px; max-width: 42%; }
-
 /* 信息条：全屏下两行字段之间的空隙拉大，别挤成一小坨。 */
 .media-room.is-expanded .tpl-fields { gap: 0; }
 .media-room.is-expanded .tpl-list { padding-right: 0; }
-
 
 /* 窄屏：拼贴改成上下排，右列面板和彩胶都不画——屏幕太窄，
    硬塞进去只会把画面挤没。 */
@@ -796,11 +755,9 @@
    拼贴版是固定比例排版，窗口小的时候整体等比缩，不改结构；
    压成单列会让右列两轨变成 0px，面板和唱片直接不渲染。 */
 
-
 .template-collage > .tpl-block {
   border-radius: 0;
 }
-
 
 /* 文字。参考图里通篇是衬线体（Georgia/Times 那一路），
    小标题是大写 + 宽字距，值是斜体。 */

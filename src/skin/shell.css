@@ -85,7 +85,6 @@
   margin-top: 18px;
 }
 
-/* ---------- 导航：一块黑底滑块弹过去 ---------- */
 .view-tabs {
   position: relative;
   display: flex;
@@ -97,7 +96,6 @@
   border-radius: 999px;
   background: var(--bold-sunken);
   width: fit-content;
-  /* 胶囊自身有 5px 内边距，往左退同样多，第一个页签的起点才和下面的内容对齐 */
   margin-left: -5px;
   margin-bottom: 22px;
 }
@@ -151,7 +149,10 @@
   background: transparent;
   color: var(--bold-on-dark);
 }
-.view-tabs > button.active svg { color: var(--bold-on-dark); }
+.view-tabs > button.active svg {
+  color: var(--bold-on-dark);
+  stroke-width: 2.1;
+}
 .view-tabs > button.active:hover { color: var(--bold-on-dark); }
 .view-tabs > button:not(.active):hover { color: var(--bold-ink); background: #ffffffb0; }
 .view-tabs small {
@@ -160,7 +161,14 @@
   opacity: .5;
   margin-left: 1px;
 }
-.tab-dot { background: var(--bold-coral); width: 6px; height: 6px; margin-left: 2px; }
+.tab-dot {
+  background: var(--bold-coral);
+  width: 6px;
+  height: 6px;
+  margin-left: 2px;
+  transform-origin: 50% 50%;
+  animation: tab-dot-in 180ms cubic-bezier(.2, .7, .3, 1) both;
+}
 
 /* ---------- 工具条 ---------- */
 .collection-toolbar { margin: 0 0 20px; }

@@ -89,7 +89,6 @@
   }
 }
 
-
 /* 三块内容各自钉死在自己的格子里。缝本身不画东西，露出底下的画布色。 */
 .template-collage .tpl-block {
   position: relative;
@@ -104,10 +103,8 @@
   grid-row: 1;
 }
 
-
 /* 信息条只有 105px 高（305 的 27.4%），三组内容必须压得很紧才放得下。
    实测按默认间距排，「PLAYLIST」那行会被控制条压住。 */
-
 
 .tpl-block-bar .tpl-fields { gap: 0; }
 .tpl-block-bar .tpl-fields > div { gap: 0; }
@@ -117,12 +114,10 @@
 
 /* 右列：一整条竖面板，从顶到底，跨越上下两行。 */
 
-
 .tpl-dot-tl { top: 10px; left: 10px; }
 .tpl-dot-tr { top: 10px; right: 10px; }
 .tpl-dot-bl { bottom: 10px; left: 10px; }
 .tpl-dot-br { bottom: 10px; right: 10px; }
-
 
 /* with + 三个平台 + 三个小图标 */
 .tpl-with {
@@ -163,11 +158,9 @@
   z-index: 6;
 }
 
-
 /* 星的位置统一在文件末尾那套 `.template-collage .tpl-star-*` 里定义。
    这里原来是 px 写法（`top: 42px; right: 6px`），非 collage 版式用不上，
    而 collage 版式下它会被末尾那套按实测换来的百分比覆盖，属于死规则。 */
-
 
 .tpl-fields > div {
   display: grid;
@@ -196,7 +189,6 @@
   opacity: 0.7;
 }
 
-
 /* 内圈：正在放的那张封面。拿不到封面就只留盘面，不画空洞。 */
 .tpl-disc-label {
   position: absolute;
@@ -224,7 +216,6 @@
   background: var(--tpl-panel);
   box-shadow: 0 0 0 1px #ffffff33;
 }
-
 
 /* 唱片跟着音乐转。原版（唱片柜里的 .vinyl）是 10s 一圈、用 animation-play-state
    控制启停；这里沿用同一节奏。
@@ -267,15 +258,20 @@
   to { opacity: 0; transform: translateX(42%); }
 }
 
-/* 唱片上永远挂两条动画：入场（只播一次）和自转。
-   自转用 animation-play-state 而不是加/删 animation——原版 .vinyl 就是这么做的。
-   这样暂停时碟停在当前角度，续播从那个角度接着转，不会跳回 0°。
-   入场之后自转才起步（delay 520ms），两条动画各自改各自的属性，不打架。 */
 .template-collage .tpl-disc {
-  animation:
-    tpl-disc-enter 520ms cubic-bezier(0.22, 0.61, 0.36, 1) 1,
-    tpl-disc-spin 10s linear infinite 520ms;
+  animation: tpl-disc-enter 520ms cubic-bezier(0.22, 0.61, 0.36, 1) 1, tpl-disc-spin 10s linear infinite 520ms;
   animation-play-state: running, paused;
+  background: radial-gradient(circle at 42% 38%, #ffffff1f 0%, #ffffff00 46%), var(--disc-base, #1d1d1d);
+  position: absolute;
+  left: 82.40%;
+  top: 68.52%;
+  width: 32.25%;
+  aspect-ratio: 1;
+  height: auto;
+  translate: calc(-50% + var(--disc-drag, 0px)) -50%;
+  border-radius: 50%;
+  z-index: 6;
+  box-shadow: 0 0 0 0.35cqw #ffffff1f, 0 2.2cqw 5cqw #00000052;
 }
 
 .template-collage .tpl-disc.spinning {
@@ -626,13 +622,18 @@
   }
 }
 
-
 .media-room.is-expanded .tpl-note { font-size: 15px; margin-top: 26px; }
-.media-room.is-expanded .tpl-with { font-size: 15px; margin-top: 30px; }
+.media-room.is-expanded .tpl-with {
+  font-size: 14px;
+  margin-top: 26px;
+}
 .media-room.is-expanded .tpl-with em { font-size: 14px; margin-top: 8px; }
 
-
-.media-room.is-expanded .tpl-pick { font-size: 13px; width: 22%; }
+.media-room.is-expanded .tpl-pick {
+  font-size: 13px;
+  width: 22%;
+  max-width: 42%;
+}
 .media-room.is-expanded .tpl-fields b,
 .media-room.is-expanded .tpl-list b { font-size: 13px; }
 .media-room.is-expanded .tpl-fields span { font-size: 17px; max-width: 30ch; }
