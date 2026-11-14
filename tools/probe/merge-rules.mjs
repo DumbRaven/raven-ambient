@@ -84,11 +84,57 @@ function specificity(sel) {
   return ids * 1e6 + classes * 1e3 + types;
 }
 
-function tailKey(sel) {
-  return sel.split(',').map(part => {
-    const tail = part.trim().split(/[\s>+~]+/).filter(Boolean).pop() || '';
-    return (tail.match(/\.[\w-]+/g) || []).join('');
-  }).filter(Boolean).sort().join('|');
+/**
+ * 把选择器拆成单个部分，每部分带自己的尾段指纹与特异性。
+ *
+ * 为什么不能把 `.a, .b > c` 当成一个整体算：只要其中**一部分**能命中
+ * 目标元素，这条规则就会夹在中间改变层叠。用整串指纹会漏掉这种部分命中，
+ * 使本该被挡住的合并通过。
+ */
+function parts(sel) {
+  return sel.split(',').map(s => s.trim()).filter(Boolean).map(s => ({
+    raw: s,
+    key: tailKeyOf(s),
+    spec: specificity(s),
+  }));
+}
+
+/**
+ * 单个选择器（不含逗号）的尾段指纹。
+ *
+ * 只取类名是不够的：`.record-card > p` 与 `.transition-options button`
+ * 的类名尾段都是空串，会被误判成同一个元素（13 个被夹住的里至少 2 个
+ * 是这么误报的）。所以标签名与伪元素也要算进来。
+ *
+ * 返回**结构化**对象而非拼好的字符串，因为比对时要做子集判断：
+ * `.tpl-tag` 与 `.tpl-tag.is-armed` 是同一个盒子上更具体的规则，
+ * 会压住前者；而 `.tpl-tag` 与 `.tpl-tag::before` 是两个不同的盒子，
+ * 互不覆盖。拼成字符串就分不出这两种情况了。
+ */
+function tailKeyOf(part) {
+  const tail = part.trim().split(/[\s>+~]+/).filter(Boolean).pop() || '';
+  return {
+    tag: (tail.match(/^[a-zA-Z][\w-]*/) || [''])[0].toLowerCase(),
+    classes: (tail.match(/\.[\w-]+/g) || []).sort(),
+    pseudo: ((tail.match(/::?[\w-]+(\([^)]*\))?/g) || []).sort()).join(''),
+  };
+}
+
+/**
+ * other 的尾段是否**可能命中**与 mine 相同的盒子，且不会更弱。
+ *
+ * 判据（宁可多挡，不可漏挡）：
+ *   · 伪元素必须完全相同——`::before` 与元素本身是两个盒子；
+ *   · 标签名：两边都写了就必须相同，一边没写则视为可能；
+ *   · 类名：other 的类名集合必须是 mine 的**超集**——多一个类意味着
+ *     它是同一盒子上更具体的选择器（`.tpl-tag.is-armed` 压住 `.tpl-tag`）。
+ *
+ * 代价不对称：多挡只是少合并几条（可读性收益小），漏挡会让渲染真的变。
+ */
+function mayHit(mine, other) {
+  if (other.pseudo !== mine.pseudo) return false;
+  if (other.tag && mine.tag && other.tag !== mine.tag) return false;
+  return mine.classes.every(c => other.classes.includes(c));
 }
 
 let pos = 0;
@@ -112,8 +158,7 @@ for (const r of all) {
 /** 判断这一组能不能合并。返回 null 表示可以，否则返回原因。 */
 function blockReason(group) {
   const sel = group[0].sel;
-  const tail = tailKey(sel);
-  const spec = Math.min(...sel.split(',').map(specificity));
+  const mine = parts(sel);
   const propOccurrences = new Map();
   for (const r of group) {
     for (const d of decls(r.body)) {
@@ -135,8 +180,16 @@ function blockReason(group) {
       // 现状）；合并把 modern 的规则提到 shelf 之后，窄屏那条突然赢了，
       // 卡片宽度变了 2px、12 份快照崩 1 份。
       if (!decls(other.body).some(d => d.prop === prop)) continue;
-      if (tailKey(other.sel) !== tail) continue;
-      if (Math.min(...other.sel.split(',').map(specificity)) >= spec) return `${prop} 被 ${other.file}:${other.line} 夹住`;
+      // 逐部分比对：只要 other 的**某一部分**可能命中 mine 的某一部分、
+      // 且特异性不低于它，就可能在层叠里压住它，这组就不能合并。
+      //
+      // 早先这里用整串指纹 + Math.min(spec)，两头都错：
+      //   · 整串指纹 —— `.a, .b > c` 里只要 `.b > c` 能命中就会被漏掉；
+      //   · Math.min —— 多选择器里那个很弱的部分把整体特异性拉低，
+      //     于是特异性其实更高的规则被判成「压不住」，该挡的没挡住。
+      const clash = parts(other.sel).some(o =>
+        mine.some(m => mayHit(m.key, o.key) && o.spec >= m.spec));
+      if (clash) return `${prop} 被 ${other.file}:${other.line} 夹住`;
     }
   }
   return null;
@@ -169,10 +222,11 @@ console.log(`[merge] ${all.length} 条规则，${groups.size} 个选择器，可
 
 // dry-run 时把前几个合并结果打出来看
 if (!write) {
-  for (const p of plan.slice(0, 4)) {
-    const last = p.group[p.group.length - 1];
+  for (const p of plan.slice(0, 6)) {
+    const first = p.group[0];
     console.log(`${p.group[0].sel}   ${p.group.length} 次（${p.group.map(r => r.file + ':' + r.line).join(', ')}）`);
-    console.log(`  → 合并到 ${last.file}:${last.line}，${p.merged.size} 个属性`);
+    // 落点与下面「执行」段一致：第一次出现的位置。
+    console.log(`  → 合并到 ${first.file}:${first.line}，${p.merged.size} 个属性`);
     for (const prop of p.orderOf) console.log(`     ${prop}: ${p.merged.get(prop).slice(0, 60)}`);
     console.log();
   }

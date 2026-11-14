@@ -11,18 +11,6 @@
   filter: saturate(0.92) brightness(0.9);
 }
 
-/* ===== 文字位置的唯一来源：AE 的 raven-shapes.json =====
-   每条都是 layer 的 pos（锚点）+ fontSize，除以画布 1920×1080 换算成百分比。
-   改动版式时只改这一段，别在别处再写 position。 */
-
-/* 正介绍：pos(1410.18,131.25)，字号 18 → 1.67cqw。相对面板：左 21.9%、上 16.2%。 */
-
-/* 镜像介绍：pos(1467.46,269)，scale(-100,-100) 就是整块上下左右都翻。 */
-
-/* 竖排 DUMBRAVEN：pos(1748.61,230.56)，字号 52 → 4.81cqw。
-   相对面板：左 77.7%、上 32.7%。 */
-.template-collage .tpl-tag { right: 12.5%; top: 32.65%; width: 26%; }
-
 .template-collage .tpl-block-bar .tpl-fields {
   padding-top: 12.9%;
   position: absolute;
@@ -30,26 +18,33 @@
   padding: 0;
   display: block;
 }
-/* 这里只管第一格（TITLE）的字号。第二格改成番茄钟之后读数是 2.9cqw、
-   标签 1.32cqw，都不一样，不能再按 `> div > b` 一把抓。 */
-.template-collage .tpl-block-bar .tpl-fields > div:first-child > b { font-size: 1.48cqw; }
-.template-collage .tpl-block-bar .tpl-fields > div:first-child span { font-size: 1.67cqw; }
+.template-collage .tpl-block-bar .tpl-fields > div:first-child > b {
+  font-size: 1.32cqw;
+  letter-spacing: 0.14em;
+  opacity: 0.72;
+  font-weight: 600;
+}
+.template-collage .tpl-block-bar .tpl-fields > div:first-child span {
+  font-size: 1.49cqw;
+  display: block;
+  position: static;
+  left: 2.15cqw;
+  top: 1.06cqw;
+  white-space: nowrap;
+}
 .template-collage .tpl-block-bar .tpl-list > b { font-size: 1.48cqw; }
 .template-collage .tpl-block-bar .tpl-list span { font-size: 1.57cqw; }
 
-/* 正介绍 pos(1410.18,131.25) 字号 18 */
-/* 镜像介绍 pos(1467.46,269) 字号 20，AE 里 scale(-100,-100) 整块翻转 */
-/* 竖排 DUMBRAVEN pos(1748.61,230.56) 字号 52 */
-.template-collage .tpl-tag { right: 11.5%; top: 26.4%; width: 21%; }
-
 .template-collage .tpl-block-bar .tpl-fields > div:first-child {
-  position: absolute; left: 4.61%; top: 13.50%; margin: 0;
+  position: absolute;
+  left: 4.61%;
+  top: 13.50%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1cqw;
 }
-.template-collage .tpl-block-bar .tpl-fields > div:first-child > b { font-size: 1.32cqw; }
-.template-collage .tpl-block-bar .tpl-fields > div:first-child span {
-  display: block; position: absolute; left: 2.15cqw; top: 1.06cqw;
-  font-size: 1.49cqw; white-space: nowrap;
-}
+
 .template-collage .tpl-block-bar .tpl-list {
   position: absolute;
   left: 4.85%;
@@ -77,17 +72,6 @@
   fill: color-mix(in srgb, var(--tpl-bar) 65%, var(--tpl-panel));
 }
 
-/* ===== 凹槽里的竖排 DUMBRAVEN：5 行、每行 2 个字母、左右交错 =====
-   AE 里那一层是「    R D     A U     V M     E B     N」——每行两个字母，
-   第二列比第一列低一截，整体像一个斜着排的柱子。 */
-.template-collage .tpl-tag {
-  right: 11.5%;
-  top: 26.4%;
-  width: 21%;
-  padding: 2.2cqw 0 2.6cqw;
-  border-radius: 5.2cqw;
-}
-
 /* 每行两个字母：第二个往下沉半格，做出「交错」的错位感。 */
 .template-collage .tpl-badge > span {
   display: block;
@@ -96,45 +80,6 @@
 .template-collage .tpl-badge > span:nth-child(even) {
   transform: translateY(0.5cqw);
   opacity: 0.88;
-}
-
-/* ===== 面板右上那枚竖排 DUMBRAVEN 胶囊（覆盖上面所有写法） =====
-   位置全部取自参考图（AE 最终渲染 PNG）的实测像素，不取 AE 的 pos——
-   AE 导出 JSON 里这些图层还套着父级/空对象变换，算出来的绝对值是错的
-   （同一个 JSON 里「小图标」算 51.6%，实测 67.79%）。
-   画布实测：胶囊 x=[1701,1841] y=[91,400] → left 88.73% top 8.49% w 7.30% h 28.82%。
-   这里换成相对面板的百分比：left 70.34% top 9.58% width 22.79%。 */
-.template-collage .tpl-tag {
-  right: auto;
-  top: 9.58%;
-  left: 70.34%;
-  width: 22.79%;
-  min-height: 0;
-  /* 高 = 胶囊实测 28.82% 画布高 ÷ 面板高 55.74% */
-  height: 51.70%;
-  padding: 0;
-  /* 圆角是半个宽：参考图里那是一条正胶囊，两端是正半圆，不是圆角矩形。 */
-  border-radius: 999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  /* 胶囊底是半透明白叠在面板上：参考图实测 #7a8494，面板 #4a5363，
-     即约 26% 的白。之前那块白噪点就是丢了这层透明度、又叠了死白的纹理。 */
-  background-image: none;
-  background-color: #ffffff3d;
-  box-shadow: none;
-  isolation: isolate;
-  /* 这是个 <button>：点一下换石纹（用户 m09905）。把浏览器默认的
-     按钮外观全部抹掉，只留 cursor 与按下反馈。 */
-  appearance: none;
-  border: 0;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-  /* 不许选中文字：连点两下不该选中 DUMB / RAVEN。 */
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-  transition: transform 160ms cubic-bezier(.2, .8, .3, 1);
 }
 
 /* 按下时给一点点形变。为什么这么轻：这块胶囊在画面里占得不小，
@@ -209,29 +154,6 @@
 .template-collage .tpl-block-bar {
   display: block;
   padding: 0;
-}
-
-.template-collage .tpl-block-bar .tpl-fields > div:first-child {
-  position: absolute;
-  left: 4.61%;
-  top: 13.50%;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1.1cqw;
-}
-
-.template-collage .tpl-block-bar .tpl-fields > div:first-child > b {
-  font-size: 1.32cqw;
-  letter-spacing: 0.14em;
-  opacity: 0.72;
-  font-weight: 600;
-}
-
-.template-collage .tpl-block-bar .tpl-fields > div:first-child span {
-  position: static;
-  font-size: 1.49cqw;
-  white-space: nowrap;
 }
 
 /* 第二格：番茄钟。原先这里是 PHOTOGRAPHY / 「Read the introduction」，
