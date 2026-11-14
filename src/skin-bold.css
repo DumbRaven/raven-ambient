@@ -28,6 +28,20 @@
   --bold-coral: #f7b7a8;
   --bold-sand: #efede6;
 
+  /* 下面这批是「按用途拆开」的令牌，不是「按色值拆开」。
+     同一个 #fff 在 color / background / border 里是三种东西：
+     深底上的白字会跟着底走，白卡片的底可能要保持白，白描边介于两者之间。
+     合成一个令牌，往后调一处就得连带改其他两处。 */
+  --bold-on-dark: #fff;
+  --bold-surface: #fff;
+  --bold-edge: #fff;
+  --bold-solid: #000;
+  --bold-hover: #f2f1ed;
+  --bold-sunken: #f0efea;
+  --bold-danger: #c04a34;
+  --bold-danger-deep: #a13a26;
+  --bold-soft: #6f6f6a;
+
   color: var(--bold-ink);
   background: var(--bold-page);
   font-family: "Inter", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
@@ -44,7 +58,7 @@
   background: var(--bold-page);
 }
 
-body { background: var(--bold-page, #f6f5f2); }
+body { background: var(--bold-page, var(--bold-page)); }
 
 /* 去掉纸纹与渐变底，换成干净的白 */
 .background-wash { display: none; }
@@ -70,13 +84,13 @@ body { background: var(--bold-page, #f6f5f2); }
 }
 
 .brand { gap: 10px; }
-.brand > svg { color: #101010; }
+.brand > svg { color: var(--bold-ink); }
 .brand > span {
   font-family: "Inter", "Segoe UI", sans-serif;
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.2px;
-  color: #101010;
+  color: var(--bold-ink);
 }
 .brand i {
   font-size: 14px;
@@ -93,11 +107,11 @@ body { background: var(--bold-page, #f6f5f2); }
   height: 36px;
   padding: 0;
   border-radius: 50%;
-  color: #101010;
+  color: var(--bold-ink);
   border: 1px solid var(--bold-line);
-  background: #fff;
+  background: var(--bold-surface);
 }
-.icon-button:not(:disabled):hover { background: #f2f1ed; color: #101010; }
+.icon-button:not(:disabled):hover { background: var(--bold-hover); color: var(--bold-ink); }
 
 .local-status {
   font: 600 9px/1 "Inter", sans-serif;
@@ -105,7 +119,7 @@ body { background: var(--bold-page, #f6f5f2); }
   color: var(--bold-faint);
   margin-right: 8px;
 }
-.local-status i { background: #101010; box-shadow: none; width: 5px; height: 5px; }
+.local-status i { background: var(--bold-ink); box-shadow: none; width: 5px; height: 5px; }
 
 /* ---------- 首屏标题 ---------- */
 .intro { padding: 26px 2px 30px; }
@@ -122,12 +136,12 @@ body { background: var(--bold-page, #f6f5f2); }
   line-height: 1.14;
   letter-spacing: -1.4px;
   font-weight: 800;
-  color: #101010;
+  color: var(--bold-ink);
 }
 .intro h1 em {
   font-style: normal;
   font-weight: 800;
-  color: #101010;
+  color: var(--bold-ink);
 }
 .intro > p {
   color: var(--bold-muted);
@@ -147,7 +161,7 @@ body { background: var(--bold-page, #f6f5f2); }
   min-height: 0;
   padding: 5px;
   border-radius: 999px;
-  background: #f0efea;
+  background: var(--bold-sunken);
   width: fit-content;
   /* 胶囊自身有 5px 内边距，往左退同样多，第一个页签的起点才和下面的内容对齐 */
   margin-left: -5px;
@@ -166,7 +180,7 @@ body { background: var(--bold-page, #f6f5f2); }
   width: var(--nav-marker-width, 0px);
   transform: translateX(var(--nav-marker-x, 0px));
   border-radius: 999px;
-  background: #101010;
+  background: var(--bold-ink);
   pointer-events: none;
   z-index: 0;
 }
@@ -194,18 +208,18 @@ body { background: var(--bold-page, #f6f5f2); }
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0;
-  color: #6f6f6a;
+  color: var(--bold-soft);
   gap: 6px;
   background: transparent;
   transition: color .22s ease;
 }
 .view-tabs > button.active {
   background: transparent;
-  color: #fff;
+  color: var(--bold-on-dark);
 }
-.view-tabs > button.active svg { color: #fff; }
-.view-tabs > button.active:hover { color: #fff; }
-.view-tabs > button:not(.active):hover { color: #101010; background: #ffffffb0; }
+.view-tabs > button.active svg { color: var(--bold-on-dark); }
+.view-tabs > button.active:hover { color: var(--bold-on-dark); }
+.view-tabs > button:not(.active):hover { color: var(--bold-ink); background: #ffffffb0; }
 .view-tabs small {
   font: 600 10px/1 "Inter", sans-serif;
   color: inherit;
@@ -222,7 +236,7 @@ body { background: var(--bold-page, #f6f5f2); }
   gap: 2px;
   padding: 4px;
   border-radius: 999px;
-  background: #f0efea;
+  background: var(--bold-sunken);
   width: fit-content;
 }
 
@@ -235,7 +249,7 @@ body { background: var(--bold-page, #f6f5f2); }
   width: var(--flip-width, 0px);
   transform: translateX(var(--flip-x, 0px));
   border-radius: 999px;
-  background: #101010;
+  background: var(--bold-ink);
   pointer-events: none;
   z-index: 0;
   transition: transform 380ms cubic-bezier(.3, 1.28, .48, 1), width 380ms cubic-bezier(.3, 1.28, .48, 1);
@@ -248,7 +262,7 @@ body { background: var(--bold-page, #f6f5f2); }
   z-index: 1;
   font-size: 12px;
   font-weight: 600;
-  color: #6f6f6a;
+  color: var(--bold-soft);
   padding: 7px 16px;
   border: 0;
   border-radius: 999px;
@@ -259,25 +273,25 @@ body { background: var(--bold-page, #f6f5f2); }
 .filter-tabs button.active {
   background: transparent;
   border-color: transparent;
-  color: #fff;
+  color: var(--bold-on-dark);
   box-shadow: none;
 }
 
-.filter-tabs button.active:hover { color: #fff; }
-.filter-tabs button:not(.active):hover { color: #101010; background: transparent; }
+.filter-tabs button.active:hover { color: var(--bold-on-dark); }
+.filter-tabs button:not(.active):hover { color: var(--bold-ink); background: transparent; }
 
 .search {
   gap: 7px;
   color: var(--bold-faint);
   max-width: 168px;
-  background: #fff;
+  background: var(--bold-surface);
   border: 1px solid var(--bold-line);
   border-radius: 999px;
   padding: 8px 14px;
 }
 .search input {
   font-size: 12px;
-  color: #101010;
+  color: var(--bold-ink);
   padding: 0;
 }
 .search input::placeholder { color: var(--bold-faint); }
@@ -288,7 +302,7 @@ body { background: var(--bold-page, #f6f5f2); }
 .cabinet {
   border: 0;
   border-radius: 26px;
-  background: #fff;
+  background: var(--bold-surface);
   box-shadow: none;
   backdrop-filter: none;
   padding: 22px 20px 0;
@@ -303,7 +317,7 @@ body { background: var(--bold-page, #f6f5f2); }
   padding: 2px 4px 18px;
   text-transform: uppercase;
 }
-.shelf-label > span:last-child { font-size: 11px; letter-spacing: 0; color: #101010; }
+.shelf-label > span:last-child { font-size: 11px; letter-spacing: 0; color: var(--bold-ink); }
 
 .record-grid {
   column-gap: 18px;
@@ -325,7 +339,7 @@ body { background: var(--bold-page, #f6f5f2); }
 .case-front {
   border: 0;
   border-radius: 20px;
-  background: #fff;
+  background: var(--bold-surface);
   box-shadow: 0 0 0 1px #00000008, 0 2px 10px #0000000a;
   transform-origin: 50% 50%;
   transition: transform .5s cubic-bezier(.2,.7,.3,1), opacity .4s;
@@ -393,7 +407,7 @@ body { background: var(--bold-page, #f6f5f2); }
   right: 17px;
   font: 700 9px/1 "Inter", sans-serif;
   letter-spacing: .8px;
-  color: #101010;
+  color: var(--bold-ink);
   opacity: .42;
   text-transform: uppercase;
   overflow: hidden;
@@ -409,7 +423,7 @@ body { background: var(--bold-page, #f6f5f2); }
   font-weight: 700;
   line-height: 1.24;
   letter-spacing: -0.4px;
-  color: #101010;
+  color: var(--bold-ink);
   text-shadow: none;
   -webkit-line-clamp: 2;
 }
@@ -419,7 +433,7 @@ body { background: var(--bold-page, #f6f5f2); }
   bottom: 15px;
   font: 600 9px/1 "Inter", sans-serif;
   letter-spacing: .4px;
-  color: #101010;
+  color: var(--bold-ink);
   opacity: .38;
   text-transform: uppercase;
   overflow: hidden;
@@ -432,7 +446,7 @@ body { background: var(--bold-page, #f6f5f2); }
 .record-name {
   font-size: 13px;
   font-weight: 600;
-  color: #101010;
+  color: var(--bold-ink);
   letter-spacing: -0.1px;
   line-height: 1.5;
 }
@@ -442,15 +456,15 @@ body { background: var(--bold-page, #f6f5f2); }
   height: 28px;
   border-radius: 50%;
   border: 1px solid var(--bold-line);
-  background: #fff;
-  color: #101010;
+  background: var(--bold-surface);
+  color: var(--bold-ink);
   padding: 0;
 }
-.select-record:not(:disabled):hover { background: #f2f1ed; color: #101010; }
+.select-record:not(:disabled):hover { background: var(--bold-hover); color: var(--bold-ink); }
 .select-record[aria-pressed="true"] {
-  background: #101010;
-  border-color: #101010;
-  color: #fff;
+  background: var(--bold-ink);
+  border-color: var(--bold-ink);
+  color: var(--bold-on-dark);
   box-shadow: none;
 }
 .select-record > span { font: 600 11px/1 "Inter", sans-serif; }
@@ -461,20 +475,20 @@ body { background: var(--bold-page, #f6f5f2); }
   gap: 7px;
   margin-top: 4px;
 }
-.playing-bars i { background: #101010; }
+.playing-bars i { background: var(--bold-ink); }
 
 /* ---------- 加入条 / 柜底 ---------- */
 .add-to-shelf {
   margin: 22px 0 20px;
   font-size: 12px;
   font-weight: 600;
-  color: #6f6f6a;
+  color: var(--bold-soft);
   padding: 13px;
   border: 1px dashed #d8d6cf;
   border-radius: 14px;
   background: transparent;
 }
-.add-to-shelf:not(:disabled):hover { background: #f6f5f2; color: #101010; border-color: #101010; }
+.add-to-shelf:not(:disabled):hover { background: var(--bold-page); color: var(--bold-ink); border-color: var(--bold-ink); }
 
 .cabinet-base {
   font: 600 9px/1 "Inter", sans-serif;
@@ -486,8 +500,8 @@ body { background: var(--bold-page, #f6f5f2); }
   padding: 0 20px;
   border-radius: 0 0 26px 26px;
 }
-.cabinet-base > span:first-child { font: 700 10px "Inter", sans-serif; color: #101010; }
-.cabinet-base i { background: #101010; box-shadow: none; width: 5px; height: 5px; }
+.cabinet-base > span:first-child { font: 700 10px "Inter", sans-serif; color: var(--bold-ink); }
+.cabinet-base i { background: var(--bold-ink); box-shadow: none; width: 5px; height: 5px; }
 
 /* ---------- 右侧介绍 ---------- */
 .record-notes { padding-top: 14px; }
@@ -513,7 +527,7 @@ body { background: var(--bold-page, #f6f5f2); }
   font-weight: 800;
   line-height: 1.24;
   letter-spacing: -0.6px;
-  color: #101010;
+  color: var(--bold-ink);
 }
 .artist { font-size: 12px; color: var(--bold-muted); margin-top: 7px; }
 .fine-rule { background: var(--bold-line); width: 100%; margin: 20px 0; height: 1px; }
@@ -527,10 +541,10 @@ body { background: var(--bold-page, #f6f5f2); }
 .text-button {
   font-size: 12px;
   font-weight: 600;
-  color: #101010;
+  color: var(--bold-ink);
   gap: 6px;
 }
-.text-button:not(:disabled):hover { color: #000; }
+.text-button:not(:disabled):hover { color: var(--bold-solid); }
 .edit-notes { font-size: 11px; }
 /* 「编辑 / 试听 / 移除」排成一行。移除缩到最右边，和常用动作拉开距离——
    它不是每天都会点的事，但也不该藏进弹窗第二层。 */
@@ -553,13 +567,13 @@ body { background: var(--bold-page, #f6f5f2); }
   transition: background 0.18s, color 0.18s, border-color 0.18s;
 }
 .notes-preview:not(:disabled):hover,
-.notes-remove:not(:disabled):hover { background: #f6f5f2; color: #101010; }
+.notes-remove:not(:disabled):hover { background: var(--bold-page); color: var(--bold-ink); }
 /* 试听中：实心黑，一眼看出现在响的是试听 */
-.notes-preview.on { background: #101010; color: #fff; border-color: #101010; }
-.notes-preview.on:not(:disabled):hover { background: #000; color: #fff; }
+.notes-preview.on { background: var(--bold-ink); color: var(--bold-on-dark); border-color: var(--bold-ink); }
+.notes-preview.on:not(:disabled):hover { background: var(--bold-solid); color: var(--bold-on-dark); }
 /* 第一下变红，第二下才删。红色只在这一步出现，平时不吓人。 */
-.notes-remove.armed { background: #c04a34; color: #fff; border-color: #c04a34; }
-.notes-remove.armed:not(:disabled):hover { background: #a13a26; color: #fff; border-color: #a13a26; }
+.notes-remove.armed { background: var(--bold-danger); color: var(--bold-on-dark); border-color: var(--bold-danger); }
+.notes-remove.armed:not(:disabled):hover { background: var(--bold-danger-deep); color: var(--bold-on-dark); border-color: var(--bold-danger-deep); }
 
 
 .record-meta { margin: 20px 0 16px; }
@@ -568,25 +582,25 @@ body { background: var(--bold-page, #f6f5f2); }
   margin: 10px 0;
 }
 .record-meta dt { color: var(--bold-faint); }
-.record-meta dd { color: #101010; }
+.record-meta dd { color: var(--bold-ink); }
 
 .notes-select {
   padding: 12px;
   border: 1px solid var(--bold-line);
   border-radius: 999px;
-  background: #fff;
+  background: var(--bold-surface);
   font-size: 12px;
   font-weight: 600;
-  color: #101010;
+  color: var(--bold-ink);
   gap: 7px;
 }
-.notes-select:not(:disabled):hover { background: #f6f5f2; color: #101010; }
+.notes-select:not(:disabled):hover { background: var(--bold-page); color: var(--bold-ink); }
 .notes-select.chosen {
-  background: #101010;
-  border-color: #101010;
-  color: #fff;
+  background: var(--bold-ink);
+  border-color: var(--bold-ink);
+  color: var(--bold-on-dark);
 }
-.notes-select.chosen:hover { background: #000; color: #fff; }
+.notes-select.chosen:hover { background: var(--bold-solid); color: var(--bold-on-dark); }
 
 /* ---------- 滑杆 ---------- */
 .slider-field > span {
@@ -594,7 +608,7 @@ body { background: var(--bold-page, #f6f5f2); }
   font-weight: 500;
   color: var(--bold-muted);
 }
-.slider-field output { font: 600 11px "Inter", sans-serif; color: #101010; }
+.slider-field output { font: 600 11px "Inter", sans-serif; color: var(--bold-ink); }
 
 /* 数字：平时是一行文字，点上去才变成输入框。
    原来常驻一个带 padding 的 number input，会自己撑出一块方框、和标签挤在一起；
@@ -610,14 +624,14 @@ body { background: var(--bold-page, #f6f5f2); }
   border: 0;
   background: none;
   font: 600 11px "Inter", sans-serif;
-  color: #101010;
+  color: var(--bold-ink);
   font-variant-numeric: tabular-nums;
   cursor: text;
   border-radius: 5px;
   transition: background 0.14s ease;
 }
-.slider-field .slider-read:hover { background: #f0efea; }
-.slider-field .slider-read:focus-visible { outline: 2px solid #101010; outline-offset: 2px; }
+.slider-field .slider-read:hover { background: var(--bold-sunken); }
+.slider-field .slider-read:focus-visible { outline: 2px solid var(--bold-ink); outline-offset: 2px; }
 
 /* 编辑态：贴着数字原来的位置长出一个同样大小的输入框，宽度由字符数决定，
    不用固定 38px —— 那会把「0」也撑成一格宽，和百分号之间空出一大块。 */
@@ -626,12 +640,12 @@ body { background: var(--bold-page, #f6f5f2); }
   padding: 0;
   border: 0;
   border-radius: 4px;
-  background: #f0efea;
+  background: var(--bold-sunken);
   font: 600 11px "Inter", sans-serif;
-  color: #101010;
+  color: var(--bold-ink);
   text-align: right;
   font-variant-numeric: tabular-nums;
-  box-shadow: 0 0 0 1.5px #101010;
+  box-shadow: 0 0 0 1.5px var(--bold-ink);
   /* 去掉数字框自带的两条上下箭头：这里一格就是 1，用键盘上下键更准 */
   appearance: textfield;
   -moz-appearance: textfield;
@@ -653,23 +667,23 @@ body { background: var(--bold-page, #f6f5f2); }
 input[type="range"] {
   height: 4px;
   border-radius: 999px;
-  background: linear-gradient(to right, #101010 0 var(--fill), #eceae5 var(--fill) 100%);
+  background: linear-gradient(to right, var(--bold-ink) 0 var(--fill), #eceae5 var(--fill) 100%);
   margin: 14px 0 8px;
 }
 input[type="range"]::-webkit-slider-thumb {
   width: 15px;
   height: 15px;
-  background: #101010;
-  border: 3px solid #fff;
+  background: var(--bold-ink);
+  border: 3px solid var(--bold-edge);
   border-radius: 50%;
   box-shadow: 0 1px 4px #0000002e;
 }
 .dock-bottom input[type="range"] {
-  background: linear-gradient(to right, #ffffff 0 var(--fill), #ffffff2e var(--fill) 100%);
+  background: linear-gradient(to right, var(--bold-bg) 0 var(--fill), #ffffff2e var(--fill) 100%);
 }
 .dock-bottom input[type="range"]::-webkit-slider-thumb {
   background: var(--bold-ink);
-  border-color: #fff;
+  border-color: var(--bold-edge);
   box-shadow: none;
 }
 
@@ -680,7 +694,7 @@ input[type="range"]::-webkit-slider-thumb {
   font-weight: 600;
   color: var(--bold-muted);
 }
-.sound-tweaks summary:hover { color: #101010; }
+.sound-tweaks summary:hover { color: var(--bold-ink); }
 .tweak-help { font-size: 10px; line-height: 1.8; color: var(--bold-faint); }
 
 /* ---------- 开关 ---------- */
@@ -694,10 +708,10 @@ input[type="range"]::-webkit-slider-thumb {
 .toggle span {
   width: 20px;
   height: 20px;
-  background: #fff;
+  background: var(--bold-surface);
   box-shadow: 0 1px 3px #00000026;
 }
-.toggle.on { background: #101010; }
+.toggle.on { background: var(--bold-ink); }
 .toggle.on span { transform: translateX(18px); }
 
 /* ---------- 底部致谢 ---------- */
@@ -741,7 +755,7 @@ input[type="range"]::-webkit-slider-thumb {
   font-weight: 800;
   line-height: 1.4;
   letter-spacing: -0.4px;
-  color: #101010;
+  color: var(--bold-ink);
   margin: 12px 0 10px;
 }
 .empty-copy p { font-size: 12px; color: var(--bold-muted); line-height: 1.8; }
@@ -754,7 +768,7 @@ input[type="range"]::-webkit-slider-thumb {
   font-weight: 700;
   line-height: 1.5;
   letter-spacing: -0.4px;
-  color: #101010;
+  color: var(--bold-ink);
 }
 .empty-notes em { font-style: normal; color: var(--bold-faint); }
 .empty-notes small { font-size: 11px; line-height: 2; color: var(--bold-muted); }
@@ -777,11 +791,11 @@ input[type="range"]::-webkit-slider-thumb {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  color: #101010;
+  color: var(--bold-ink);
   border: 1px solid var(--bold-line);
-  background: #fff;
+  background: var(--bold-surface);
 }
-.pager-arrow:not(:disabled):hover { background: #101010; color: #fff; border-color: #101010; }
+.pager-arrow:not(:disabled):hover { background: var(--bold-ink); color: var(--bold-on-dark); border-color: var(--bold-ink); }
 .pager-numbers { gap: 6px; }
 .pager-numbers button {
   min-width: 34px;
@@ -793,11 +807,11 @@ input[type="range"]::-webkit-slider-thumb {
   background: transparent;
 }
 .pager-numbers button.active {
-  background: #101010;
-  color: #fff;
-  border-color: #101010;
+  background: var(--bold-ink);
+  color: var(--bold-on-dark);
+  border-color: var(--bold-ink);
 }
-.pager-numbers button:not(.active):hover { background: #f0efea; color: #101010; }
+.pager-numbers button:not(.active):hover { background: var(--bold-sunken); color: var(--bold-ink); }
 
 /* ---------- 按钮 ---------- */
 .primary-button,
@@ -809,27 +823,27 @@ input[type="range"]::-webkit-slider-thumb {
   gap: 8px;
 }
 .primary-button {
-  background: #101010;
-  color: #fff;
-  border: 1px solid #101010;
+  background: var(--bold-ink);
+  color: var(--bold-on-dark);
+  border: 1px solid var(--bold-ink);
   box-shadow: none;
 }
 .primary-button:not(:disabled):hover {
-  background: #000;
-  color: #fff;
+  background: var(--bold-solid);
+  color: var(--bold-on-dark);
   box-shadow: none;
 }
 .secondary-button {
   border: 1px solid var(--bold-line);
-  background: #fff;
-  color: #101010;
+  background: var(--bold-surface);
+  color: var(--bold-ink);
 }
-.secondary-button:not(:disabled):hover { background: #f6f5f2; color: #101010; border-color: #d8d6cf; }
+.secondary-button:not(:disabled):hover { background: var(--bold-page); color: var(--bold-ink); border-color: #d8d6cf; }
 
 /* ---------- 弹窗 ---------- */
 .modal {
-  background: #fff;
-  color: #101010;
+  background: var(--bold-surface);
+  color: var(--bold-ink);
   border: 0;
   outline: 0;
   border-radius: 28px;
@@ -846,10 +860,10 @@ input[type="range"]::-webkit-slider-thumb {
   height: 34px;
   border-radius: 50%;
   border: 1px solid var(--bold-line);
-  background: #fff;
-  color: #101010;
+  background: var(--bold-surface);
+  color: var(--bold-ink);
 }
-.modal-close:not(:disabled):hover { background: #101010; color: #fff; border-color: #101010; }
+.modal-close:not(:disabled):hover { background: var(--bold-ink); color: var(--bold-on-dark); border-color: var(--bold-ink); }
 .eyebrow {
   font: 700 9px/1 "Inter", sans-serif;
   letter-spacing: 1.5px;
@@ -862,7 +876,7 @@ input[type="range"]::-webkit-slider-thumb {
   font-weight: 800;
   line-height: 1.25;
   letter-spacing: -0.7px;
-  color: #101010;
+  color: var(--bold-ink);
   margin-top: 14px;
 }
 .modal-lead { font-size: 12px; color: var(--bold-muted); margin-top: 8px; line-height: 1.7; }
@@ -872,22 +886,22 @@ input[type="range"]::-webkit-slider-thumb {
   padding: 18px 16px;
   border: 1px solid var(--bold-line);
   border-radius: 18px;
-  background: #fff;
-  color: #101010;
+  background: var(--bold-surface);
+  color: var(--bold-ink);
 }
-.import-types button:hover { background: #f6f5f2; color: #101010; }
+.import-types button:hover { background: var(--bold-page); color: var(--bold-ink); }
 .import-types button.selected {
-  border-color: #101010;
-  background: #f6f5f2;
-  box-shadow: 0 0 0 1px #101010;
-  color: #101010;
+  border-color: var(--bold-ink);
+  background: var(--bold-page);
+  box-shadow: 0 0 0 1px var(--bold-ink);
+  color: var(--bold-ink);
 }
-.import-types strong { font-size: 13px; font-weight: 700; margin-top: 12px; color: #101010; }
+.import-types strong { font-size: 13px; font-weight: 700; margin-top: 12px; color: var(--bold-ink); }
 .import-types small { font-size: 11px; color: var(--bold-muted); margin-top: 6px; line-height: 1.6; }
 
 .import-help { font-size: 11px; line-height: 1.9; color: var(--bold-faint); margin-top: 18px; }
 .import-report {
-  background: #f6f5f2;
+  background: var(--bold-page);
   border: 0;
   border-radius: 14px;
   padding: 14px;
@@ -904,32 +918,32 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 14px;
   background: #f9f8f5;
   padding: 13px;
-  color: #101010;
+  color: var(--bold-ink);
   font-size: 13px;
   line-height: 1.7;
   margin-top: 8px;
 }
 .text-field input:focus,
 .text-field textarea:focus {
-  outline: 2px solid #101010;
+  outline: 2px solid var(--bold-ink);
   outline-offset: 0;
-  background: #fff;
+  background: var(--bold-surface);
 }
 .text-field textarea::placeholder { color: var(--bold-faint); }
-.remove-record { color: #c04a34; margin-top: 24px; }
-.remove-record:hover { color: #a13a26; }
+.remove-record { color: var(--bold-danger); margin-top: 24px; }
+.remove-record:hover { color: var(--bold-danger-deep); }
 
 .settings-group { border-bottom: 1px solid var(--bold-line); padding-bottom: 22px; margin-top: 24px; }
-.settings-group h3 { font-size: 13px; font-weight: 700; color: #101010; letter-spacing: -0.1px; }
+.settings-group h3 { font-size: 13px; font-weight: 700; color: var(--bold-ink); letter-spacing: -0.1px; }
 .settings-group > p { font-size: 11px; color: var(--bold-muted); margin: 8px 0 12px; line-height: 1.7; }
 .settings-group > .text-button { margin-top: 14px; }
 
 .sleep-select { font-size: 12px; color: var(--bold-muted); margin-top: 16px; }
 .sleep-select select {
-  background: #f6f5f2;
+  background: var(--bold-page);
   border: 1px solid var(--bold-line);
   border-radius: 999px;
-  color: #101010;
+  color: var(--bold-ink);
   padding: 9px 14px;
   font-size: 12px;
   font-weight: 600;
@@ -937,7 +951,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 .guide-steps { margin-top: 24px; }
 .guide-steps p { font-size: 12px; line-height: 1.8; color: var(--bold-muted); padding-bottom: 20px; padding-left: 34px; }
-.guide-steps strong { font-size: 13px; font-weight: 700; color: #101010; margin-bottom: 5px; }
+.guide-steps strong { font-size: 13px; font-weight: 700; color: var(--bold-ink); margin-bottom: 5px; }
 .guide-steps p > span { font: 700 10px "Inter", sans-serif; color: var(--bold-faint); }
 
 /* 换唱片的方式：三选一胶囊 */
@@ -950,16 +964,16 @@ input[type="range"]::-webkit-slider-thumb {
   padding: 13px 16px;
   border: 1px solid var(--bold-line);
   border-radius: 16px;
-  background: #fff;
+  background: var(--bold-surface);
   text-align: left;
-  color: #101010;
+  color: var(--bold-ink);
 }
-.transition-options button:hover { background: #f6f5f2; color: #101010; }
+.transition-options button:hover { background: var(--bold-page); color: var(--bold-ink); }
 .transition-options button[aria-checked="true"],
 .transition-options button.chosen {
-  border-color: #101010;
-  box-shadow: 0 0 0 1px #101010;
-  background: #f6f5f2;
+  border-color: var(--bold-ink);
+  box-shadow: 0 0 0 1px var(--bold-ink);
+  background: var(--bold-page);
 }
 .transition-options strong { font-size: 13px; font-weight: 700; }
 .transition-options small { font-size: 11px; color: var(--bold-muted); line-height: 1.6; }
@@ -968,7 +982,7 @@ input[type="range"]::-webkit-slider-thumb {
 .toast,
 .motion-notice {
   bottom: 152px;
-  background: #101010;
+  background: var(--bold-ink);
   border: 0;
   border-radius: 999px;
   box-shadow: 0 10px 30px #00000033;
@@ -976,10 +990,10 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
-  color: #fff;
+  color: var(--bold-on-dark);
   backdrop-filter: none;
 }
-.toast svg, .motion-notice svg { color: #fff; }
+.toast svg, .motion-notice svg { color: var(--bold-on-dark); }
 
 /* ---------- 正在听 ---------- */
 .listening-room { padding-top: 8px; }
@@ -988,7 +1002,7 @@ input[type="range"]::-webkit-slider-thumb {
   aspect-ratio: 1.62;
   max-width: 460px;
   border-radius: 28px;
-  background: #101010;
+  background: var(--bold-ink);
   border: 0;
   box-shadow: 0 20px 50px #0000001f;
   overflow: hidden;
@@ -1032,7 +1046,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .vinyl-label {
   box-shadow: 0 0 0 1px #ffffff26;
-  color: #101010;
+  color: var(--bold-ink);
 }
 
 .tonearm {
@@ -1081,7 +1095,7 @@ input[type="range"]::-webkit-slider-thumb {
   font-weight: 800;
   line-height: 1.24;
   letter-spacing: -0.9px;
-  color: #101010;
+  color: var(--bold-ink);
   margin-top: 10px;
 }
 
@@ -1091,7 +1105,7 @@ input[type="range"]::-webkit-slider-thumb {
   margin-top: 26px;
   padding-bottom: 13px;
 }
-.queue-heading h3 { font-size: 13px; font-weight: 700; color: #101010; letter-spacing: -0.1px; }
+.queue-heading h3 { font-size: 13px; font-weight: 700; color: var(--bold-ink); letter-spacing: -0.1px; }
 .queue-heading > span { font: 600 10px "Inter", sans-serif; color: var(--bold-faint); letter-spacing: .3px; }
 
 .music-queue li {
@@ -1100,26 +1114,26 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 12px;
   gap: 12px;
 }
-.music-queue li.current { background: #f6f5f2; }
+.music-queue li.current { background: var(--bold-page); }
 .queue-number { font: 600 10px "Inter", sans-serif; color: var(--bold-faint); width: 26px; }
-.queue-title { font-size: 13px; font-weight: 600; color: #101010; }
+.queue-title { font-size: 13px; font-weight: 600; color: var(--bold-ink); }
 .queue-title small { color: var(--bold-muted); font-size: 11px; margin-top: 4px; font-weight: 400; }
 .queue-remove { color: var(--bold-faint); }
-.queue-remove:hover { color: #c04a34; }
+.queue-remove:hover { color: var(--bold-danger); }
 .queue-empty { font-size: 12px; color: var(--bold-muted); line-height: 1.8; margin-top: 16px; }
 
 .ambient-chips { gap: 9px; padding-top: 15px; }
 .ambient-chips button {
   font-size: 12px;
   font-weight: 600;
-  color: #101010;
+  color: var(--bold-ink);
   border: 1px solid var(--bold-line);
   border-radius: 999px;
   padding: 9px 15px;
-  background: #fff;
+  background: var(--bold-surface);
   gap: 8px;
 }
-.ambient-chips button:hover { background: #f6f5f2; color: #101010; }
+.ambient-chips button:hover { background: var(--bold-page); color: var(--bold-ink); }
 .ambient-mark { width: 15px; height: 15px; }
 
 .back-cabinet { margin: 28px 0 4px; font-size: 12px; }
@@ -1130,7 +1144,7 @@ input[type="range"]::-webkit-slider-thumb {
 .focus-stage {
   border: 0;
   border-radius: 28px;
-  background: #fff;
+  background: var(--bold-surface);
   box-shadow: none;
   backdrop-filter: none;
   padding: 26px 22px 26px;
@@ -1148,12 +1162,12 @@ input[type="range"]::-webkit-slider-thumb {
 .focus-head > .notes-eyebrow > span {
   font: 700 10px/1 "Inter", sans-serif;
   letter-spacing: .6px;
-  color: #101010;
+  color: var(--bold-ink);
 }
 .focus-mode {
   font: 700 9px/1 "Inter", sans-serif;
   letter-spacing: 1.4px;
-  color: #101010;
+  color: var(--bold-ink);
   border: 0;
   border-radius: 999px;
   padding: 7px 13px;
@@ -1162,8 +1176,8 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .focus-dial { width: min(280px, 74vw); margin: 20px auto 6px; }
-.focus-track { stroke: #f0efea; stroke-width: 10; }
-.focus-progress { stroke: #101010; stroke-width: 10; stroke-linecap: round; }
+.focus-track { stroke: var(--bold-sunken); stroke-width: 10; }
+.focus-progress { stroke: var(--bold-ink); stroke-width: 10; stroke-linecap: round; }
 .focus-dial.is-break .focus-progress { stroke: var(--bold-lilac); }
 
 .focus-phase {
@@ -1177,11 +1191,11 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 62px;
   font-weight: 800;
   letter-spacing: -2.5px;
-  color: #101010;
+  color: var(--bold-ink);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
-.focus-dial.is-running .focus-time { color: #101010; }
+.focus-dial.is-running .focus-time { color: var(--bold-ink); }
 .focus-caption { font-size: 11px; color: var(--bold-muted); letter-spacing: 0; }
 
 .focus-actions { gap: 10px; margin-top: 20px; }
@@ -1201,13 +1215,13 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.2px;
-  color: #101010;
+  color: var(--bold-ink);
   margin: 16px 0 4px;
 }
 .focus-numbers { gap: 30px; margin: 16px 0 10px; }
 .focus-numbers strong {
   font: 800 36px/1 "Inter", sans-serif;
-  color: #101010;
+  color: var(--bold-ink);
   letter-spacing: -1px;
   font-variant-numeric: tabular-nums;
 }
@@ -1223,19 +1237,19 @@ input[type="range"]::-webkit-slider-thumb {
   padding: 9px 15px;
   border: 1px solid var(--bold-line);
   border-radius: 999px;
-  background: #fff;
-  color: #101010;
+  background: var(--bold-surface);
+  color: var(--bold-ink);
   font-size: 11px;
   font-weight: 600;
 }
-.focus-presets button:hover { background: #f6f5f2; color: #101010; }
+.focus-presets button:hover { background: var(--bold-page); color: var(--bold-ink); }
 .focus-presets button.chosen {
-  border-color: #101010;
-  box-shadow: 0 0 0 1px #101010;
-  background: #f6f5f2;
-  color: #101010;
+  border-color: var(--bold-ink);
+  box-shadow: 0 0 0 1px var(--bold-ink);
+  background: var(--bold-page);
+  color: var(--bold-ink);
 }
-.focus-switch > span { font-size: 12px; font-weight: 500; color: #101010; gap: 3px; }
+.focus-switch > span { font-size: 12px; font-weight: 500; color: var(--bold-ink); gap: 3px; }
 .focus-switch small { font-size: 10px; color: var(--bold-muted); }
 .focus-clear { font-size: 11px; }
 
@@ -1248,16 +1262,16 @@ input[type="range"]::-webkit-slider-thumb {
   background: #10101008;
 }
 .music-queue.reorder-queue > .queue-item.dragging {
-  background: #fff;
+  background: var(--bold-surface);
   border-radius: 12px;
-  box-shadow: 0 10px 26px #0000001f, 0 0 0 1px #101010;
+  box-shadow: 0 10px 26px #0000001f, 0 0 0 1px var(--bold-ink);
 }
 .queue-item.drop-before::before {
   left: 2px;
   right: 2px;
   height: 2px;
   border-radius: 2px;
-  background: #101010;
+  background: var(--bold-ink);
 }
 .queue-remove { color: var(--bold-faint); }
 
@@ -1270,7 +1284,7 @@ input[type="range"]::-webkit-slider-thumb {
     border: 1px solid #eceae5;
     border-radius: 34px;
     box-shadow: 0 18px 60px #0000000a;
-    background: #fff;
+    background: var(--bold-surface);
   }
   .background-wash, .paper-grain { position: absolute; }
   .portrait-shell { padding-left: 40px; padding-right: 40px; }
@@ -1468,15 +1482,15 @@ input[type="range"]::-webkit-slider-thumb {
    ============================================================ */
 
 .text-field[data-invalid="true"] input {
-  border-color: #c04a34;
+  border-color: var(--bold-danger);
   background: #fdf6f4;
   outline: none;
 }
 
 .text-field[data-invalid="true"] input:focus {
-  outline: 2px solid #c04a34;
+  outline: 2px solid var(--bold-danger);
   outline-offset: 0;
-  background: #fff;
+  background: var(--bold-surface);
 }
 
 .field-error {
@@ -1485,14 +1499,14 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 11px;
   font-weight: 500;
   line-height: 1.6;
-  color: #c04a34;
+  color: var(--bold-danger);
   letter-spacing: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
   /* 抖动由 JS 判断并跳过；这里只确保颜色反馈仍在 */
   .text-field[data-invalid="true"] input {
-    border-color: #c04a34;
+    border-color: var(--bold-danger);
     background: #fdf6f4;
   }
 }
@@ -1557,10 +1571,10 @@ input[type="range"]::-webkit-slider-thumb {
 .line-in-select select {
   flex: 1;
   min-width: 0;
-  background: #f6f5f2;
+  background: var(--bold-page);
   border: 1px solid var(--bold-line);
   border-radius: 999px;
-  color: #101010;
+  color: var(--bold-ink);
   padding: 9px 14px;
   font-size: 12px;
   font-weight: 600;
@@ -1587,7 +1601,7 @@ input[type="range"]::-webkit-slider-thumb {
   flex: 1;
   height: 4px;
   border-radius: 999px;
-  background: #f0efea;
+  background: var(--bold-sunken);
   overflow: hidden;
 }
 
@@ -1611,7 +1625,7 @@ input[type="range"]::-webkit-slider-thumb {
   margin: 10px 0 0;
   font-size: 11px;
   line-height: 1.6;
-  color: #c04a34;
+  color: var(--bold-danger);
 }
 
 /* 复选框：方形小勾，不用系统默认样式，避免在纯白底上显脏 */
@@ -1632,14 +1646,14 @@ input[type="range"]::-webkit-slider-thumb {
   margin: 0;
   border: 1px solid var(--bold-line);
   border-radius: 5px;
-  background: #fff;
+  background: var(--bold-surface);
   cursor: pointer;
   transition: background .16s, border-color .16s;
 }
 
 .line-in-auto input:checked {
-  background: #101010;
-  border-color: #101010;
+  background: var(--bold-ink);
+  border-color: var(--bold-ink);
 }
 
 .line-in-auto input:checked::after {
@@ -1648,8 +1662,8 @@ input[type="range"]::-webkit-slider-thumb {
   width: 7px;
   height: 4px;
   margin: 4px auto 0;
-  border-left: 1.5px solid #fff;
-  border-bottom: 1.5px solid #fff;
+  border-left: 1.5px solid var(--bold-edge);
+  border-bottom: 1.5px solid var(--bold-edge);
   transform: rotate(-45deg);
 }
 
@@ -1672,7 +1686,7 @@ input[type="range"]::-webkit-slider-thumb {
   margin-top: 14px;
   padding: 14px 16px;
   border-radius: 16px;
-  background: #f6f5f2;
+  background: var(--bold-page);
   cursor: pointer;
   transition: background .2s;
 }
@@ -1699,7 +1713,7 @@ input[type="range"]::-webkit-slider-thumb {
 .line-mode-copy b {
   font-size: 13px;
   font-weight: 700;
-  color: #101010;
+  color: var(--bold-ink);
 }
 
 .line-mode-copy small {
@@ -1728,14 +1742,14 @@ input[type="range"]::-webkit-slider-thumb {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--bold-surface);
   box-shadow: 0 1px 3px #00000024;
   transition: transform .22s cubic-bezier(.2, .7, .3, 1);
 }
 
-.line-mode-toggle > input:checked ~ .line-mode-switch { background: #101010; }
+.line-mode-toggle > input:checked ~ .line-mode-switch { background: var(--bold-ink); }
 .line-mode-toggle > input:checked ~ .line-mode-switch::after { transform: translateX(18px); }
-.line-mode-toggle > input:focus-visible ~ .line-mode-switch { outline: 2px solid #101010; outline-offset: 3px; }
+.line-mode-toggle > input:focus-visible ~ .line-mode-switch { outline: 2px solid var(--bold-ink); outline-offset: 3px; }
 
 /* 外部音乐音量：和主音量同一套滑杆手感，但更宽、带百分比 */
 .line-volume {
@@ -1763,7 +1777,7 @@ input[type="range"]::-webkit-slider-thumb {
   width: 34px;
   text-align: right;
   font: 600 11px "Inter", sans-serif;
-  color: #101010;
+  color: var(--bold-ink);
 }
 
 .line-in-hint {
@@ -1784,7 +1798,7 @@ input[type="range"]::-webkit-slider-thumb {
   white-space: nowrap;
   font-size: 13px;
   font-weight: 600;
-  color: #101010;
+  color: var(--bold-ink);
   text-align: left;
   cursor: default;
 }
@@ -1803,14 +1817,14 @@ input[type="range"]::-webkit-slider-thumb {
   height: 26px;
   flex: none;
   border-radius: 999px;
-  background: #f0efea;
+  background: var(--bold-sunken);
   color: var(--bold-faint);
   transition: background .2s, color .2s, transform .16s;
 }
 
 .queue-toggle.on {
-  background: #101010;
-  color: #ffffff;
+  background: var(--bold-ink);
+  color: var(--bold-bg);
 }
 
 .queue-toggle:not(:disabled):hover {
@@ -1864,7 +1878,7 @@ input[type="range"]::-webkit-slider-thumb {
   margin-top: 20px;
   padding: 16px;
   border-radius: 20px;
-  background: #f6f5f2;
+  background: var(--bold-page);
   animation: now-playing-in 260ms cubic-bezier(.2, .7, .3, 1) both;
 }
 
@@ -1880,7 +1894,7 @@ input[type="range"]::-webkit-slider-thumb {
   height: 64px;
   border-radius: 14px;
   overflow: hidden;
-  background: #101010;
+  background: var(--bold-ink);
   box-shadow: 0 6px 16px #0000001f;
 }
 
@@ -1926,7 +1940,7 @@ input[type="range"]::-webkit-slider-thumb {
 .now-playing-copy > b {
   font-size: 14px;
   font-weight: 700;
-  color: #101010;
+  color: var(--bold-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
@@ -1952,11 +1966,11 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .06em;
-  background: #101010;
-  color: #fff;
+  background: var(--bold-ink);
+  color: var(--bold-on-dark);
 }
 
-.now-playing-state.paused { background: #dedcd4; color: #101010; }
+.now-playing-state.paused { background: #dedcd4; color: var(--bold-ink); }
 
 @media (prefers-reduced-motion: reduce) {
   .now-playing-card { animation: none; }
@@ -1988,7 +2002,7 @@ input[type="range"]::-webkit-slider-thumb {
   line-height: 0.96;
   letter-spacing: -3px;
   font-weight: 800;
-  color: #101010;
+  color: var(--bold-ink);
 }
 
 .today-stamp {
@@ -2020,7 +2034,7 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 30px;
   font-weight: 800;
   letter-spacing: -1.2px;
-  color: #101010;
+  color: var(--bold-ink);
 }
 
 .today-count small {
@@ -2131,7 +2145,7 @@ input[type="range"]::-webkit-slider-thumb {
   min-width: 0;
   font-size: 12px;
   font-weight: 600;
-  color: #101010;
+  color: var(--bold-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2140,7 +2154,7 @@ input[type="range"]::-webkit-slider-thumb {
 .record-card { list-style: none; }
 
 .record-card .playing-bars { margin-left: 0; }
-.record-card .playing-bars i { background: #101010; }
+.record-card .playing-bars i { background: var(--bold-ink); }
 
 /* 网格：明亮版保持两列，和大圆角块的气质一致 */
 .record-grid {
@@ -2333,8 +2347,8 @@ input[type="range"]::-webkit-slider-thumb {
   border: 0;
   padding: 0;
   cursor: pointer;
-  color: #ffffff;
-  background-color: #101010;
+  color: var(--bold-bg);
+  background-color: var(--bold-ink);
   background-size: cover;
   background-position: center;
   box-shadow: 0 6px 18px #1010102e, 0 0 0 1px #10101014;
@@ -2344,7 +2358,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 .dock-disc:hover { box-shadow: 0 8px 22px #1010103d, 0 0 0 1px #1010101f; }
-.dock-disc:focus-visible { outline: 2px solid #101010; outline-offset: 3px; }
+.dock-disc:focus-visible { outline: 2px solid var(--bold-ink); outline-offset: 3px; }
 
 /* 播放时上下浮动。2.4s 一周期、只走 3px：慢到不抢眼，又能看出「在转」。 */
 .dock-disc.playing { animation: dock-float 2400ms ease-in-out infinite; }
@@ -2376,7 +2390,7 @@ input[type="range"]::-webkit-slider-thumb {
   height: 9px;
   border-radius: 50%;
   background: var(--bold-lemon, #d9eb6c);
-  box-shadow: 0 0 0 2px #ffffff;
+  box-shadow: 0 0 0 2px var(--bold-bg);
 }
 
 /* 播放卡：从屏幕底部弹出来，像系统窗口那样「展开」而不是「滑入」。
@@ -2399,8 +2413,8 @@ input[type="range"]::-webkit-slider-thumb {
   max-width: calc(100vw - 32px);
   padding: 18px 18px 14px;
   border-radius: 26px;
-  background: #101010;
-  color: #ffffff;
+  background: var(--bold-ink);
+  color: var(--bold-bg);
   box-shadow: 0 24px 60px #00000047, 0 0 0 1px #ffffff14;
   /* 从底边中点长出来，而不是从中心放大：卡片贴着屏幕下沿，
      以中心缩放会看起来「浮起来」，以底边缩放才是「从这里展开」。 */
@@ -2471,7 +2485,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   cursor: pointer;
   transition: background 180ms ease, color 180ms ease;
 }
-.play-card-close:hover { background: #ffffff26; color: #ffffff; }
+.play-card-close:hover { background: #ffffff26; color: var(--bold-bg); }
 
 /* 波形：48 根柱子，高度由 JS 每帧写 --h（0–1） */
 .play-card-wave {
@@ -2487,7 +2501,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   height: calc(var(--h, 0) * 100%);
   min-height: 2px;
   border-radius: 2px;
-  background: #ffffff;
+  background: var(--bold-bg);
   opacity: calc(.35 + var(--h, 0) * .65);
   transition: height 90ms linear, opacity 90ms linear;
 }
@@ -2516,17 +2530,17 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 /* 卡里的圆形按钮统一白底黑字，和外面的黑底白字反过来 */
 .play-card .icon-button {
   background: #ffffff14;
-  color: #ffffff;
+  color: var(--bold-bg);
 }
 .play-card .icon-button:hover:not(:disabled) { background: #ffffff26; }
 .play-card .icon-button:disabled { opacity: .35; }
 .play-card .main-play {
   width: 44px;
   height: 44px;
-  background: #ffffff;
-  color: #101010;
+  background: var(--bold-bg);
+  color: var(--bold-ink);
 }
-.play-card .icon-button.on { background: #ffffff; color: #101010; }
+.play-card .icon-button.on { background: var(--bold-bg); color: var(--bold-ink); }
 .play-card .order-button { opacity: .7; }
 
 .play-card-foot {
@@ -2543,7 +2557,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 
 /* 卡里的浅色滑杆：外部是黑底，轨道与填充都要换 */
 .play-card input[type='range'] {
-  background: linear-gradient(to right, #ffffff 0 var(--fill, 0%), #ffffff33 var(--fill, 0%) 100%);
+  background: linear-gradient(to right, var(--bold-bg) 0 var(--fill, 0%), #ffffff33 var(--fill, 0%) 100%);
   height: 3px;
 }
 /* 卡里的通道按钮：斜线是绝对定位的，按钮自己必须是定位上下文，否则会跑到卡片中心 */
@@ -2554,7 +2568,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 .play-card input[type='range']::-webkit-slider-thumb {
   width: 11px;
   height: 11px;
-  background: #ffffff;
+  background: var(--bold-bg);
   border: 0;
 }
 
@@ -2620,7 +2634,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   position: absolute;
   inset: -2px;
   border-radius: 50%;
-  border: 1px solid #101010;
+  border: 1px solid var(--bold-ink);
   pointer-events: none;
 }
 .select-record:not(:disabled):active {
@@ -2697,10 +2711,10 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   gap: 2px;
   padding: 3px 3px 3px 12px;
   border-radius: 999px;
-  background: #f0efea;
+  background: var(--bold-sunken);
   font-size: 11px;
   font-weight: 600;
-  color: #101010;
+  color: var(--bold-ink);
 }
 
 .media-dir > span {
@@ -2719,8 +2733,8 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 }
 
 .media-dir .icon-button:hover {
-  background: #fff;
-  color: #101010;
+  background: var(--bold-surface);
+  color: var(--bold-ink);
 }
 
 /* 相集：票根。
@@ -4193,7 +4207,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   width: 84px;
   height: 84px;
   border-radius: 24px;
-  background: #f0efea;
+  background: var(--bold-sunken);
   color: var(--bold-faint);
 }
 
@@ -4202,7 +4216,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.5px;
-  color: #101010;
+  color: var(--bold-ink);
 }
 
 .media-empty p {
@@ -4232,7 +4246,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   max-height: 88vh;
   border-radius: 20px;
   overflow: hidden;
-  background: #101010;
+  background: var(--bold-ink);
   box-shadow: 0 30px 90px #00000066;
   animation: media-stage-rise 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
@@ -4251,13 +4265,13 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 10px 10px 16px;
-  background: #101010;
+  background: var(--bold-ink);
 }
 
 .media-stage-bar b {
   font-size: 12px;
   font-weight: 600;
-  color: #fff;
+  color: var(--bold-on-dark);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4269,12 +4283,12 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   flex: none;
   border: 0;
   background: #ffffff1a;
-  color: #fff;
+  color: var(--bold-on-dark);
 }
 
 .media-stage-bar .icon-button:hover {
   background: #ffffff2e;
-  color: #fff;
+  color: var(--bold-on-dark);
 }
 
 @keyframes media-stage-in {
@@ -4353,8 +4367,8 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 /* 来源胶囊里的壁纸那一枚：给它一个星形前置，和用户自己的文件夹区分开。 */
 .media-dir.is-wallpaper {
   padding-right: 3px;
-  background: #101010;
-  color: #fff;
+  background: var(--bold-ink);
+  color: var(--bold-on-dark);
 }
 
 .media-dir.is-wallpaper .icon-button {
@@ -4363,7 +4377,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 
 .media-dir.is-wallpaper .icon-button:hover {
   background: #ffffff1f;
-  color: #fff;
+  color: var(--bold-on-dark);
 }
 
 @media (max-width: 599px) {
@@ -4466,7 +4480,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   padding: 4px 10px;
   border-radius: 999px;
   background: #ffffff1f;
-  color: #fff;
+  color: var(--bold-on-dark);
   font-size: 11px;
   font-weight: 600;
   backdrop-filter: blur(8px);
@@ -4481,8 +4495,8 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   padding: 11px 14px;
   margin-top: 8px;
   border-radius: 16px;
-  background: #101010;
-  color: #ffffff;
+  background: var(--bold-ink);
+  color: var(--bold-bg);
 }
 
 .theater-controls {
@@ -4499,18 +4513,18 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
   border: 0;
   border-radius: 999px;
   background: #ffffff14;
-  color: #fff;
+  color: var(--bold-on-dark);
 }
 
 .theater-bar .icon-button:hover {
   background: #ffffff2e;
-  color: #fff;
+  color: var(--bold-on-dark);
 }
 
 /* 播放键是这一排里唯一的主动作，给个白底 */
 .theater-play {
-  background: #fff !important;
-  color: #101010 !important;
+  background: var(--bold-surface) !important;
+  color: var(--bold-ink) !important;
 }
 
 .theater-play:hover {
@@ -4528,7 +4542,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 .theater-copy b {
   font-size: 13px;
   font-weight: 700;
-  color: #fff;
+  color: var(--bold-on-dark);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4549,7 +4563,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 
 .theater-loop.on {
   background: #ffffff2e !important;
-  color: #fff !important;
+  color: var(--bold-on-dark) !important;
 }
 
 @media (max-width: 599px) {
@@ -4620,9 +4634,9 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 
 /* 「桌面壁纸」按钮按下时反白，和播放台上的循环键同一套状态语言。 */
 .media-pick.on {
-  background: #101010;
-  border-color: #101010;
-  color: #ffffff;
+  background: var(--bold-ink);
+  border-color: var(--bold-ink);
+  color: var(--bold-bg);
 }
 
 @media (max-width: 599px) {
@@ -4767,7 +4781,7 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 }
 
 .media-room.is-expanded .theater-copy b {
-  color: #ffffff;
+  color: var(--bold-bg);
 }
 
 .media-room.is-expanded .theater-copy small {
@@ -4777,16 +4791,16 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 .media-room.is-expanded .theater-controls .icon-button,
 .media-room.is-expanded .theater-loop,
 .media-room.is-expanded .theater-expand {
-  color: #ffffff;
+  color: var(--bold-bg);
   border-color: #ffffff2e;
   background: #ffffff14;
 }
 
 .media-room.is-expanded .theater-loop.on,
 .media-room.is-expanded .theater-expand[aria-pressed="true"] {
-  background: #ffffff;
-  border-color: #ffffff;
-  color: #101010;
+  background: var(--bold-bg);
+  border-color: var(--bold-bg);
+  color: var(--bold-ink);
 }
 
 /* 全屏按钮：和循环键同一套尺寸语言，平时不抢戏 */
@@ -4848,7 +4862,7 @@ body:has(.media-room.is-expanded) {
   display: grid;
   place-items: center;
   padding: 28px;
-  background: #101010;
+  background: var(--bold-ink);
   min-height: 260px;
 }
 
@@ -4922,8 +4936,8 @@ body:has(.media-room.is-expanded) {
   padding: 0 9px 0 7px;
   border: 0;
   border-radius: 999px;
-  background: #101010;
-  color: #fff;
+  background: var(--bold-ink);
+  color: var(--bold-on-dark);
   font-family: inherit;
   font-size: 10px;
   font-weight: 700;
@@ -4938,7 +4952,7 @@ body:has(.media-room.is-expanded) {
 /* 壁纸那一枚本来就整颗是黑的，移出键要反过来才看得见。 */
 .media-dir.is-wallpaper .chip-action {
   background: #ffffff1f;
-  color: #fff;
+  color: var(--bold-on-dark);
 }
 
 .media-dir.is-wallpaper .chip-action:hover {
@@ -4974,7 +4988,7 @@ body:has(.media-room.is-expanded) {
   gap: 2px;
   padding: 6px;
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--bold-bg);
   border: 1px solid var(--bold-line);
   box-shadow: 0 18px 44px #10101026, 0 1px 2px #1010100f;
   animation: add-menu-in 160ms cubic-bezier(.2,.7,.3,1) both;
@@ -5092,7 +5106,7 @@ body:has(.media-room.is-expanded) {
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: #6f6f6a;
+  color: var(--bold-soft);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -5100,8 +5114,8 @@ body:has(.media-room.is-expanded) {
 }
 
 .media-import-main:hover {
-  background: #f2f1ed;
-  color: #101010;
+  background: var(--bold-hover);
+  color: var(--bold-ink);
 }
 
 .media-import-alt {
@@ -5125,8 +5139,8 @@ body:has(.media-room.is-expanded) {
 }
 
 .media-import-alt:hover {
-  background: #f2f1ed;
-  color: #101010;
+  background: var(--bold-hover);
+  color: var(--bold-ink);
 }
 
 /* 贴底的菜单只能往上弹，否则一出页面就被切掉。
@@ -5236,7 +5250,7 @@ body:has(.media-room.is-expanded) {
   position: absolute;
   inset: 0;
   overflow: hidden;
-  background: var(--tpl-base, #101010);
+  background: var(--tpl-base, var(--bold-ink));
 }
 
 /* 拼贴里每一块都是一张「裁好的照片」，不是「完整展示的图」。
@@ -5591,7 +5605,7 @@ body:has(.media-room.is-expanded) {
   left: var(--wx);
   top: var(--wy);
   translate: -50% -50%;
-  color: #ffffff;
+  color: var(--bold-bg);
   /* 压在壁纸上的字必须自带一层底：壁纸可能是白雪山也可能是黑森林，
      单靠字色在任何一边都会有一半读不出来。
      做法是「细描边 + 柔和阴影」而不是加背景板——背景板会遮住壁纸。 */
@@ -5761,7 +5775,7 @@ body:has(.media-room.is-expanded) {
 
 .dw-kill:hover {
   background: #b3392be6;
-  color: #ffffff;
+  color: var(--bold-bg);
 }
 
 /* 缩放手柄：右下角一颗小圆点，往外拖变大、往里拖变小。
@@ -5907,7 +5921,7 @@ body:has(.media-room.is-expanded) {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
   line-height: 1;
-  color: #ffffff;
+  color: var(--bold-bg);
 }
 
 .overlay-title .ov-title {
@@ -5920,7 +5934,7 @@ body:has(.media-room.is-expanded) {
   font-size: calc(clamp(18px, 2.2vw, 34px) * var(--oscale, 1));
   font-weight: 600;
   letter-spacing: 0.01em;
-  color: #ffffff;
+  color: var(--bold-bg);
 }
 
 .overlay-date .ov-date {
@@ -5945,7 +5959,7 @@ body:has(.media-room.is-expanded) {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;
-  color: #ffffff;
+  color: var(--bold-bg);
   text-shadow: none;
 }
 
@@ -6056,8 +6070,8 @@ body:has(.media-room.is-expanded) {
 }
 
 .theater-overlay-toggle.on {
-  background: #ffffff;
-  color: #101010;
+  background: var(--bold-bg);
+  color: var(--bold-ink);
 }
 
 .theater-overlay-veil {
@@ -6080,7 +6094,7 @@ body:has(.media-room.is-expanded) {
   gap: 1px;
   padding: 6px;
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--bold-bg);
   border: 1px solid var(--bold-line);
   box-shadow: 0 18px 44px #10101033;
 }
@@ -6132,8 +6146,8 @@ body:has(.media-room.is-expanded) {
 }
 
 .overlay-dot.on {
-  background: #101010;
-  border-color: #101010;
+  background: var(--bold-ink);
+  border-color: var(--bold-ink);
 }
 
 .theater-overlay-tip {
@@ -6312,9 +6326,9 @@ body:has(.media-room.is-expanded) {
 }
 
 .theater-rain-toggle.on {
-  background: #ffffff;
-  color: #101010;
-  border-color: #ffffff;
+  background: var(--bold-bg);
+  color: var(--bold-ink);
+  border-color: var(--bold-bg);
 }
 
 .theater-rain-menu {
@@ -6327,7 +6341,7 @@ body:has(.media-room.is-expanded) {
   gap: 10px;
   padding: 12px;
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--bold-bg);
   border: 1px solid var(--bold-line);
   box-shadow: 0 18px 44px #10101026, 0 1px 2px #1010100f;
   animation: add-menu-in 160ms cubic-bezier(.2,.7,.3,1) both;
@@ -6364,8 +6378,8 @@ body:has(.media-room.is-expanded) {
 }
 
 .rain-modes > button.on {
-  background: #101010;
-  color: #ffffff;
+  background: var(--bold-ink);
+  color: var(--bold-bg);
 }
 
 .rain-slider {
@@ -6380,7 +6394,7 @@ body:has(.media-room.is-expanded) {
   width: 100%;
   height: 4px;
   border-radius: 999px;
-  accent-color: #101010;
+  accent-color: var(--bold-ink);
 }
 
 /* 全屏时菜单跟着放大一点，别在 4K 上像颗纽扣 */
@@ -6449,7 +6463,7 @@ body:has(.media-room.is-expanded) {
   width: var(--marker-width, 0px);
   transform: translateX(var(--marker-x, 0px));
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--bold-bg);
   pointer-events: none;
   transition:
     transform 380ms cubic-bezier(0.3, 1.28, 0.48, 1),
@@ -6481,14 +6495,14 @@ body:has(.media-room.is-expanded) {
 }
 
 .media-theater .theater-templates > button:hover {
-  color: #ffffff;
+  color: var(--bold-bg);
 }
 
 /* 底已经由滑块画了，这里只改字色。写 background 会在滑块上再盖一层，
    两块白叠起来边缘会发灰。 */
 .media-theater .theater-templates > button.on {
   background: transparent;
-  color: #101010;
+  color: var(--bold-ink);
 }
 
 /* 右侧三个图标键（叠加 / 雨 / 全屏）排成一簇，别互相挤 */
@@ -6787,9 +6801,9 @@ body:has(.media-room.is-expanded) {
 }
 
 .theater-tone-toggle.on {
-  background: #ffffff;
-  color: #101010;
-  border-color: #ffffff;
+  background: var(--bold-bg);
+  color: var(--bold-ink);
+  border-color: var(--bold-bg);
 }
 
 /* 点面板外面收起。铺满整屏的透明按钮，压在菜单下面一层。 */
@@ -6811,10 +6825,10 @@ body:has(.media-room.is-expanded) {
   width: 244px;
   padding: 12px;
   border-radius: 16px;
-  background: #ffffff;
+  background: var(--bold-bg);
   border: 1px solid var(--bold-line, #eceae5);
   box-shadow: 0 18px 44px #10102626, 0 1px 2px #1010100f;
-  color: #101010;
+  color: var(--bold-ink);
   font-family: "Inter", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
   animation: tone-menu-in 160ms cubic-bezier(.2, .7, .3, 1) both;
 }
@@ -6846,12 +6860,12 @@ body:has(.media-room.is-expanded) {
 }
 
 .tone-modes button:hover {
-  color: #101010;
+  color: var(--bold-ink);
 }
 
 .tone-modes button.on {
-  background: #101010;
-  color: #ffffff;
+  background: var(--bold-ink);
+  color: var(--bold-bg);
 }
 
 /* 「挑一个」：画面取出来的几个主色，圆点里留白勾。 */
@@ -6879,7 +6893,7 @@ body:has(.media-room.is-expanded) {
 }
 
 .tone-swatches button.on {
-  box-shadow: inset 0 0 0 1px #00000016, 0 0 0 2px #ffffff, 0 0 0 3.5px #101010;
+  box-shadow: inset 0 0 0 1px #00000016, 0 0 0 2px var(--bold-bg), 0 0 0 3.5px var(--bold-ink);
 }
 
 .tone-swatches small {
@@ -6936,7 +6950,7 @@ body:has(.media-room.is-expanded) {
   padding: 0;
   border: 1px solid var(--bold-line, #eceae5);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--bold-bg);
   cursor: pointer;
 }
 
@@ -6950,14 +6964,14 @@ body:has(.media-room.is-expanded) {
   border: 1px solid var(--bold-line, #eceae5);
   border-radius: 8px;
   background: #faf9f6;
-  color: #101010;
+  color: var(--bold-ink);
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 11px;
   letter-spacing: .02em;
 }
 
 .tone-hex::placeholder { color: #b6b5ae; }
-.tone-hex:focus { outline: 2px solid #101010; outline-offset: -1px; }
+.tone-hex:focus { outline: 2px solid var(--bold-ink); outline-offset: -1px; }
 
 .tone-reset {
   justify-self: start;
@@ -6965,14 +6979,14 @@ body:has(.media-room.is-expanded) {
   padding: 5px 10px;
   border: 1px solid var(--bold-line, #eceae5);
   border-radius: 999px;
-  background: #ffffff;
+  background: var(--bold-bg);
   color: #6f6f68;
   font-size: 10.5px;
   font-weight: 600;
   cursor: pointer;
 }
 
-.tone-reset:hover { color: #101010; border-color: #d5d2c9; }
+.tone-reset:hover { color: var(--bold-ink); border-color: #d5d2c9; }
 
 .tone-hint {
   margin: 10px 0 0;
@@ -7146,7 +7160,7 @@ body:has(.media-room.is-expanded) {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: #ffffff;
+  background: var(--bold-bg);
   filter: url(#tpl-marble);
   mix-blend-mode: soft-light;
   opacity: 0.85;
