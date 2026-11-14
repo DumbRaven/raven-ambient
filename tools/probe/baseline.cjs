@@ -343,22 +343,57 @@ guard(async () => {
     }
 
     // 模态框是独立的视觉资产，且只在打开时存在，视图截图覆盖不到。
-    // 设置里塞了滑杆、单选、开关、下拉，是控件最密集的一屏。
+    // 四个都拍：漏掉的那个正好最容易在重构时被改坏（占位重复、按钮丢失）。
+    // 设置里塞了滑杆、单选、开关、下拉，是控件最密集的一屏；
+    // 收藏与编辑带表单和封面网格；说明是纯排版。
+    const modals = [
+      ['modal-settings', '.header-actions button[aria-label="空间设置"]'],
+      ['modal-import', '.shelf-label ~ * .add-to-shelf'],
+      ['modal-guide', '.header-actions button[aria-label="使用说明"]'],
+    ];
+    for (const [name, opener] of modals) {
+      try {
+        await probe.run(`(() => {
+          const node = document.querySelector(${JSON.stringify(opener)});
+          if (!node) return 0;
+          node.click();
+          return 1;
+        })()`);
+        await wait(700);
+        await probe.run(FREEZE_DATES);
+        await grab(size.id, name);
+        await probe.run(`(() => {
+          document.querySelector('.modal-close')?.click();
+          return 1;
+        })()`);
+        await wait(600);
+      } catch (error) {
+        console.log(`[baseline] 跳过 ${size.id}/${name}：${error.message}`);
+      }
+    }
+
+    // 编辑弹窗要先把一张唱片点开成「已聚焦」，否则右侧面板是空的，
+    // 弹窗里的内容也就无从比对。先点开第一张卡，再从右侧进编辑。
     try {
       await probe.run(`(() => {
-        document.querySelector('.header-actions button[aria-label="空间设置"]')?.click();
+        document.querySelector('.record-card .record-preview')?.click();
+        return 1;
+      })()`);
+      await wait(600);
+      await probe.run(`(() => {
+        document.querySelector('.edit-notes')?.click();
         return 1;
       })()`);
       await wait(700);
       await probe.run(FREEZE_DATES);
-      await grab(size.id, 'modal-settings');
+      await grab(size.id, 'modal-edit');
       await probe.run(`(() => {
         document.querySelector('.modal-close')?.click();
         return 1;
       })()`);
       await wait(600);
     } catch (error) {
-      console.log(`[baseline] 跳过 ${size.id}/modal-settings：${error.message}`);
+      console.log(`[baseline] 跳过 ${size.id}/modal-edit：${error.message}`);
     }
   }
 
