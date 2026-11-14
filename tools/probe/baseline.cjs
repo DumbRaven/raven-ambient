@@ -159,13 +159,43 @@ const FREEZE_RANDOM = `(() => {
  *
  * 移到 (1,1) 而不是 (0,0)：左上角有 `.brand` 品牌字，压上去同样会出 hover 态。
  */
+/*
+ * 焦点也要清掉。`styles.css` 里 `.record-card:focus-within .case-front` 与
+ * hover 是同一组规则——卡片被聚焦时唱片盒一样会掀开。键盘焦点会留到下一张图：
+ * 上一张点过页签、按过弹窗里的按钮，焦点就还在那张卡上，于是这张图莫名其妙
+ * 掀开一张、跟上一张对不上，看起来像样式回归，其实是标尺没擦干净。
+ * 实测：单独起窗口时 activeElement 是 BODY，连拍时才会残留。
+ */
 const RESET_POINTER = `(() => {
   window.scrollTo(0, 0);
   document.documentElement.scrollTop = 0;
+  if (document.activeElement && document.activeElement !== document.body) {
+    document.activeElement.blur();
+  }
   return 1;
 })()`;
 
 const PARK_POINTER = { x: 1, y: 1 };
+
+/*
+ * 把唱片卡全部合回去。
+ *
+ * 卡片是否掀开是 React 状态（`App.tsx` 的 `flip` → `RecordCard` 的 `data-flip`），
+ * 不是 CSS。所以清焦点没用——`modal-edit` 那张为了让右侧面板有内容会点开第一张卡，
+ * 点开之后 `flip` 一直留着，下一轮拍 `cabinet` 时那张卡还是掀着的。
+ * 表现是同一份代码 `narrow/cabinet` 差 11%，看起来像布局塌了，其实只是残留。
+ *
+ * 点的是卡片的正文按钮，再点一次就翻回去（`toggleFlip` 是 toggle）。
+ * 先数一遍掀开的数量，回读确认真的合上了，没合上就报错——标尺宁可炸掉也不能
+ * 静默拍一张错图。
+ */
+const CLOSE_CARDS = `(() => {
+  const open = () => document.querySelectorAll('.record-card[data-flip="open"]');
+  for (const node of open()) {
+    node.querySelector('.record-preview')?.click();
+  }
+  return open().length;
+})()`;
 
 /**
  * 把跟当天有关的文本换成固定串，跨天跑不会平白多出差异。
@@ -312,9 +342,18 @@ guard(async () => {
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, `${name}.png`);
 
-    // 顺序有讲究：先归位鼠标（会触发 :hover 退出动画），再等动画停，最后截图。
+    // 顺序有讲究：先把卡片合回去（掀开是 React 状态，清焦点清不掉），
+    // 再归位鼠标（会触发 :hover 退出动画），再等动画停，最后截图。
+    if (!opts.keepCards) {
+      await probe.run(CLOSE_CARDS);
+      await wait(750);
+    }
     if (park) await probe.hover(PARK_POINTER);
-    await probe.run(RESET_POINTER);
+    // 滚回顶部只对普通截图做。hover 那张不能做：harness 的 hover 会先
+    // scrollIntoView 把目标滚进视口，此时再 scrollTo(0,0) 会把卡片从光标底下
+    // 挪走，:hover 当场失效——拍出来是合着的卡片，看着像样式坏了。
+    // （这个坑被「上一张残留的掀开态」掩盖了很久，直到给 grab 加了卡片复位才露出来。）
+    if (park) await probe.run(RESET_POINTER);
     await probe.run(SETTLE);
     await wait(300);
 
@@ -327,7 +366,31 @@ guard(async () => {
   for (const size of SIZES) {
     // 同一窗口实例改尺寸，launchSeed 不变，封面不会换一批。
     probe.win.setContentSize(size.width, size.height);
+    // 重新加载，把上一轮尺寸留下的 React 状态清干净。
+    //
+    // 真踩到的坑：上一轮拍 modal-edit 时点过 .record-preview，而 toggleFlip
+    // (App.tsx:397) 只在 open/closed 之间翻，没有回到 undefined 的路径。合上后
+    // data-flip 停在 'closed'，RecordCard 的注释写明这是「钉住合上」——于是
+    // 下一轮尺寸的 cabinet-hover 再也掀不开，图与 cabinet 字节相同。
+    // reload 后种子脚本（Page.addScriptToEvaluateOnNewDocument）会重跑，
+    // mulberry32 从同一初值出发，封套配色不变，所以不破坏可比性。
+    await probe.run('location.reload()').catch(() => {});
+    await wait(5200);
     await wait(900);
+
+    // 悬停态必须**最先**拍，理由见下面 CLOSE_CARDS 的注释：一旦点过
+    // .record-preview，flip 就被钉在 'closed'，之后任何 hover 都不再掀开。
+    await probe.run(switchView('唱片柜'));
+    await wait(1100);
+    await probe.run(FREEZE_DATES);
+    try {
+      await probe.hover('.record-card .record-preview');
+      await wait(700);
+      // keepCards：hover 态要的就是卡片掀开，别让 grab 把它合回去。
+      await grab(size.id, 'cabinet-hover', { park: false, keepCards: true });
+    } catch (error) {
+      console.log(`[baseline] 跳过 ${size.id}/cabinet-hover：${error.message}`);
+    }
 
     for (const view of VIEWS) {
       const result = await probe.run(switchView(view.label));
@@ -336,19 +399,6 @@ guard(async () => {
       await wait(1100);
       await probe.run(FREEZE_DATES);
       await grab(size.id, view.id);
-    }
-
-    // 悬停态单独出图：唱片盒掀开、黑胶滑出是这一版最早的招牌动作，
-    // 而 :hover 只有真实鼠标事件才触发（harness 的 hover 走 CDP）。
-    await probe.run(switchView('唱片柜'));
-    await wait(1100);
-    await probe.run(FREEZE_DATES);
-    try {
-      await probe.hover('.record-card .record-preview');
-      await wait(700);
-      await grab(size.id, 'cabinet-hover', { park: false });
-    } catch (error) {
-      console.log(`[baseline] 跳过 ${size.id}/cabinet-hover：${error.message}`);
     }
 
     // 模态框是独立的视觉资产，且只在打开时存在，视图截图覆盖不到。

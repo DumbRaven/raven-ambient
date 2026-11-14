@@ -43,6 +43,20 @@ MAX_CLUSTERS = 8
 # 又不会把相邻的两个元素糊成一团。
 GRID = 16
 
+# 抖动噪声的判定门槛：像素占比不超过这个数，且单通道差不超过 NOISE_DELTA，
+# 就当作栅格化的抖动放过，不算回归。
+#
+# 为什么需要这个：`wide/cabinet-hover` 里黑胶盘面的同心纹路是
+# `repeating-radial-gradient`，Chromium 每次栅格化同一个圆环时会带上一点点
+# 不同的舍入，实测稳定出现 15~36 个像素、每通道差 1 色阶、位置每次都不一样。
+# 判断依据是「性质」不是「数量」：
+#   - 真回归（阴影浅了 2px、留白 24→32）一定同时**面积大**或**差值大**；
+#   - 抖动噪声一定是**面积小**且**差值小**，两者同时成立才算噪声。
+# 所以两个条件必须同时满足才放过——单看面积会漏掉「一个小图标换了颜色」，
+# 单看差值会漏掉「整块区域挪了 1px」。
+NOISE_RATIO = 0.0002  # 0.02%：18 张图里最多 133 个像素
+NOISE_DELTA = 1  # 只容忍 ±1 色阶
+
 
 def load_manifest(root: Path, required: bool = True):
     """读目录里的 manifest.json。基线必须有，当前这侧可以没有。
@@ -128,6 +142,16 @@ def compare_one(ref_path: Path, cur_path: Path, tolerance: int, out_dir: Path, l
         return f"一致      {total} 像素", True
 
     max_delta = int(delta.max())
+
+    # 抖动噪声：面积小到可忽略，且差值只有一格色阶。两者同时成立才放过。
+    # 报告里要写清楚「这是被判定为噪声的」，否则下次看到这行会以为比对没生效。
+    if max_delta <= NOISE_DELTA and changed / total <= NOISE_RATIO:
+        return (
+            f"噪声      {changed}/{total} 像素（{changed / total * 100:.3f}%），"
+            f"最大通道差 {max_delta}，判为栅格化抖动",
+            True,
+        )
+
     found = clusters_of(mask)
 
     # 差异图：原图上把不同的像素染成品红，其余压成浅灰，方便一眼看到位置。
