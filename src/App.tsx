@@ -36,6 +36,10 @@ import EditModal from './EditModal';
 const emptyStatus: RoomStatus = { running: false, playing: false, musicPlaying: false, ducked: false, level: 0, currentTime: 0, duration: 0, musicOn: true, ambientOn: true, lineInput: 0, lineLive: false };
 type Modal = 'import' | 'settings' | 'edit' | 'guide' | null;
 function message(error: unknown) { return error instanceof Error ? error.message : '没有完成，请重试。'; }
+// 大标题与右上角那个计数都跟着当前空间走。放在一张表里，
+// 加第二个空间时不会漏掉其中一处（以前标题和计数是两段独立的三元表达式，
+// 「专注」的计数一度写成了 Math.round(running ? 1 : 0)）。
+const viewTitles: Record<'cabinet' | 'listening' | 'focus' | 'media', string> = { cabinet: 'Cabinet', listening: 'Listening', focus: 'Focus', media: 'Gallery' };
 export default function App() {
   const [cabinet, setCabinet] = useState<Cabinet>(structuredClone(emptyCabinet));
   const cabinetRef = useRef(cabinet); cabinetRef.current = cabinet;
@@ -654,8 +658,33 @@ export default function App() {
     <input ref={coverInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" aria-label="选择唱片封面" onChange={e => void uploadPicture(e, true)} />
     <div className="background-wash" /><div className="paper-grain" />
     <div className="portrait-shell">
-      <header className="masthead"><a href="#" className="brand" onClick={e => { e.preventDefault(); setView('cabinet'); }}><Bird size={18} strokeWidth={1.3} /><span>RAVEN <i>ambient</i></span></a><div className="header-actions"><span className="local-status"><i />LOCAL ONLY</span><button className="icon-button" aria-label="使用说明" onClick={() => setModal('guide')}><Info size={16} /></button><button className="icon-button" aria-label="空间设置" onClick={() => setModal('settings')}><Settings2 size={17} /></button></div></header>
-      <section className="today-head"><div className="today-row"><h1 key={view} className="today-title">{view === 'cabinet' ? 'Cabinet' : view === 'listening' ? 'Listening' : view === 'media' ? 'Gallery' : 'Focus'}</h1><div className="today-stamp"><span>{todayStamp}</span><i /><span className="today-count"><RollNumber value={view === 'cabinet' ? cabinet.records.length : view === 'listening' ? selectedCount : view === 'media' ? cabinet.media.length : Math.round(status.running ? 1 : 0)} minDigits={2} /></span></div></div></section>
+      <header className="masthead">
+        <a href="#" className="brand" onClick={e => { e.preventDefault(); setView('cabinet'); }}>
+          <Bird size={18} strokeWidth={1.3} />
+          <span>RAVEN <i>ambient</i></span>
+        </a>
+        <div className="header-actions">
+          <span className="local-status"><i />LOCAL ONLY</span>
+          <button className="icon-button" aria-label="使用说明" onClick={() => setModal('guide')}>
+            <Info size={16} />
+          </button>
+          <button className="icon-button" aria-label="空间设置" onClick={() => setModal('settings')}>
+            <Settings2 size={17} />
+          </button>
+        </div>
+      </header>
+      <section className="today-head">
+        <div className="today-row">
+          <h1 key={view} className="today-title">{viewTitles[view]}</h1>
+          <div className="today-stamp">
+            <span>{todayStamp}</span>
+            <i />
+            <span className="today-count">
+              <RollNumber value={view === 'cabinet' ? cabinet.records.length : view === 'listening' ? selectedCount : view === 'media' ? cabinet.media.length : Math.round(status.running ? 1 : 0)} minDigits={2} />
+            </span>
+          </div>
+        </div>
+      </section>
       <ViewTabs view={view} selectedCount={selectedCount} playing={playingNow} cardOpen={cardOpen} discCover={discCover} sleepUntil={sleepUntil} remaining={remaining} navigationRef={viewLayout.navigationRef} onSelect={selectView} onCard={openCard} />
       <div ref={viewLayout.stageRef} className="view-stage" data-motion={pageMotion.phase} data-view={pageMotion.value} inert={pageMotion.phase === 'exit'} style={{ '--page-direction': pageMotion.direction, '--wipe-x': `${wipe.x}px`, '--wipe-y': `${wipe.y}px`, '--wipe-r': `${wipe.r}px` } as CSSProperties}>
       <div ref={viewLayout.contentRef} className="view-content">
