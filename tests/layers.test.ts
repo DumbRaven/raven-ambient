@@ -21,6 +21,8 @@ import {
   layerMetas,
   MAX_LAYERS,
   moveLayer,
+  nudgeScale,
+  nudgeSpot,
   readLayers,
   removeLayer,
   SCALE_MAX,
@@ -235,4 +237,38 @@ test('缩放松手先钉住：倍率立刻生效，不等上层确认', () => {
 test('缩放松手也钳位：直接传越界值不会写进存档', () => {
   assert.deepEqual(settleScale({}, 'clock', 99), { clock: SCALE_MAX });
   assert.deepEqual(settleScale({}, 'clock', 0.01), { clock: SCALE_MIN });
+});
+
+test('键盘挪位置：一步就是一格，两个方向互不牵连', () => {
+  const at = { x: 0.5, y: 0.5 };
+  assert.deepEqual(nudgeSpot(at, 0.01, 0), { x: 0.51, y: 0.5 });
+  assert.deepEqual(nudgeSpot(at, -0.05, 0), { x: 0.45, y: 0.5 });
+  assert.deepEqual(nudgeSpot(at, 0, 0.01), { x: 0.5, y: 0.51 });
+  assert.deepEqual(nudgeSpot(at, 0, -0.05), { x: 0.5, y: 0.45 });
+});
+
+test('键盘挪位置：到边上就停住，不会累积成欠账', () => {
+  // 到右边缘后继续按右键，位置不动；此时按左键应当立刻往回走一格，
+  // 而不是先把之前多按的几次「还」掉
+  const edge = nudgeSpot({ x: 0.99, y: 0.5 }, 0.01, 0);
+  assert.deepEqual(edge, { x: 1, y: 0.5 });
+  const back = nudgeSpot(edge, -0.01, 0);
+  assert.deepEqual(back, { x: 0.99, y: 0.5 });
+});
+
+test('键盘挪位置：已经在边上还能往外按，不越界也不改别的轴', () => {
+  assert.deepEqual(nudgeSpot({ x: 0, y: 1 }, -0.01, 0.01), { x: 0, y: 1 });
+});
+
+test('键盘改倍率：一步 10%，上下限交给 clampScale', () => {
+  assert.equal(nudgeScale(1, 0.1), 1.1);
+  assert.equal(nudgeScale(1, -0.1), 0.9);
+  assert.equal(nudgeScale(1, 0.25), 1.25);
+});
+
+test('键盘改倍率：到上下限就停住，不会越界', () => {
+  assert.equal(nudgeScale(SCALE_MAX, 0.1), SCALE_MAX);
+  assert.equal(nudgeScale(SCALE_MIN, -0.1), SCALE_MIN);
+  // 差一步到顶时按一下，应当正好落在顶而不是冲过去
+  assert.equal(nudgeScale(SCALE_MAX - 0.05, 0.1), SCALE_MAX);
 });

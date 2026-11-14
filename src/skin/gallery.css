@@ -1317,6 +1317,15 @@
   cursor: grabbing;
 }
 
+/* 票面现在也是键盘的一个停靠点（role=button + tabIndex），得看得见焦点。
+   用画在纸里面的内阴影而不是外描边：外描边会被 .ticket-lift 的
+   preserve-3d + drop-shadow 裁掉一圈，看起来像漏了一个角。 */
+.ticket-lift-panel:focus-visible {
+  outline: 2px solid #efeada;
+  outline-offset: -4px;
+  border-radius: 2px;
+}
+
 /* 提示挂在浮层上、不挂在会动的票根上：票根跟着手走（--bend 驱动
    translate/rotate），提示跟着一起转就会「晃」，而且它压在条码上读不出来。 */
 .ticket-tip {

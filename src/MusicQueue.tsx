@@ -3,7 +3,7 @@ import { Pause, Play, X } from 'lucide-react';
 import { moveItem, type RecordItem } from './records';
 import { formatTime } from './model';
 import { pointerSession } from './pointer-session';
-import { clampQueueOffset, queueDropIndex, queueOffsets, type QueueSlot } from './queue-layout';
+import { clampQueueOffset, nudgeQueueIndex, queueDropIndex, queueOffsets, type QueueSlot } from './queue-layout';
 import RollNumber from './roll-number';
 
 type Drag = { id: string; queue: string[]; from: number; to: number; offset: number; slots: QueueSlot[]; settling: boolean };
@@ -27,6 +27,7 @@ export default function MusicQueue({ queue, records, currentId, onPlay, onRemove
   const suppressClick = useRef(false);
   const mounted = useRef(true);
   const [settledId, setSettledId] = useState<string | null>(null);
+  const [moved, setMoved] = useState('');
   const settleLineTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const latest = useRef({ queue, onReorder }); latest.current = { queue, onReorder };
   const publish = (next: Drag | null) => { dragRef.current = next; if (mounted.current) setDrag(next); };
@@ -119,31 +120,62 @@ export default function MusicQueue({ queue, records, currentId, onPlay, onRemove
 
   const offsets = drag ? queueOffsets(drag.slots, drag.from, drag.to) : [];
   const slotStyle = drag ? { '--queue-slot-top': `${drag.slots[drag.from].top + offsets[drag.from]}px`, '--queue-slot-height': `${drag.slots[drag.from].height}px` } as CSSProperties : undefined;
-  return <ol ref={list} className={`music-queue reorder-queue${drag ? ' is-reordering' : ''}${variant === 'ambient' ? ' ambient-queue' : ''}`} aria-label={variant === 'ambient' ? '环境音播放队列' : '音乐播放队列'} style={slotStyle}
-    onPointerDownCapture={() => { if (!dragRef.current) suppressClick.current = false; }}
-    onClickCapture={event => { if (suppressClick.current && event.detail !== 0) { event.preventDefault(); event.stopPropagation(); } }}>
-    {queue.map((id, index) => {
-      const record = records.find(item => item.id === id)!;
-      const lifted = drag?.id === id;
-      return <li key={id} data-record-id={id}
-        className={['queue-item', variant === 'ambient' ? 'ambient-item' : '', currentId === id ? 'current' : '', lifted ? 'dragging' : '', lifted && drag.settling ? 'settling' : '', settledId === id ? 'settled' : ''].filter(Boolean).join(' ')}
-        onPointerDown={event => beginDrag(event, index)}
-        style={{ '--queue-y': `${lifted ? drag.offset : offsets[index] ?? 0}px` } as CSSProperties}>
-        <span className="queue-number"><RollNumber value={index + 1} minDigits={2} /></span>
-        {variant === 'ambient'
-          // 环境音是整组一起响的，没有「单独播这一首」，标题就只做展示
-          ? <span className={`queue-title static ${muted.includes(id) ? 'is-muted' : ''}`}>{record.name}<small>{muted.includes(id) ? `${record.artist} · 已暂停` : `${record.artist} · 循环叠加`}</small></span>
-          : <button className="queue-title" onClick={() => onPlay(id)}>{record.name}<small>{record.artist} · {formatTime(record.duration)}</small></button>}
-        {variant === 'ambient' && onToggle && <button
-          className={`icon-button queue-toggle ${muted.includes(id) ? '' : 'on'}`}
-          aria-pressed={!muted.includes(id)}
-          aria-label={`${muted.includes(id) ? '恢复' : '暂停'}${record.name}`}
-          title={muted.includes(id) ? '恢复这一路环境音' : '单独暂停这一路环境音'}
-          onClick={() => onToggle(record)}>
-          {muted.includes(id) ? <Play size={12} fill="currentColor" /> : <Pause size={12} fill="currentColor" />}
-        </button>}
-        <button className="icon-button queue-remove" aria-label={`从队列移除${record.name}`} onClick={() => onRemove(record)}><X size={13} /></button>
-      </li>;
-    })}
-  </ol>;
+
+  /**
+   * 键盘换位：Alt + ↑/↓ 把这一行往上/下挪一格。
+   *
+   * 为什么不复用拖拽那套：长按 350ms 再跟着指针走，键盘没有「指针位置」这个概念，
+   * 而换位这个动作本身是离散的——「挪一格」正好是一次按键。
+   * 用 Alt 而不是裸方向键：方向键在列表里是滚动，抢掉会让人没法用键盘翻页。
+   *
+   * 焦点不用手动还：`<li>` 带 key，moveItem 只换顺序，React 会把**同一个**
+   * DOM 节点搬过去，焦点跟着节点走。真正会丢的是「不知道挪到第几位了」——
+   * 这个靠下面那行 aria-live 播报。
+   */
+  function nudge(event: React.KeyboardEvent<HTMLLIElement>, from: number) {
+    if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+    const to = nudgeQueueIndex(from, queue.length, event.key === 'ArrowUp' ? -1 : 1);
+    if (to === null) return;
+    event.preventDefault();
+    // 拖拽进行中不接键盘：两套逻辑同时改 queue 会互相把对方取消掉
+    if (dragRef.current) return;
+    const record = records.find(item => item.id === queue[from]);
+    if (record) setMoved(`${record.name}，第 ${to + 1} 位，共 ${queue.length} 位`);
+    onReorder(moveItem(queue, from, to));
+  }
+
+  return (
+    <>
+      {/* 换位结果只说给屏幕阅读器听。视觉上序号与位置已经变了，再显示一遍是噪音。 */}
+      <div className="sr-only" role="status" aria-live="polite">{moved}</div>
+      <ol ref={list} className={`music-queue reorder-queue${drag ? ' is-reordering' : ''}${variant === 'ambient' ? ' ambient-queue' : ''}`} aria-label={variant === 'ambient' ? '环境音播放队列' : '音乐播放队列'} style={slotStyle}
+        onPointerDownCapture={() => { if (!dragRef.current) suppressClick.current = false; }}
+        onClickCapture={event => { if (suppressClick.current && event.detail !== 0) { event.preventDefault(); event.stopPropagation(); } }}>
+        {queue.map((id, index) => {
+          const record = records.find(item => item.id === id)!;
+          const lifted = drag?.id === id;
+          return <li key={id} data-record-id={id}
+            className={['queue-item', variant === 'ambient' ? 'ambient-item' : '', currentId === id ? 'current' : '', lifted ? 'dragging' : '', lifted && drag.settling ? 'settling' : '', settledId === id ? 'settled' : ''].filter(Boolean).join(' ')}
+            onPointerDown={event => beginDrag(event, index)}
+            onKeyDown={event => nudge(event, index)}
+            style={{ '--queue-y': `${lifted ? drag.offset : offsets[index] ?? 0}px` } as CSSProperties}>
+            <span className="queue-number"><RollNumber value={index + 1} minDigits={2} /></span>
+            {variant === 'ambient'
+              // 环境音是整组一起响的，没有「单独播这一首」，标题就只做展示
+              ? <span className={`queue-title static ${muted.includes(id) ? 'is-muted' : ''}`}>{record.name}<small>{muted.includes(id) ? `${record.artist} · 已暂停` : `${record.artist} · 循环叠加`}</small></span>
+              : <button className="queue-title" onClick={() => onPlay(id)}>{record.name}<small>{record.artist} · {formatTime(record.duration)}</small></button>}
+            {variant === 'ambient' && onToggle && <button
+              className={`icon-button queue-toggle ${muted.includes(id) ? '' : 'on'}`}
+              aria-pressed={!muted.includes(id)}
+              aria-label={`${muted.includes(id) ? '恢复' : '暂停'}${record.name}`}
+              title={muted.includes(id) ? '恢复这一路环境音' : '单独暂停这一路环境音'}
+              onClick={() => onToggle(record)}>
+              {muted.includes(id) ? <Play size={12} fill="currentColor" /> : <Pause size={12} fill="currentColor" />}
+            </button>}
+            <button className="icon-button queue-remove" aria-label={`从队列移除${record.name}`} onClick={() => onRemove(record)}><X size={13} /></button>
+          </li>;
+        })}
+      </ol>
+    </>
+  );
 }

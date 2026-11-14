@@ -405,6 +405,17 @@
   cursor: grab;
 }
 
+/* 键盘停在这块上时给个框。用 outline 而不是 box-shadow：这几块是
+   text-shadow + -webkit-text-stroke 画的字，外面套 box-shadow 会被
+   描边压住，看不出边界。outline 不参与布局，也不会把它们撑大。
+   叠加元素的焦点提示不在这里——它本来就有那圈虚线，复用比再加一层干净，
+   见 atmosphere.css 的 `.overlay:focus-visible::after`。 */
+.dw[data-editable='true']:focus-visible {
+  outline: 2px solid #ffffffd9;
+  outline-offset: 6px;
+  border-radius: 4px;
+}
+
 .dw.is-dragging {
   cursor: grabbing;
   /* 拖动时抬一点、加一层投影：手指按住的那块要「离屏幕更近」 */
@@ -594,6 +605,16 @@
 .dw[data-editable='true']:hover .layer-grip,
 .layer-grip:focus-visible {
   opacity: 1;
+}
+
+/* 手柄是深色小圆点，压在任意壁纸上。全局焦点环是灰绿 #8e9a8f，
+   在深色画面上几乎看不见（实测对白底也只有 2.93:1）。这里换成近白，
+   并留一圈深色 offset——纯白描边落在浅色壁纸（雪山）上同样会消失。 */
+.layer-grip:focus-visible {
+  outline: 2px solid #ffffffd9;
+  outline-offset: 2px;
+  /* 白环落在浅色壁纸（雪山、白墙）上会融进去，所以再垫一圈暗影 */
+  box-shadow: 0 0 0 1px #000000a6, 0 2px 8px #00000073;
 }
 
 .layer-grip:hover {

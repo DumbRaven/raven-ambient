@@ -1,5 +1,20 @@
 export type QueueSlot = { top: number; height: number };
 
+/**
+ * 键盘挪一格：把「第几行」换成「挪到第几行」。
+ *
+ * 拖动那条路径靠像素位置算落点（`queueDropIndex`），键盘没有指针，
+ * 直接按索引加减一格更贴切——用户按一次就是「往上/下一位」。
+ * 越界时返回 `null` 而不是夹到边上：夹住会让「已经在第一位还按上」变成
+ * 一次空的重排，白触发一次存档。
+ */
+export function nudgeQueueIndex(from: number, length: number, direction: -1 | 1): number | null {
+  if (!Number.isInteger(from) || from < 0 || from >= length) return null;
+  const to = from + direction;
+  if (to < 0 || to >= length) return null;
+  return to;
+}
+
 /** 所有坐标取自拖动开始时的布局，不读取正在过渡的行位置。 */
 export function clampQueueOffset(slots: QueueSlot[], from: number, offset: number): number {
   if (!slots[from] || !Number.isFinite(offset)) return 0;

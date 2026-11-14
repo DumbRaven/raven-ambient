@@ -240,6 +240,29 @@ export function scaleFromDrag(start: number, startDistance: number, distance: nu
 }
 
 /**
+ * 键盘挪一格：把方向键换成新的相对位置。
+ *
+ * 为什么用相对位置（0~1）而不是像素：换窗口大小时位置不能跟着漂，
+ * 拖动那条路径也是按 `left/top` 百分比存的。这里只做加减和夹紧，
+ * 出界就停在边上，不会累积成「按十次往左」的欠账。
+ */
+export function nudgeSpot(spot: LayerSpot, dx: number, dy: number): LayerSpot {
+  return {
+    x: Math.min(1, Math.max(0, spot.x + dx)),
+    y: Math.min(1, Math.max(0, spot.y + dy)),
+  };
+}
+
+/**
+ * 键盘改倍率：+ / - 各一步。
+ *
+ * 上下限交给 `clampScale`，这里不重复判——两处各写一遍迟早会改得不一致。
+ */
+export function nudgeScale(scale: number, delta: number): number {
+  return clampScale(scale + delta);
+}
+
+/**
  * 松手之后、上层确认之前，先把它按在这里。
  *
  * 为什么需要这个：桌面放映窗是另一个渲染进程，拖完以后位置要绕一圈才回来——

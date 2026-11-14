@@ -76,6 +76,20 @@
   border: 0;
 }
 
+/* 同上，但给「只该被读出来、不该被看见」的通用场合用（队列换位的播报）。
+   与 .roll-text 同一条实现：哪天要改隐藏手法，两处一起改。 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 @keyframes tab-dot-in {
   from { opacity: 0; transform: scale(.2); }
   to   { opacity: 1; transform: scale(1); }

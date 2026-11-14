@@ -52,7 +52,10 @@ const STYLE_SNAPSHOT = `(() => {
       .sort();
     let role = '';
     if (el.getAttribute('role')) role += '[role=' + el.getAttribute('role') + ']';
-    if (el.getAttribute('aria-label')) role += '[label=' + el.getAttribute('aria-label') + ']';
+    // aria-label 刻意不进签名：它是自由文本，永远不会被 CSS 选择器命中，
+    // 改了措辞不该让整份快照报警。2026-11-15 给图层块补无障碍标签时，
+    // 它让 12 份快照共 1616 条「差异」全红，而属性值一条都没变。
+    // role / aria-pressed 保留——[aria-pressed="true"] 这种选择器是真能命中样式的。
     if (el.getAttribute('aria-pressed')) role += '[pressed=' + el.getAttribute('aria-pressed') + ']';
     const base = tag + (cls.length ? '.' + cls.join('.') : '') + role;
     const n = indexMap.get(base) || 0;
@@ -92,6 +95,14 @@ const STYLE_SNAPSHOT = `(() => {
       count++;
     }
 
+    // 无障碍标签单独记一笔，不进签名。
+    //
+    // 为什么：它是自由文本，CSS 永远命中不到，但它会变——改个措辞、补个说明，
+    // 不该让整份快照按「元素消失 + 元素新增」报几千条。可它又确实值得盯：
+    // 「这次重构把某个按钮的标签弄丢了」是真回归，只是不该用元素身份来抓。
+    // 所以记在元素自己的记录里：签名不变、标签变了，就报一条改动而不是一片缺失。
+    if (el.getAttribute('aria-label')) entry.label = el.getAttribute('aria-label');
+
     byHash[hash] = entry;
   }
 
@@ -109,7 +120,11 @@ function flatten(snapshot) {
   const lines = [];
   for (const hash of Object.keys(snapshot.byHash).sort()) {
     const entry = snapshot.byHash[hash];
+    // label 是存在元素记录上的字符串（不进签名，理由见 STYLE_SNAPSHOT 里那段），
+    // 单独出一行 `标签: 值`，伪元素循环才不会把它当成一个属性对象去遍历。
+    if (typeof entry.label === 'string') lines.push(`${hash} | 标签 | 文案: ${entry.label}`);
     for (const pseudo of Object.keys(entry).sort()) {
+      if (pseudo === 'label') continue;
       const props = entry[pseudo];
       for (const name of Object.keys(props).sort()) {
         lines.push(`${hash} | ${pseudo} | ${name}: ${props[name]}`);

@@ -10,7 +10,7 @@
 //
 // 「撕」必须是人拖出来的，不能自动播：这一下既是确认，也是让他看清自己点的是哪张。
 // 判据（拖多少算撕开、灰烬怎么散、飞行落点）在 ticket-tear.ts，纯函数，有测试。
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { mediaSrc } from './media';
 import { folderOf, titleOf } from './media-text';
@@ -212,7 +212,7 @@ function Ticket({
   index: number;
   playing: boolean;
   picked: boolean;
-  onOpen: () => void;
+  onOpen: (trigger: HTMLElement) => void;
 }) {
   return (
     <li data-id={item.id}>
@@ -220,7 +220,7 @@ function Ticket({
         className={`ticket ${picked ? 'is-current' : ''}`}
         data-kind={item.kind}
         data-shape={ticketShape(item.id)}
-        onClick={onOpen}
+        onClick={event => onOpen(event.currentTarget)}
         aria-pressed={picked}
         aria-label={`放映 ${titleOf(item)}`}
       >
@@ -260,9 +260,16 @@ function TicketStage({
   const timers = useRef<number[]>([]);
   const shotRef = useRef<HTMLSpanElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLSpanElement>(null);
   const flakes = useRef(ashParticles(item.id));
 
   useEffect(() => () => { timers.current.forEach(window.clearTimeout); }, []);
+
+  // 浮层一打开就把焦点搬进票根。不搬的话焦点还留在下面网格里那张票上，
+  // 而网格此刻是 inert —— 浏览器会把焦点丢给 <body>，键盘用户当场失联。
+  useEffect(() => {
+    panelRef.current?.focus();
+  }, []);
 
   const finish = () => {
     timers.current.push(window.setTimeout(() => onDone(item.id), FLY_MS));
@@ -331,6 +338,20 @@ function TicketStage({
     }
   }
 
+  /**
+   * 键盘撕开：与「拖动越过阈值」走同一条后续链路。
+   *
+   * 不模拟一次假的拖拽（那要伪造 pointerId、clientY 与 getBoundingClientRect），
+   * 直接把「越过阈值之后该发生的事」重放一遍：进度钉满 → burn()。
+   * 后续的燃烧、飞行、onDone 完全复用，两条路径不会各改各的。
+   */
+  function tear() {
+    if (phase !== 'idle') return;
+    setPull(1);
+    setTearable(false);
+    burn();
+  }
+
   // 形变进度只算一次：折痕的形状与票面淡化都读它。
   const bend = tearEase(pull);
   // 一只从右下角翻起来的狗耳该怎么摆、绕哪个轴转多少度，全部由纯函数算好，
@@ -384,6 +405,20 @@ function TicketStage({
         </span>
         <span
           className="ticket-lift-panel"
+          ref={panelRef}
+          /* 键盘进得来：拖拽是鼠标/触屏的手势，键盘要的是「按一下就等于撕开」。
+             role=button + tabIndex 是这里唯一诚实的表达——屏幕阅读器读到的
+             「放映 X」与按下去发生的事完全一致。 */
+          role="button"
+          tabIndex={0}
+          aria-label={`撕开票根，放映 ${titleOf(item)}`}
+          aria-disabled={phase !== 'idle'}
+          onKeyDown={event => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            // 空格默认会滚页面；Enter 在某些容器上会触发点按。两条都要拦。
+            event.preventDefault();
+            tear();
+          }}
           onPointerDown={down}
           onPointerMove={move}
           onPointerUp={up}
@@ -398,7 +433,7 @@ function TicketStage({
             <TicketFace item={item} index={index} />
           </span>
         </span>
-        {phase === 'idle' && <span className="ticket-tip">按住票根往上撕</span>}
+        {phase === 'idle' && <span className="ticket-tip">按住票根往上撕，或按回车</span>}
         {phase !== 'idle' && (
           <span className="ticket-ash" aria-hidden="true">
             {flakes.current.map((flake, i) => (
@@ -448,6 +483,15 @@ type Props = {
 
 export default function MediaTickets({ items, active, seen, currentId, listRef, template, page, onPage, onPick }: Props) {
   const [openId, setOpenId] = useState('');
+  // 关掉浮层之后把焦点还给「打开它的那张票」。不还的话焦点落到 <body>，
+  // 键盘用户得从头 Tab 一遍才能继续挑下一张。
+  const opener = useRef<HTMLElement | null>(null);
+
+  const close = useCallback(() => {
+    setOpenId('');
+    opener.current?.focus();
+    opener.current = null;
+  }, []);
 
   // 纸纹滤镜只需要一份，抹在整个列表与浮层的票根上（CSS 里 filter: url(#id)）。
   // 插在 <body> 上而不是某个票根里：被 mask 裁过的容器里引用滤镜，
@@ -474,14 +518,18 @@ export default function MediaTickets({ items, active, seen, currentId, listRef, 
 
   useEffect(() => {
     if (!openId) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpenId(''); };
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') close(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [openId]);
+  }, [openId, close]);
 
   return (
     <>
-      <ul className="ticket-grid" ref={listRef}>
+      {/* 浮层开着的时候，下面这一整片（票格 + 分页）都不该再被 Tab 到。
+          inert 同时挡住焦点与点击穿透，比一个个 aria-hidden 可靠。
+          注意必须挂在 <ul> 与 <nav> 各自身上：套一层 div 会改变
+          .ticket-grid 与 .ticket-pager 的网格上下文。 */}
+      <ul className="ticket-grid" ref={listRef} inert={opened ? true : undefined}>
         {slips.map((item, offset) => (
           <Ticket
             key={item.id}
@@ -489,12 +537,15 @@ export default function MediaTickets({ items, active, seen, currentId, listRef, 
             index={pageInfo.from + offset}
             playing={active && seen.has(item.id)}
             picked={currentId === item.id}
-            onOpen={() => setOpenId(item.id)}
+            onOpen={trigger => {
+              opener.current = trigger;
+              setOpenId(item.id);
+            }}
           />
         ))}
       </ul>
       {pageInfo.pages > 1 && (
-        <nav className="ticket-pager" aria-label="票根分页">
+        <nav className="ticket-pager" aria-label="票根分页" inert={opened ? true : undefined}>
           <button
             className="pager-arrow"
             aria-label="上一页"
@@ -532,8 +583,8 @@ export default function MediaTickets({ items, active, seen, currentId, listRef, 
           item={opened}
           index={openedIndex}
           template={template}
-          onClose={() => setOpenId('')}
-          onDone={id => { setOpenId(''); onPick(id); }}
+          onClose={close}
+          onDone={id => { setOpenId(''); opener.current = null; onPick(id); }}
         />
       )}
     </>

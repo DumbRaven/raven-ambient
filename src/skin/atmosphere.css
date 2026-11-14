@@ -48,6 +48,12 @@
   border-color: #ffffff5c;
 }
 
+/* 键盘停在这块上：复用悬停那圈虚线，只是更亮。
+   （重画一个有边框的兄弟节点会改变元素尺寸，而这几块的位置是百分比定位的。） */
+.overlay:focus-visible::after {
+  border-color: #ffffffa6;
+}
+
 .overlay.is-dragging::after {
   border-color: #ffffffa6;
 }

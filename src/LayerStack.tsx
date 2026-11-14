@@ -14,7 +14,10 @@ import {
   clockText,
   dateText,
   findLayer,
+  nudgeScale,
+  nudgeSpot,
   scaleFromDrag,
+  scaleLayer,
   settleAt,
   settleConfirm,
   settleScale,
@@ -190,6 +193,48 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
     setResize({ id, start: scale, startDistance, cx, cy });
   }
 
+  /**
+   * 键盘移动：方向键一次挪 1%，Shift + 方向键一次挪 5%。
+   *
+   * 与拖动走同一个出口（`onChange` + 先钉住再报上去），只是不用指针位置，
+   * 而是在现有 spot 上加减。为什么是 1%：视口 1000px 时一格 10px，
+   * 按住不放能连发，够细也够快；要快就用 Shift。
+   */
+  function nudge(event: React.KeyboardEvent<HTMLDivElement>, id: LayerId) {
+    if (!editable) return;
+    const step = (event.shiftKey ? 5 : 1) / 100;
+    const dx = event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0;
+    const dy = event.key === 'ArrowDown' ? step : event.key === 'ArrowUp' ? -step : 0;
+    if (!dx && !dy) return;
+    // 方向键在这些元素里默认是滚动容器；这里要的是「挪这块」
+    event.preventDefault();
+    const item = value.find(entry => entry.id === id);
+    if (!item) return;
+    const current = settling[id] ?? live[id] ?? item.spot;
+    const spot = nudgeSpot(current, dx, dy);
+    setSettling(pinned => settleAt(pinned, id, spot));
+    onChange(value.map(entry => (entry.id === id ? { ...entry, spot } : entry)));
+  }
+
+  /**
+   * 键盘改大小：+ / - 一次 10%（Shift 25%）。
+   *
+   * 拖手柄是「到中心的距离比」，键盘没有距离，所以直接改倍率。
+   * 边界由 nudgeScale 里的 clampScale 兜，这里不再重复一遍判断。
+   */
+  function scaleBy(event: React.KeyboardEvent<HTMLButtonElement>, id: LayerId, scale: number) {
+    if (!editable) return;
+    const step = event.shiftKey ? 0.25 : 0.1;
+    const delta = event.key === '+' || event.key === '=' ? step : event.key === '-' || event.key === '_' ? -step : 0;
+    if (!delta) return;
+    // 手柄在块里面，不拦住的话方向键会连带挪动整块
+    event.preventDefault();
+    event.stopPropagation();
+    const next = nudgeScale(scale, delta);
+    setSettlingScale(current => settleScale(current, id, next));
+    onChange(scaleLayer(value, id, next));
+  }
+
   useEffect(() => {
     if (!resize) return;
     const onMove = (event: PointerEvent) => {
@@ -270,6 +315,10 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
                 } as CSSProperties
               }
               onPointerDown={event => start(event, item.id)}
+              onKeyDown={event => nudge(event, item.id)}
+              tabIndex={editable ? 0 : undefined}
+              role={editable ? 'group' : undefined}
+              aria-label={editable ? `${removeWords[item.id]}，方向键移动位置` : undefined}
               title={findLayer(item.id) ? `拖动调整位置：${findLayer(item.id)!.name}` : undefined}
             >
               {item.id === 'clock' && <b className="ov-clock">{text('clock')}</b>}
@@ -295,8 +344,9 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
                 <button
                   type="button"
                   className="layer-grip"
-                  aria-label={`拖动改变${removeWords[item.id]}的大小`}
+                  aria-label={`改变${removeWords[item.id]}的大小：拖动手柄，或用 + / - 键`}
                   onPointerDown={event => gripStart(event, item.id, scale)}
+                  onKeyDown={event => scaleBy(event, item.id, scale)}
                 />
               )}
             </div>
@@ -325,7 +375,11 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
             className={`dw dw-${item.id} ${dragging ? 'is-dragging' : ''}`}
             style={style}
             onPointerDown={event => start(event, item.id)}
+            onKeyDown={event => nudge(event, item.id)}
             data-editable={editable ? 'true' : undefined}
+            tabIndex={editable ? 0 : undefined}
+            role={editable ? 'group' : undefined}
+            aria-label={editable ? `${removeWords[item.id]}，方向键移动位置` : undefined}
           >
             {item.id === 'clock' && <b className="dw-clock">{text('clock')}</b>}
             {item.id === 'date' && <span className="dw-date">{text('date')}</span>}
@@ -351,8 +405,9 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
               <button
                 type="button"
                 className="layer-grip"
-                aria-label={`拖动改变${removeWords[item.id]}的大小`}
+                aria-label={`改变${removeWords[item.id]}的大小：拖动手柄，或用 + / - 键`}
                 onPointerDown={event => gripStart(event, item.id, scale)}
+                onKeyDown={event => scaleBy(event, item.id, scale)}
               />
             )}
 
