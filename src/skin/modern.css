@@ -120,10 +120,7 @@
     padding: 4px;
   }
 
-  .view-tabs > button {
-    gap: 5px;
-    padding: 8px 9px;
-  }
+  
 
   .view-tabs > button.active {
     gap: 5px;

@@ -32,8 +32,6 @@
   top: 1.06cqw;
   white-space: nowrap;
 }
-.template-collage .tpl-block-bar .tpl-list > b { font-size: 1.48cqw; }
-.template-collage .tpl-block-bar .tpl-list span { font-size: 1.57cqw; }
 
 .template-collage .tpl-block-bar .tpl-fields > div:first-child {
   position: absolute;
@@ -56,11 +54,10 @@
   flex-direction: column;
   gap: 1.4cqw;
 }
-.template-collage .tpl-block-bar .tpl-list > b { font-size: 1.32cqw; }
+
 /* 曲目串 pos(496.83,945) → (38.25%,64.60%)，是一整段连续文字 */
 .template-collage .tpl-block-bar .tpl-list span {
   display: block; margin-top: 2.6cqw;
-  font-size: 1.40cqw; line-height: 1.55; opacity: 0.82;
 }
 
 /* 翅膀单独一条 path，盖在身体上。放在这里而不是用 currentColor，

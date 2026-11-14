@@ -24,12 +24,6 @@
 }
 .shelf-label > span:last-child { font-size: 11px; letter-spacing: 0; color: var(--bold-ink); }
 
-.record-grid {
-  column-gap: 18px;
-  row-gap: 26px;
-  padding: 0 2px;
-}
-
 .record-card {
   padding-bottom: 10px;
   list-style: none;
@@ -177,7 +171,6 @@
 .record-card > p {
   font-size: 11px;
   color: var(--bold-muted);
-  gap: 7px;
   margin-top: 4px;
 }
 .playing-bars i { background: var(--bold-ink); }

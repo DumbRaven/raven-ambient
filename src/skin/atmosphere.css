@@ -686,9 +686,6 @@
    原来用 background-position 动画，位移距离和图案周期对不齐，视觉上是在闪而不是在落。
    现在位移正好等于图案周期（20px），循环无缝，而且方向就是往下。 */
 
-@keyframes rain-fall {  to { transform: translateY(20px); }
-}
-
 /* ---------- 放映：乌鸦 / 雨丝 / 空库提示（定稿） ---------- */
 
 .media-room.is-expanded /* 雨丝。

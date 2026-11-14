@@ -243,13 +243,6 @@
   background: #0d0d0d;
 }
 
-.theater-screen .theater-live {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
 /* 还没拿到第一帧时的等待态。抓帧器启动要几十毫秒，
    这段时间什么都不画会闪一下黑块。 */
 .theater-wait {

@@ -101,16 +101,8 @@
 /* 圆角不在这里设：每个块画自己的对角圆角，
    统一写 0 会把它们全抹掉（这条是 0,2,0，比单类名那条优先级高）。 */
 
-/* 信息条：标签、值、曲目段一律按容器宽缩放。 */
-.template-collage .tpl-fields > div > b,
-.template-collage .tpl-list > b {
-  font-size: 1.75cqw;
-  letter-spacing: 0.18em;
-}
-
 .template-collage .tpl-block-bar {
   gap: 1.4cqw;
-  padding: 3.2% 15% 2.6% 3.4%;
 }
 
 .template-collage .tpl-block-panel {
@@ -336,11 +328,6 @@
   .tone-swatches button { transition: none; }
 }.template-collage .tpl-fields > div > b,
 .template-collage .tpl-list > b {
-  display: block;
-  font-size: 1.8cqw;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  opacity: 0.72;
   margin-bottom: 0.5cqw;
 }
 .template-collage .tpl-words {

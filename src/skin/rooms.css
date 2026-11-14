@@ -307,8 +307,8 @@
   .intro h1 { font-size: 38px; letter-spacing: -1.2px; }
   .edition { font-size: 9px; letter-spacing: 1.3px; }
   .brand > span { font-size: 14px; }
-  .view-tabs { padding: 4px; gap: 3px; }
-  .view-tabs > button { padding: 8px 12px; font-size: 11px; }
+  
+  .view-tabs > button { font-size: 11px; }
   .cabinet-layout { grid-template-columns: minmax(0, 1fr) 148px; gap: 20px; }
   .cabinet { padding: 18px 15px 0; border-radius: 22px; }
   .cabinet-base { margin: 0 -15px; padding: 0 15px; border-radius: 0 0 22px 22px; }  .cover-title { font-size: 15px; left: 14px; right: 14px; bottom: 28px; }
