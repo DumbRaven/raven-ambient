@@ -1,0 +1,831 @@
+/* ==========================================================================
+ * collage-type.css —— 拼贴版式：文字按 AE 锚点绝对定位（靠书写顺序覆盖，见文件头）
+ *
+ * 从 collage.css 切出，层叠顺序 2/2。
+ * 顺序由 skin-bold.css 里的 @import 决定，改顺序会改变渲染结果。
+ * ========================================================================== */
+.template-collage .tpl-disc:not(.has-disc) {
+  /* 没在放音乐时只是「这里有台唱机」的暗示，但压太狠会变成一块灰饼。
+     保留花色，只降一点亮度。 */
+  opacity: 0.72;
+  filter: saturate(0.92) brightness(0.9);
+}
+
+/* ===== 文字位置的唯一来源：AE 的 raven-shapes.json =====
+   每条都是 layer 的 pos（锚点）+ fontSize，除以画布 1920×1080 换算成百分比。
+   改动版式时只改这一段，别在别处再写 position。 */
+
+/* 正介绍：pos(1410.18,131.25)，字号 18 → 1.67cqw。相对面板：左 21.9%、上 16.2%。 */
+
+/* 镜像介绍：pos(1467.46,269)，scale(-100,-100) 就是整块上下左右都翻。 */
+
+/* 竖排 DUMBRAVEN：pos(1748.61,230.56)，字号 52 → 4.81cqw。
+   相对面板：左 77.7%、上 32.7%。 */
+.template-collage .tpl-tag { right: 12.5%; top: 32.65%; width: 26%; }
+.template-collage .tpl-badge { font-size: 4.81cqw; }
+
+/* 标题：pos(1380.54,370.25)，字号 18。相对面板：左 17.8%、上 55.8%。 */
+.template-collage .tpl-words { left: 17.80%; top: 55.85%; width: 62%; }
+.template-collage .tpl-title-text { font-size: 2.30cqw; }
+.template-collage .tpl-sub { font-size: 1.30cqw; }
+
+/* 信息条：全部按 AE 锚点。外接框 34..1244 / 768..1042（1210×274）。 */
+/* TITLE  pos(89.76,805)  → 相对信息条 4.6% / 13.5% */
+/* 标题值 pos(115.55,826.75) */
+/* PLAYLIST pos(92.71,869) → 4.8% / 36.9% */
+/* 曲目串 pos(496.83,945) → 38.3% / 64.6% */
+/* photography pos(698.06,801.75) → 54.9% / 12.3% */
+/* Read The   pos(692.58,837.07) → 54.5% / 25.2% */
+.template-collage .tpl-block-bar .tpl-fields { padding-top: 12.9%; }
+/* 这里只管第一格（TITLE）的字号。第二格改成番茄钟之后读数是 2.9cqw、
+   标签 1.32cqw，都不一样，不能再按 `> div > b` 一把抓。 */
+.template-collage .tpl-block-bar .tpl-fields > div:first-child > b { font-size: 1.48cqw; }
+.template-collage .tpl-block-bar .tpl-fields > div:first-child span { font-size: 1.67cqw; }
+.template-collage .tpl-block-bar .tpl-list > b { font-size: 1.48cqw; }
+.template-collage .tpl-block-bar .tpl-list span { font-size: 1.57cqw; }
+
+/* 乌鸦：pos(1118.6,948)，相对信息条 89.7% / 65.7%，高约信息条的 60%。 */
+.template-collage .tpl-raven { left: 87.2%; top: 60%; width: 9.5%; height: auto; }
+
+/* Produced By：字号 29 → 2.69cqw，色 #C5AF83。
+   AE 的 pos(2228.71,943.79) 在 1920 画布右边界之外（x=116.08%），照抄等于一个字都看不见。
+   参考图（AE 最终渲染 PNG）里它落在右下角 88.78%..99.43%，右端被画布裁掉一截——
+   也就是 AE 那台「安全框外」的图层，最终输出时确实有一部分进来了。
+   所以位置取参考图实测值，不取 AE 的 pos。 */
+.template-collage .tpl-produced {
+  left: 87.43%;
+  /* 胶囊顶边 82.46%。参考图文字带从 84.51% 起，差 2.05% 画布高 = 1.15cqw，
+     但行高会在字上留 0.3cqw 的 leading，所以 padding-top 取 0.85cqw 才落得准。 */
+  top: 82.46%;
+  /* 右端贴死画布边界：参考图里这块半透明底是**越过画布右边被裁掉**的，
+     所以不能写 width，要写 right: 0 —— 写 width 时右边会留一条缝，
+     看起来像「没铺到头」。left + right 一起写，宽度由它们撑开。 */
+  right: 0;
+  bottom: auto;
+  font-size: 1.55cqw;
+  /* 左边留白，右边不补：字靠左排，胶囊右段本来就伸到画布外，看不见。 */
+  padding: 0.85cqw 0 1.04cqw 1.36cqw;
+  margin: 0;
+  text-align: left;
+  border-radius: 2.6cqw 0 0 2.6cqw;
+  background: #ffffff42;
+  /* 参考图金字核心色实测 rgb(212,160,64)。原来的 #C5AF83 又淡又发灰，
+     在浅色胶囊上几乎读不出来。
+     走 --tpl-gold：竖排胶囊的四颗星、DUMBRAVEN 字母和这行署共用同一个金色，
+     用户调一次三处一起变（配色面板「胶囊 · 署名」那一组）。 */
+  color: var(--tpl-gold);
+  /* 唱片在本层里是 z-index:6，署名只有 3。唱片的深色外阴影
+     「0 2.2cqw 5cqw #00000052」半径 5cqw，正好铺到署名上半行，
+     把金字压成灰褐色（放大图里 Produced By 明显比 DumbRaven 灰）。
+     参考图里署名压在唱片的阴影之上，所以这里抬到唱片上面。 */
+  z-index: 7;
+}
+/* 两行字号一样大：参考图里第二行只比第一行高 23px vs 28px，
+   差的那 5px 是第一行 “Produced By” 里 y 的下降部，不是字号差异。 */
+.template-collage .tpl-produced b { font-size: inherit; }
+
+/* 角标的画布坐标（3.36% / 2.09%）由上面那条统一给出，这里不再重复写 left/top。
+   之前这里又写了一套，后出现会赢，把 2.7%/1.15% 钉死在画面上——两个值都来自
+   AE 的锚点，但 AE 这份导出漏了父级变换（同 Produced By 那批），所以位置一律
+   以参考图像素为准：x=2.09%、y=3.36%。 */
+
+/* ===== 文字按 AE 锚点绝对定位（覆盖掉上面的流式网格排布） =====
+   面板：615×602；信息条：1210×274。百分比 = (锚点 - 块左上) / 块尺寸。
+   这里全部 position:absolute，不参与父级网格流，才和 AE 一一对应。 */
+.template-collage .tpl-block-panel { display: block; padding: 0; }
+
+/* 正介绍 pos(1410.18,131.25) 字号 18 */
+/* 镜像介绍 pos(1467.46,269) 字号 20，AE 里 scale(-100,-100) 整块翻转 */
+/* 竖排 DUMBRAVEN pos(1748.61,230.56) 字号 52 */
+.template-collage .tpl-tag { right: 11.5%; top: 26.4%; width: 21%; }
+/* 标题 pos(1380.54,370.25) 字号 18 */
+.template-collage .tpl-words {
+  position: absolute; left: 17.81%; top: 55.86%; width: 60%;
+  transform: none; margin: 0; padding: 0;
+}
+.template-collage .tpl-title-text { font-size: 2.93cqw; line-height: 1.16; }
+.template-collage .tpl-sub { font-size: 1.63cqw; }.template-collage .tpl-block-bar .tpl-fields > div:first-child {
+  position: absolute; left: 4.61%; top: 13.50%; margin: 0;
+}
+.template-collage .tpl-block-bar .tpl-fields > div:first-child > b { font-size: 1.32cqw; }
+.template-collage .tpl-block-bar .tpl-fields > div:first-child span {
+  display: block; position: absolute; left: 2.15cqw; top: 1.06cqw;
+  font-size: 1.49cqw; white-space: nowrap;
+}
+/* 第二格原本是 PHOTOGRAPHY（pos 698.06,801.75 → 54.88%,12.32%），已删。
+   现在那一格是番茄钟，位置和字号全部写在文件末尾那段，别在这里补。 */
+/* PLAYLIST pos(92.71,869) 字号 16 → (4.85%,36.86%) */
+.template-collage .tpl-block-bar .tpl-list {
+  position: absolute; left: 4.85%; top: 36.86%; right: 6%; margin: 0; padding: 0;
+}
+.template-collage .tpl-block-bar .tpl-list > b { font-size: 1.32cqw; }
+/* 曲目串 pos(496.83,945) → (38.25%,64.60%)，是一整段连续文字 */
+.template-collage .tpl-block-bar .tpl-list span {
+  display: block; margin-top: 2.6cqw;
+  font-size: 1.40cqw; line-height: 1.55; opacity: 0.82;
+}
+
+/* 乌鸦：位置取自参考图实测（AE 的 pos 少了父级变换，算出来是错的）。
+   参考图里它是近纯黑的剪影，站在信息条右下角，画布 55.87%..64.11% × 83.68%..95.99%。
+   换算成相对信息条：left 85.85% top 49.55% width 13.08%。
+   颜色用页底色 #1c2433 而不是纯黑——参考图实测 #040405，但信息条是灰的，
+   纯黑会显得像贴上去的一块，参考图那点微弱的暖调来自环境光。 */
+/* 乌鸦：位置和尺寸都是参考图像素实测（.tools/raven-box.cjs 的阈值扫描，
+   T=30~40 之间包围盒稳定：125×101px，相对信息条 left 85.79% / top 49.27% /
+   宽 10.33% / 高 36.86%）。
+   两个必须知道的偏差：
+   1. 原写 width 13.08%，算出来的底边落在 96.81%——信息条只有 274px 高，
+      超出去的那截正是被 mask 裁掉的尾巴。
+   2. 参考图那只乌鸦的宽高比是 1.238，而我们这份 `ravenPath`（从
+      `docs/images/00-logo.png` 描出来的）是 617/553 = 1.116，**同等宽度下更高**。
+      所以不能只对齐 top：那样底边会比参考图低 4 个百分点、正好顶进圆弧。
+      这里改成**对齐底边**（参考图底 86.13%），高度 40.88% 反推 top = 45.25%，
+      脚踩在同一个高度上，尾巴离圆弧还有余量。 */
+.template-collage .tpl-raven {
+  position: absolute;
+  left: 85.79%;
+  top: 45.25%;
+  width: 10.33%;
+  height: auto;
+  margin: 0;
+  /* 两色乌鸦：身体用面板色、翅膀用信息条色。
+     原 logo 就是这两块颜色（身体 rgb(33,42,50)、翅膀 rgb(93,108,120)），
+     深浅关系一致——信息条比面板亮，所以翅膀仍然是「亮过身体」的那块。
+     这两个令牌跟着壁纸取色走，换一张图乌鸦跟着换，不会钉死在某个灰上。 */
+  color: var(--tpl-panel);
+  opacity: 1;
+}
+
+/* 翅膀单独一条 path，盖在身体上。放在这里而不是用 currentColor，
+   是因为一个元素只能有一个 currentColor。
+   取「信息条色向面板色压 35%」，而不是直接用信息条色：
+   信息条色正是乌鸦脚下的底色，直接填进去翅膀会和背景糊在一起、变成一块洞。
+   压 35% 之后它仍明显亮过身体，两色关系（亮翅膀 / 暗身体）保住了。 */
+.template-collage .tpl-raven .tpl-raven-wing {
+  fill: color-mix(in srgb, var(--tpl-bar) 65%, var(--tpl-panel));
+}
+
+/* ===== 三块的外形：全部用 SVG mask（曲线 + 等比缩放） =====
+   clip-path:path() 的坐标是像素、不随容器缩放，所以曲线只能靠 mask-image。
+   preserveAspectRatio="none" 让 path 跟着块的宽高等比拉伸。 */
+
+/* 画面块：左上角是一段大弧，AE 里半径约 162px（块宽 1210 的 13.4%）。 */
+.template-collage > .tpl-block-media {
+  border-radius: 0;
+  -webkit-mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 708' preserveAspectRatio='none'><path d='M162,0 L1210,0 L1210,708 L0,708 L0,162 Q0,0 162,0 Z' fill='white'/></svg>");
+  mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 708' preserveAspectRatio='none'><path d='M162,0 L1210,0 L1210,708 L0,708 L0,162 Q0,0 162,0 Z' fill='white'/></svg>");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+/* 信息条：右下角顺着唱片的圆内凹。参考图实测那段是**半径 152px 的正圆**
+   （画布宽 7.94%，残差 rms 0.48px），不是斜切——原先写的是
+   `Q1120,232 1210,127` 二次贝塞尔，两个控制点会让弧在接近右下角时变直，
+   远看就像被斜着切掉一个角。
+   这段弧的圆心 (1096.3,883.4) 落在信息条右下角**外侧**（信息条右下角是
+   1244,1042），底切点 x=1096.3（相对信息条宽 87.94%）、右切点 y=883.4
+   （相对信息条高 44.63%）——也就是右下角就是一段半径 152 的圆角，
+   两条直角边分别在 x=1096.3 与 y=883.4 处离开边缘。
+   换算成 mask 的 viewBox（信息条自身 1210×274）：
+     圆心 (1062.3, 121.4)，半径 152
+     底边从 (0,274) 走到 (1062.3,274)，然后弧上到 (1210,121.4)，
+     右边从 (1210,121.4) 上到 (1210,0)。
+   用真正的 A（arc）指令，不用 Q；`preserveAspectRatio='none'` 会让弧在
+   非等比缩放下变成椭圆，但那正是 AE 的行为——它按成片比例渲染。 */
+.template-collage > .tpl-block-bar {
+  clip-path: none;
+  -webkit-mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 274' preserveAspectRatio='none'><path d='M1210,0 L0,0 L0,274 L1062.3,274 A152,152 0 0 0 1210,121.4 L1210,0 Z' fill='white'/></svg>");
+  mask-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1210 274' preserveAspectRatio='none'><path d='M1210,0 L0,0 L0,274 L1062.3,274 A152,152 0 0 0 1210,121.4 L1210,0 Z' fill='white'/></svg>");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  padding-right: 24%;
+}
+
+/* ===== 凹槽里的竖排 DUMBRAVEN：5 行、每行 2 个字母、左右交错 =====
+   AE 里那一层是「    R D     A U     V M     E B     N」——每行两个字母，
+   第二列比第一列低一截，整体像一个斜着排的柱子。 */
+.template-collage .tpl-tag {
+  right: 11.5%;
+  top: 26.4%;
+  width: 21%;
+  padding: 2.2cqw 0 2.6cqw;
+  border-radius: 5.2cqw;
+}
+
+.template-collage .tpl-badge {
+  display: grid;
+  grid-auto-flow: row;
+  justify-items: center;
+  align-items: center;
+  gap: 0.15cqw 0.6cqw;
+  grid-template-columns: auto auto auto;
+  font-size: 5.6cqw;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #e8b84b;
+  text-shadow: 0 0 1.2cqw #e8b84b3d;
+}
+
+/* 每行两个字母：第二个往下沉半格，做出「交错」的错位感。 */
+.template-collage .tpl-badge > span {
+  display: block;
+  text-align: center;
+}
+.template-collage .tpl-badge > span:nth-child(even) {
+  transform: translateY(0.5cqw);
+  opacity: 0.88;
+}
+
+/* 星点：围着柱子在两侧散开。 */
+.template-collage .tpl-star {
+  font-size: 1.7cqw;
+  opacity: 0.75;
+  color: #e8b84b;
+}
+.template-collage .tpl-star-a { left: -14%; top: 14%; }
+.template-collage .tpl-star-b { right: -14%; top: 40%; }
+.template-collage .tpl-star-c { left: -8%; bottom: 16%; }
+.template-collage .tpl-star-d { right: -4%; bottom: 34%; }
+
+/* ===== 面板右上那枚竖排 DUMBRAVEN 胶囊（覆盖上面所有写法） =====
+   位置全部取自参考图（AE 最终渲染 PNG）的实测像素，不取 AE 的 pos——
+   AE 导出 JSON 里这些图层还套着父级/空对象变换，算出来的绝对值是错的
+   （同一个 JSON 里「小图标」算 51.6%，实测 67.79%）。
+   画布实测：胶囊 x=[1701,1841] y=[91,400] → left 88.73% top 8.49% w 7.30% h 28.82%。
+   这里换成相对面板的百分比：left 70.34% top 9.58% width 22.79%。 */
+.template-collage .tpl-tag {
+  right: auto;
+  top: 9.58%;
+  left: 70.34%;
+  width: 22.79%;
+  min-height: 0;
+  /* 高 = 胶囊实测 28.82% 画布高 ÷ 面板高 55.74% */
+  height: 51.70%;
+  padding: 0;
+  /* 圆角是半个宽：参考图里那是一条正胶囊，两端是正半圆，不是圆角矩形。 */
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 胶囊底是半透明白叠在面板上：参考图实测 #7a8494，面板 #4a5363，
+     即约 26% 的白。之前那块白噪点就是丢了这层透明度、又叠了死白的纹理。 */
+  background-image: none;
+  background-color: #ffffff3d;
+  box-shadow: none;
+  isolation: isolate;
+  /* 这是个 <button>：点一下换石纹（用户 m09905）。把浏览器默认的
+     按钮外观全部抹掉，只留 cursor 与按下反馈。 */
+  appearance: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  /* 不许选中文字：连点两下不该选中 DUMB / RAVEN。 */
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 160ms cubic-bezier(.2, .8, .3, 1);
+}
+
+/* 按下时给一点点形变。为什么这么轻：这块胶囊在画面里占得不小，
+   动大了会从「石面」变成「一个按钮」。 */
+.template-collage .tpl-tag:active {
+  transform: scale(0.985);
+}
+
+.template-collage .tpl-tag:focus-visible {
+  outline: 2px solid var(--tpl-gold);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .template-collage .tpl-tag { transition: none; }
+  .template-collage .tpl-tag:active { transform: none; }
+}
+
+/* 胶囊表面的纹理层。
+
+   两种石纹（浪脊 / 玉石）共用这一层，差别只在 marble.ts 的参数表：
+   - `background: hsl(from var(--tpl-panel) h s calc(l * 1.6))` 是**胶囊的颜色**，
+     纹理只输出中性灰当亮度系数，与这一层相乘，所以换配色它自动跟着变。
+     为什么要相对颜色语法而不是混白：用户 m09087 指出「胶囊本身是没有色彩的，
+     他是根据面板的颜色来变色的」。混白会同时提亮**和**褪色——蓝面板下
+     blueMinusRed 只剩 11.9，参考图是 24.3；而 `hsl(from …)` 只抬明度，
+     实测 27.0 / mean 128.5（参考 24.3 / 130.1），暖色面板下 -24.3。
+   - `opacity: 1`：幅度全在滤镜的 `amount` 里，这里再乘系数会把颜色一起淡掉。
+   - 两种石纹必须用同一套底色与混合模式，否则「换个石纹整块胶囊都换了亮度」——
+     用户 m09905 就是在浪脊看着比玉石弱的时候提的意见。 */
+.template-collage .tpl-tag::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* 带 filter 的元素会脱离父级 border-radius 的裁剪，方形的滤镜输出会整块露在
+     胶囊圆角外面（截图上就是胶囊四角那圈直角浅色块）。父级不能加 overflow:hidden，
+     因为四颗 ✦ 星是故意探到胶囊外的。所以在这一层自己再裁一次，形状跟 border-radius 一致。 */
+  clip-path: inset(0 round 999px);
+  background: hsl(from var(--tpl-panel) h s calc(l * 1.6));
+  filter: url(#tpl-marble);
+  mix-blend-mode: normal;
+  opacity: 1;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* 方向性高光：从左上打进来的一道光，斜着铺过整条胶囊。
+   为什么需要：石纹本身是平的，只有脉络没有光照，看着像贴图。
+   加一道单向渐变之后，胶囊立刻有了「凸面」的弧度——亮的一侧朝光源，
+   暗的一侧背光，这才是「用高光让它好看一点」真正的意思。
+
+   跟纹理分成两层而不是塞进同一条 background：纹理要过 SVG 滤镜，
+   高光不能过——滤镜会把渐变也一起揉弯，高光就碎了。 */
+.template-collage .tpl-tag::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  clip-path: inset(0 round 999px);
+  background:
+    linear-gradient(160deg, #ffffff52 0%, #ffffff1a 22%, #ffffff00 46%),
+    radial-gradient(120% 60% at 18% 8%, #ffffff3d 0%, #ffffff00 62%),
+    linear-gradient(340deg, #00000033 0%, #00000000 40%);
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* 两列字母：左列 DUMB、右列 RAVEN，不是按行铺的十个字母。 */
+.template-collage .tpl-badge {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  /* 参考图两列字母的中心距 2.63% 画布宽，实测 2.4cqw 时是 3.35%，宽了 27%。
+     Georgia 斜体比参考图的 Playfair 宽，所以间隙压到 0.6cqw 才能让整块回到
+     接近参考图的窄长比例——再大就变成两列分家的宽块了。 */
+  column-gap: 0.6cqw;
+  row-gap: 0;
+  /* 参考图单字母 cap 高约 43px、行距 55px（画布 1917 宽时）。
+     面板宽 614px → 1cqw = 614px（换算到 1917 宽画布是 1cqw = 6.14px）。
+     cap 高 43px = 7.0cqw，衬线字体 cap 约占 0.70em → font-size ≈ 10cqw；
+     行距 55px = 8.96cqw → line-height = 8.96 / 10 = 0.90。
+     这两条是绑在一起的：只放大字号不收行距，5 个字母就会顶出胶囊。 */
+  font-size: 10.6cqw;
+  /* 参考图是金色高对比衬线（Playfair 类）。项目里没有这个字体文件、
+     也不许联网加载，所以只能落到系统衬线 Georgia——字形宽度不同，
+     但粗细对比和整体气质能留住。 */
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  /* 参考图是粗笔画高对比衬线。600 在 Georgia 下笔画太细，实测金色像素
+     覆盖率只有参考的一半，整块看着发灰。 */
+  font-weight: 700;
+  /* 斜体衬线。参考图 4 倍放大（%TEMP/badge7-cmp.png 左）里 D/R/U/M/B 的竖笔
+     全部右倾，V/E/N 也有斜切——不是直立正体。
+     AE JSON 里这层登记的是 Montserrat-Bold（无衬线），跟参考图对不上，
+     说明那份导出和出图不是同一版本；以参考图像素为准。 */
+  font-style: italic;
+  line-height: 0.90;
+  letter-spacing: 0;
+  /* 参考图字母核心色中位 rgb(196,143,70) = #c48f46（直方图 7794 个金色像素）。
+     原来写 #c8a56a 偏黄偏淡，压在灰白大理石底上读不出金色感。
+     和右下角署名共用 --tpl-gold（那边实测 #d4a040，两处取同一档）。 */
+  color: var(--tpl-gold);
+  /* Georgia 斜体只有一个 400 字重，font-weight 调不动笔画粗细。
+     参考图的金色像素覆盖率是 0.379% 画布，纯色填充只有 0.301%——
+     用同色描边把笔画加粗一圈补回来（0.025em 实测对上；0.06em 会超出 38%）。
+     描边必须跟着 --tpl-gold 走，否则改金色后字芯和描边会分成两种颜色。 */
+  -webkit-text-stroke: 0.025em var(--tpl-gold);
+  paint-order: stroke fill;
+  /* 胶囊 309px 高、字母区 284px，上留 16px 下留 9px——基本是垂直居中，
+     别再额外加 margin 往下推（加过一次，右列 N 直接顶穿胶囊底）。 */
+  margin-top: 0;
+}
+
+.template-collage .tpl-badge-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 左列（4 个字母 D-U-M-B）比右列低半行——实测左列顶距胶囊顶 85px、
+   右列顶 48px，差 37px。1cqw = 6.14px，所以 37px ≈ 6.0cqw。
+   别反过来写：右列多一个字母，让它上移会直接顶穿胶囊顶。 */
+.template-collage .tpl-badge-col-left {
+  transform: translateY(6.0cqw);
+}
+
+/* 每个字母单独一行；不再有 translateY 抖动和「最后一个跨两列」，
+   那是旧的按行铺法留下的规则，对新结构没有意义。 */
+.template-collage .tpl-badge .tpl-badge-col > span {
+  display: block;
+  text-align: center;
+  opacity: 0.94;
+  transform: none;
+}
+
+/* 四颗星：参考图里它们探到胶囊外面（金色像素顶端比胶囊顶还高 41px），
+   分布在右上 / 左中 / 右下 / 左下，不在胶囊内部。 */
+.template-collage .tpl-star {
+  /* 参考图星是 22..24px（画布 1917 宽），即 1.20% 画布宽；
+     ✦ 字形宽约 0.92em，所以字号 = 1.30% 画布宽 ÷ 0.3203%（1cqw）= 4.07cqw。
+     原来写 1.5cqw，实测只有参考的 4 成，四颗星小得像灰点。
+     补一层：✦ 的字面 ink 只占约 0.53em（4.0cqw = 24.6px 时实测 14×13px），
+     要 22px 的 ink 就得 24 ÷ 0.53 = 45px = 7.0cqw。 */
+  font-size: 6.2cqw;
+  opacity: 1;
+  color: var(--tpl-gold);
+  line-height: 1;
+  /* 星按**墨迹中心**对齐胶囊边沿（见下面四条位置的注释）。
+     光写 translate(-50%,-50%) 只把 em 盒居中，而 ✦ 的字面 ink 在 em 盒里
+     偏右下（左上留白比右下的多），实测四颗星齐刷刷偏右下 2px / 4px。
+     再补半个 ink 偏移：-0.06em 横向、-0.12em 纵向——用 em 而不是 cqw，
+     因为这是字体度量，字号一变就该跟着变。 */
+  transform: translate(calc(-50% - 0.06em), calc(-50% - 0.12em));
+}
+/* 四颗星相对胶囊，按参考图金色连通块**中心点**换算（胶囊 x 1701..1841 宽 140、
+   y 91..400 高 309；星是 22..24px 的小方块）：
+     右上 [1809,90]-[1831,113]  中心 (1820, 101.5) → left 85.0%  top  3.4%
+     左中 [1696,201]-[1717,222] 中心 (1706.5,211.5) → left  3.9%  top 39.0%
+     右下 [1832,322]-[1854,344] 中心 (1843, 333)   → left 101.4% top 78.3%
+     左下 [1712,378]-[1733,400] 中心 (1722.5,389)  → left 15.4% top 96.4%
+   注意这些是**中心**，不是左上角：✦ 的墨迹在 em 盒里偏下偏右（字面 ink 只占
+   约 0.53em，而且左边的留白比右边大），按左上角摆会系统性往左上偏——
+   上一版就是这么错的。所以统一加 translate(-50%, -50%) 按中心对齐。 */
+.template-collage .tpl-star-a { left: 85.0%; top: 3.4%; right: auto; bottom: auto; }
+.template-collage .tpl-star-b { left: 3.9%; top: 39.0%; right: auto; bottom: auto; }
+.template-collage .tpl-star-c { left: 101.4%; top: 78.3%; right: auto; bottom: auto; }
+.template-collage .tpl-star-d { left: 15.4%; top: 96.4%; right: auto; bottom: auto; }
+
+/* ===== 信息条文字（覆盖上面的绝对定位） =====
+   信息条 1210×274。AE 锚点：
+     TITLE      (89.76,805)   → 相对 (4.61%, 13.50%)
+     标题值     (115.55,826.75)
+     PLAYLIST   (92.71,869)   → (4.85%, 36.86%)
+     曲目串     (496.83,945)  → (38.25%, 64.60%)
+     photography(698.06,801.75)→ (54.88%, 12.32%)
+     Read The   (692.58,837.07)→ (54.43%, 25.21%)
+   信息条现在已经不再是 grid，全部改绝对定位，才和 AE 一一对应。 */
+.template-collage .tpl-block-bar {
+  display: block;
+  padding: 0;
+}
+
+/* TITLE 组：标签在 (4.61%,13.50%)，值在标签右下方 (6.74%,21.44%)。
+   注意这些百分比都是相对信息条（1210×274），不是画布。 */
+.template-collage .tpl-block-bar .tpl-fields {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  display: block;
+}
+
+.template-collage .tpl-block-bar .tpl-fields > div:first-child {
+  position: absolute;
+  left: 4.61%;
+  top: 13.50%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1cqw;
+}
+
+.template-collage .tpl-block-bar .tpl-fields > div:first-child > b {
+  font-size: 1.32cqw;
+  letter-spacing: 0.14em;
+  opacity: 0.72;
+  font-weight: 600;
+}
+
+.template-collage .tpl-block-bar .tpl-fields > div:first-child span {
+  position: static;
+  font-size: 1.49cqw;
+  white-space: nowrap;
+}
+
+/* 第二格：番茄钟。原先这里是 PHOTOGRAPHY / 「Read the introduction」，
+   那个值对所有条目都一样、不提供信息，已删。
+   位置沿用原第二格的起点（左 54.88%、上 12.32%），但改成和第一格同一套
+   竖排节奏：标签、大号读数、进度线、阶段与轮次。 */
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus {
+  position: absolute;
+  left: 54.88%;
+  top: 12.32%;
+  /* 不给宽度的话，绝对定位 + flex column 会缩到内容宽（实测只有信息条宽的
+     6.3%、76px），底下那条进度线跟着一起缩成一小截。右栏从 54.88% 到
+     PLAYLIST 的右边界 84%，这里留到 78.88%，给乌鸦（85.79% 起）让出位置。 */
+  width: 24%;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5cqw;
+}
+
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > b {
+  font-size: 1.32cqw;
+  letter-spacing: 0.14em;
+  opacity: 0.72;
+  font-weight: 600;
+}
+
+/* 读数用等宽字体：秒数每秒跳一次，比例字体每个数字宽度不同，整行会左右抖。
+   选择器必须带满 `.tpl-fields > .tpl-focus`：更早那几套 `.tpl-fields > div > span`
+   是 4 类 + 2 元素，比单个类名更具体，不写满会被它按回 1.49cqw。 */
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-clock {
+  position: static;
+  display: block;
+  font-family: "SF Mono", "Cascadia Mono", Consolas, ui-monospace, monospace;
+  font-size: 2.9cqw;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  opacity: 0.94;
+  white-space: nowrap;
+}
+
+/* 剩余时间细线。轨道半透明、内层实色——不用父级 opacity，
+   否则整棵子树一起被压暗，内层的实色也会跟着变淡。
+
+   线高 0.16cqw 时实测只有 1.88px：用户在 m05853 问「这是个进度条吗，
+   怎么感觉没在动」。它确实在动——25 分钟走满一整条 387px，
+   每 800ms 一拍只挪 0.207px，满一像素要 3.9 秒。
+   加粗是为了先把「它是一条会变的线」立住；真正让它可读的是下面那个端点圆点。 */
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-bar {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 0.22cqw;
+  margin-top: 0.34cqw;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  /* 不能写 overflow: hidden——端点圆点要探出线头一点点，
+     裁掉就只剩半个圆，看着像线头上有个毛刺。 */
+  overflow: visible;
+}
+
+/* 已走过的部分。
+   实心度用 color-mix 而不是 opacity：opacity 会连带把子元素（那个圆点）
+   一起压淡，而圆点需要比线更实才读得出来。
+
+   `max-width: none` 必须写：`.media-room.is-expanded .tpl-fields span`
+   （`src/skin-bold.css:4231`）给文字格里的所有 span 设了 `max-width: 30ch`，
+   那是给长文字防溢出的，但它的选择器也命中了这个填充块。实测 30ch ≈ 294px，
+   于是整条线最宽只到 294.77 / 387.2 = 76.13% —— 剩余时间在 76% 以上时
+   （也就是刚开工那大半个阶段）这条线**一直是同一根**，用户看到的就是
+   「它根本没在动」。这条 bug 藏了很久，因为 76% 的线看起来完全正常。 */
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-bar > span {
+  position: relative;
+  display: block;
+  max-width: none;
+  height: 100%;
+  background: color-mix(in srgb, currentColor 80%, transparent);
+  border-radius: inherit;
+  transition: width 800ms linear;
+}
+
+/* 端点圆点：进度走到哪儿的那颗珠子。
+   为什么非要有它：一条线的边缘在缓慢变短，人眼很难注意到；一个有明确形状的
+   小点缓慢平移，哪怕 4 秒才挪 1px，也比「线段变短了」更容易被理解成「在走」。
+   它同时回答了「这条线是什么」——有个头就说明有进程。
+
+   直径取 0.52cqw（≈8px）：线本身只有 2.58px 高，圆点只比线粗一点点是没有
+   意义的——第一版 0.34cqw 实测 4px，和线几乎分不开，等于没加。 */
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-bar > span::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  width: 0.52cqw;
+  height: 0.52cqw;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translate(50%, -50%);
+}
+
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-meta {
+  position: static;
+  display: block;
+  font-size: 0.95cqw;
+  letter-spacing: 0.1em;
+  opacity: 0.55;
+  white-space: nowrap;
+}
+
+.template-collage .tpl-block-bar .tpl-fields > .tpl-focus > .tpl-focus-idle {
+  position: static;
+  display: block;
+  font-size: 1.49cqw;
+  opacity: 0.5;
+  white-space: nowrap;
+}
+
+/* PLAYLIST：另起一行，铺到信息条右侧（右边留给斜切）。 */
+.template-collage .tpl-block-bar .tpl-list {
+  position: absolute;
+  left: 4.85%;
+  top: 40.5%;
+  right: 14%;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4cqw;
+}
+
+.template-collage .tpl-block-bar .tpl-list > b {
+  font-size: 1.32cqw;
+  letter-spacing: 0.14em;
+  opacity: 0.72;
+  font-weight: 600;
+}
+
+/* 曲目串：一整段连续文字，允许换行，行距按 AE 的 leading。
+   字号与字重跟 TITLE 下的值一致（1.49cqw / 600）——用户原话「PLAYLIST 下的
+   变成 TITLE 下的格式」，这两格在视觉上本来就该是同一层信息。 */
+.template-collage .tpl-block-bar .tpl-list span {
+  position: static;
+  margin: 0;
+  font-size: 1.49cqw;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  opacity: 0.86;
+  white-space: normal;
+}
+
+/* PLAYLIST 的副行：进度 + 播放顺序（本地）或专辑（外部）。
+   比主行轻一档，因为它是「放到哪了」而不是「是哪一首」。
+   用等宽数字，秒数跳的时候那一格的宽度不会抖。 */
+.template-collage .tpl-block-bar .tpl-list .tpl-now-detail {
+  font-size: 1.20cqw;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  line-height: 1.4;
+  opacity: 0.58;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 乌鸦：信息条右端 (89.64%,65.69%)，宽 275px = 22.73%。 */
+/* 乌鸦（位置见上方 6074 那条，那里有实测依据）。这里只留一句占位说明，
+   不要再写一套 left/top，否则会盖掉实测值——之前就是这样把乌鸦顶到画布外的。 */
+
+/* ===== 面板里的标题（第三次对齐，按 AE 的叠放顺序） =====
+   AE 面板内的次序：正介绍 → 镜像介绍 → 标题 → 唱片。
+   （AE 里没有署名，见文件末尾关于 tpl-brand 的说明。） */
+
+/* 标题块：往下挪一点，和署名前后的空档对上。 */
+.template-collage .tpl-words { top: 51.5%; }
+.template-collage .tpl-title-text { font-size: 3.1cqw; }
+.template-collage .tpl-sub { margin-top: 1.1cqw; }
+
+/* ===== 面板内部最终叠放（第四次） =====
+   从上到下：正介绍 → 标题 → 镜像介绍（贴着唱片上沿）→ 唱片。
+   锚点仍取自 AE，只是把互相压住的几块拉开一点。 */
+/* 镜像介绍挪到面板中下部，不再和正文抢位置。 */
+
+/* 标题块：唱片上沿之上。 */
+.template-collage .tpl-words {
+  left: 17.81%;
+  top: 47.5%;
+  width: 62%;
+}
+/* 标题的倒影：AE 里就压在标题正下方，只留一点点。 */
+/* （标题倒影规则已删，见上方说明） */
+
+/* ===== 面板文字（旧值，已被文件末尾按参考图实测的那一套覆盖） ===== */
+
+/* 标题块在署名下方，底部留出唱片上沿的空档。 */
+.template-collage .tpl-words {
+  left: 17.81%;
+  top: 50.0%;
+  width: 60%;
+}
+.template-collage .tpl-title-text { font-size: 2.95cqw; }
+.template-collage .tpl-sub { font-size: 1.5cqw; margin-top: 1.0cqw; }
+
+/* 镜像介绍压到面板最下方（唱片上沿之上），只作纹理，不抢注意力。 */
+
+/* ===== 面板内五块，各就各位（照 AE 的绝对坐标） =====
+   面板 615×602，1cqw = 6.15px。
+   AE 里从上到下的次序：正介绍 → 署名 → 标题 → 镜像 → 凹槽在右、唱片在下。 */
+.template-collage .tpl-block-panel { overflow: hidden; }
+
+/* 正介绍：AE (1410.18,131.25)，左上角对齐 → (22.63%, 15.5%) */
+
+/* 镜像：AE (1467.46,269) 且 scale(-100,-100) → 贴在介绍右下方，压得很淡 */
+/* 正介绍：参考图实测文字带 98..177px（相对面板 11.50%..24.12%），
+   左边缘 1324px → 面板左 8.46%。四行、行距 26px → line-height 1.44。 */
+
+/* 镜像倒影：实测文字带 199..287px（相对面板 27.64%..41.69%），
+   右边缘 1556px → 面板 46.18%，所以 right 用 53.82%。
+   它是整块上下翻转的，文字右对齐，最宽那行反而在最后。 */
+
+/* 品牌署名已删（JSX 里也移除了）：AE 源文件没有 brand 图层，参考图里也没有它。
+   这里不留 display:none 之类的空壳——没有元素需要用规则去藏。 */
+
+/* 标题：实测文字带 340..400px（相对面板 50.16%..59.74%），左边缘 1320px → 7.97%。
+   三行是 AE 里同一个文本图层（fs=18、PlayfairDisplayRoman-Bold），所以字号
+   和字体都必须一样。实测墨高：参考 1.31% / 1.40% / 1.68% 画布高
+   （第三行含 J 的 descender），早先 .tpl-sub 写 1.5cqw 只有第一行的一半。
+   text-transform: capitalize 会继承下来、把 "Just for U" 变成 "Just For U"，
+   参考图里是小写 for，所以这里显式关掉。 */
+.template-collage .tpl-words {
+  left: 7.97%; top: 50.16%; width: 60%;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  text-transform: none;
+}
+.template-collage .tpl-title-text { font-size: 3.0cqw; }
+.template-collage .tpl-sub { font-size: 3.0cqw; margin-top: 0; }
+
+
+/* 信息条只有 274px 高。曲目串字号提到 1.49cqw 之后最多两行，
+   再加下面那行进度——再多就顶到底边外面去了。
+   用 -webkit-line-clamp 比 max-height 稳，截断处还能加省略号。
+   只夹主行：副行是固定的短串（`01:12 / 03:48 · 列表循环`），夹它没有意义。 */
+.template-collage .tpl-block-bar .tpl-list { right: 16%; }
+.template-collage .tpl-block-bar .tpl-list > span:not(.tpl-now-detail) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  /* 2 行 × 1.3 行高 × 1.49cqw ≈ 3.87cqw，留一点余量。这里必须真的容得下两行：
+     上限比两行还小的话，line-clamp 放行第二行、max-height 又把它裁掉半截。 */
+  max-height: 4.0cqw;
+  font-size: 1.49cqw;
+  line-height: 1.3;
+}
+
+/* ===== 面板上半：此刻的环境音 =====
+   替换掉原先那四行固定英文（For more information about / This Video /
+   please read the / introduction）和它的倒影——那是给视频套版用的说明，
+   在软件里没有信息量。现在这块说「此刻你周围是什么声音、音乐响起时它让了多少」。
+
+   位置沿用原介绍的锚点：参考图实测文字带 98..177px（相对面板 11.50%..24.12%）、
+   左边缘 1324px → 面板左 8.46%。倒影仍取右下那一段（27.64% 起）。 */
+.template-collage .tpl-ambient {
+  position: absolute;
+  left: 8.46%;
+  top: 11.50%;
+  width: 60%;
+  margin: 0;
+  z-index: 4;
+}
+
+/* 标签跟信息条那三个标签同一套度量（1.32cqw / 0.14em / 0.72 透明度），
+   这样面板和信息条上的小标题看起来是同一个系统，而不是各写各的。 */
+.template-collage .tpl-ambient > b {
+  display: block;
+  font-size: 1.32cqw;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  opacity: 0.72;
+}
+
+/* 主行：此刻叠着的环境音名字。用标题那一族的衬线大字。 */
+.template-collage .tpl-ambient-layers {
+  margin: 1.05cqw 0 0;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-size: 3.15cqw;
+  line-height: 1.26;
+  opacity: 0.92;
+  overflow-wrap: anywhere;
+}
+
+/* 副行：层数 / 静音数 / 让出多少 dB。
+   等宽数字——dB 和层数会随播放变化，比例字体会让这一行左右抖。 */
+.template-collage .tpl-ambient-meta {
+  margin: 0.95cqw 0 0;
+  font-size: 1.44cqw;
+  letter-spacing: 0.09em;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.62;
+}
+
+/* 倒影：把同一行环境音上下翻过来压淡，当纹理用。
+   这里用 transform 翻转，而不是像旧版那样在 JSX 里把文字倒着写一遍。
+
+   **宽度必须和正的那块一模一样**（left 8.46% / width 60% / 左对齐）。
+   原来这里是 right: 53.82% + width: 42% + 右对齐——那是给参考图里
+   四行英文配的盒子。英文那四行是写死了换行位置的，宽度窄一点看不出来；
+   环境音这行是**按盒子宽度自动折行**的，42% 会比 60% 早断，
+   于是倒影的折行位置和正的对不上，看起来就是「宽度不一样」。 */
+.template-collage .tpl-ambient-mirror {
+  position: absolute;
+  left: 8.46%;
+  top: 27.64%;
+  width: 60%;
+  margin: 0;
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-size: 3.15cqw;
+  line-height: 1.26;
+  opacity: 0.30;
+  text-align: left;
+  overflow-wrap: anywhere;
+  transform: scaleY(-1);
+}

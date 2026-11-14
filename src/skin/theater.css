@@ -1,0 +1,463 @@
+/* ==========================================================================
+ * theater.css —— 放映：壁纸库、播放台、桌面直播、全屏
+ *
+ * 从 gallery.css 切出，层叠顺序 2/3。
+ * 顺序由 skin-bold.css 里的 @import 决定，改顺序会改变渲染结果。
+ * ========================================================================== */
+/* ---------- 壁纸库 ---------- */
+
+/* 壁纸库那条入口现在和「从本地添加」一起待在页尾的添加区里（.media-import），
+   主次靠那里分，不再有工具栏里的并排按钮。 */
+
+.media-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+/* 来源胶囊里的壁纸那一枚：给它一个星形前置，和用户自己的文件夹区分开。 */
+.media-dir.is-wallpaper {
+  padding-right: 3px;
+  background: var(--bold-ink);
+  color: var(--bold-on-dark);
+}
+
+.media-dir.is-wallpaper .icon-button {
+  color: #ffffff99;
+}
+
+.media-dir.is-wallpaper .icon-button:hover {
+  background: #ffffff1f;
+  color: var(--bold-on-dark);
+}
+
+@media (max-width: 599px) {
+  .media-empty-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  /* 「从本地添加」外面多包了一层 .media-add（挂菜单用），
+     所以不能再写 `> button`——那样只管到「读取壁纸库」。 */
+  .media-empty-actions > .media-add,
+  .media-empty-actions > button {
+    width: 100%;
+  }
+
+  .media-empty-actions > .media-add > button,
+  .media-empty-actions > button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* 放映页的工具栏现在只剩分类胶囊，窄屏让它整行铺开、两档平分。
+   滑块量的是 offsetWidth，铺开后会经 ResizeObserver 重新量一次，不会偏。 */
+@media (max-width: 599px) {
+  .media-room .filter-tabs {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .media-room .filter-tabs button {
+    flex: 1;
+    white-space: nowrap;
+    padding: 7px 10px;
+  }
+}
+
+/* 放映页的胶囊现在也用唱片柜那块黑色滑块（见 MediaRoom.tsx 的 kindTabs），
+   所以选中项不能再自己带实底——两层黑叠在一起，滑块滑过去时旧的那一块会亮着。
+   文字变白仍交给基础规则里的 .filter-tabs button.active{color:#fff}。 */
+
+
+/* ---------- 放映：播放台 ---------- */
+
+/* 放映不是「点开看一眼」，是一直开着的一块屏。所以做成页面里常驻的一块，
+   点下面的格子把内容换上来，而不是弹层。 */
+/* 台面本身不画底、不画框——版式铺满就是台面。
+   控制条自己有黑底，不需要这层来垫。 */
+.media-theater {
+  margin: 0 0 20px;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* 视频按 16:9 留位置；图片不能套同一个框——竖图和方图会被压成一条，
+   或者上下留大片黑。图片交给内容自己决定高度，只封顶。 */
+.media-theater[data-kind='video'] .theater-screen {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  max-height: min(58vh, 520px);
+  background: #0a0a0a;
+}
+
+.media-theater[data-kind='image'] .theater-screen {
+  position: relative;
+  display: grid;
+  place-items: center;
+  max-height: min(58vh, 520px);
+  background: #0a0a0a;
+}
+
+/* 图片按宽度铺满，高度跟着自己的比例走。
+   写 width:auto 的话小图会缩成一小块、四周全是黑，看着像没加载出来。 */
+.media-theater[data-kind='image'] .theater-screen img {
+  width: 100%;
+  height: auto;
+  max-height: min(58vh, 520px);
+  object-fit: contain;
+}
+
+/* 图片不裁：壁纸比例五花八门，contain 才不会把画幅切掉。
+   视频同理，宁可留黑边也不切画面。 */
+.theater-screen img,
+.theater-screen video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #0a0a0a;
+}
+
+.theater-note {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ffffff1f;
+  color: var(--bold-on-dark);
+  font-size: 11px;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+}
+
+/* 控制条自带深色底。以前靠台面那层黑底，去掉黑框之后必须自己就是那块暗色，
+   否则白字压白底整条看不见。 */
+.theater-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 14px;
+  margin-top: 8px;
+  border-radius: 16px;
+  background: var(--bold-ink);
+  color: var(--bold-bg);
+}
+
+.theater-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.theater-bar .icon-button {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 0;
+  border-radius: 999px;
+  background: #ffffff14;
+  color: var(--bold-on-dark);
+}
+
+.theater-bar .icon-button:hover {
+  background: #ffffff2e;
+  color: var(--bold-on-dark);
+}
+
+/* 播放键是这一排里唯一的主动作，给个白底 */
+.theater-play {
+  background: var(--bold-surface) !important;
+  color: var(--bold-ink) !important;
+}
+
+.theater-play:hover {
+  background: #e8e8e3 !important;
+}
+
+.theater-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.theater-copy b {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bold-on-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theater-copy small {
+  flex: none;
+  font-size: 11px;
+  font-weight: 500;
+  color: #ffffff8a;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 循环：开着的时候是白字，关掉压暗，一眼能看出状态 */
+.theater-loop {
+  color: #ffffff66 !important;
+}
+
+.theater-loop.on {
+  background: #ffffff2e !important;
+  color: var(--bold-on-dark) !important;
+}
+
+@media (max-width: 599px) {
+  .media-theater {
+    border-radius: 18px;
+  }
+
+  .theater-bar {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+  }
+
+  .theater-copy {
+    order: 3;
+    width: 100%;
+    flex-basis: 100%;
+  }
+}
+
+/* ---------- 放映：桌面壁纸直播 ---------- */
+
+/* 播放台显示桌面时是「活的」画面，和放一张图不一样：
+   底下那层黑不该在边缘露出来，所以整块用 object-fit: cover 铺满。 */
+.media-theater[data-kind="live"] .theater-screen {
+  aspect-ratio: 16 / 9;
+  background: #0d0d0d;
+}
+
+.theater-screen .theater-live {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 还没拿到第一帧时的等待态。抓帧器启动要几十毫秒，
+   这段时间什么都不画会闪一下黑块。 */
+.theater-wait {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  height: 100%;
+  color: #8b8b85;
+}
+
+.theater-wait p {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+/* 直播指示灯：呼吸，表示画面在动。 */
+.theater-live-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: #a8e6c1;
+  box-shadow: 0 0 0 0 #a8e6c166;
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 #a8e6c166; }
+  50% { box-shadow: 0 0 0 5px #a8e6c100; }
+}
+
+/* 「桌面壁纸」按钮按下时反白，和播放台上的循环键同一套状态语言。 */
+.media-pick.on {
+  background: var(--bold-ink);
+  border-color: var(--bold-ink);
+  color: var(--bold-bg);
+}
+
+@media (max-width: 599px) {
+  .theater-live-dot {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theater-live-dot {
+    animation: none;
+  }
+}
+
+/* ---------- 放映：全屏 ---------- */
+
+/* 全屏时播放台铺满整个视口，工具栏、格子、来源全部让开。
+   用 position: fixed 而不是把窗口变成真全屏：Wallpaper Engine 检测到真全屏会暂停渲染
+   （config.json 里 playbackfullscreen: pause），但 PrintWindow 每次抓帧都会强制它重绘，
+   所以实测全屏下画面照样在动。用 fixed 铺满是为了不打断窗口本身的状态。 */
+.media-room.is-expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  margin: 0;
+  padding: 0;
+  background: #000000;
+  overflow: hidden;
+}
+
+/* 全屏时藏掉除了播放台以外的一切 */
+.media-room.is-expanded .collection-toolbar,
+.media-room.is-expanded .media-sources,
+.media-room.is-expanded .ticket-grid,
+.media-room.is-expanded .ticket-pager,
+.media-room.is-expanded .no-results,
+.media-room.is-expanded .media-import,
+.media-room.is-expanded .media-empty {
+  display: none;
+}
+
+.media-room.is-expanded .media-theater {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  border-radius: 0;
+  background: #000000;
+  display: flex;
+  flex-direction: column;
+}
+
+.media-room.is-expanded .theater-screen {
+  flex: 1;
+  min-height: 0;
+  aspect-ratio: auto;
+  /* 全屏时这块就是屏幕本身，四角必须是直角，不然桌面四角会漏出别的窗口。 */
+  border-radius: 0;
+  background: #000000;
+}
+
+.media-room.is-expanded .theater-screen video,
+.media-room.is-expanded .theater-screen img,
+.media-room.is-expanded .theater-live {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: contain;
+}
+
+/* 控制条浮在画面底部，平时淡出，鼠标或键盘动一下才出现——
+   全屏看东西的时候不该一直有一条黑带。
+
+   这里不能靠 :hover。全屏看电影时鼠标常常停在画面正中不动，
+   父元素一直处于 hover 状态，黑带就永远压在画面底下。
+   所以由 MediaRoom 记「多久没动静」，2.6 秒后把 data-chrome 设成 hidden。
+
+   **为什么是浮起来的胶囊，而不是贴底的通栏黑带**：原先是 left/right/bottom 全 0
+   加一条从底往上淡出的黑渐变，实测的问题是它没有边界——渐变和画面连成一片，
+   而版式的信息条正好占画面下部 25%，控制条那 62px 就压在信息条底边上，
+   读起来像「信息条上浮了一层脏东西」，而不是「控制条在上面」。
+   实测用 elementFromPoint 问过五个点，控制的确实都在最上层，所以这从来不是层级问题，
+   是**没有边界导致的从属感错误**：贴着底边、没有轮廓、和背景同色渐变，
+   再高的层级也读成背景的一部分。
+
+   现在的做法是它自己成为一条独立的浮层：离底边留缝、四角全圆、加模糊和细描边。
+   有轮廓的一小块才像一个「工具条」，压在谁身上都只是压着，不会融进去。 */
+.media-room.is-expanded .theater-bar {
+  position: absolute;
+  left: 26px;
+  right: 26px;
+  bottom: 20px;
+  margin: 0;
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: #0b0f14e0;
+  /* 模糊取画面下一条的颜色，让胶囊和画面之间有过渡而不是硬切。
+     saturate 稍微提一点，压暗之后颜色才不发灰。 */
+  -webkit-backdrop-filter: blur(22px) saturate(1.18);
+  backdrop-filter: blur(22px) saturate(1.18);
+  /* 描边只在顶部一点点亮，等于给胶囊一个上表面的高光——
+     和面板胶囊那层高光是同一套语言，不额外发明一种「发光边框」。 */
+  box-shadow:
+    inset 0 1px 0 #ffffff24,
+    0 10px 30px #00000059;
+  border: 0;
+  opacity: 1;
+  /* 必须显式抬起来：版式信息条 `.tpl-block-bar` 是 `z-index: 8`，而控制条是
+     `z-index: auto`（= 0），于是信息条真的压在控制条上面。
+
+     一开始量错了、以为不是层级问题：控制条原来 `bottom: 0`、高 62，
+     中线 y=1049，而信息条底边在 y=1042——中线整个落在信息条下方，
+     elementFromPoint 五个点全命中控制条自己。改成离底的胶囊之后
+     两者重叠 32px，那一段一直是信息条在画（实测像素亮度 116，
+     和没盖住的信息条一模一样），看起来就像「胶囊只有右半边浮起来了」。
+
+     取 14：高于信息条的 8 和日期那层 12，低于叠加菜单的 71
+     （菜单要能从控制条里弹出来、盖在它上面）。 */
+  z-index: 14;
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+
+/* 没有 backdrop-filter 时（老 Chromium / 关掉了合成）退回实底，
+   否则半透明黑底下透出的画面会把白字搅花。 */
+@supports not (backdrop-filter: blur(2px)) {
+  .media-room.is-expanded .theater-bar {
+    background: #0b0f14f2;
+  }
+}
+
+/* 淡出时一并往下挪一点，收得干净；重新出现时从原位浮上来 */
+.media-room.is-expanded[data-chrome="hidden"] .theater-bar {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+
+/* 键盘用户仍然能用 Tab 把焦点移进来，这时不该继续藏着 */
+.media-room.is-expanded .theater-bar:focus-within {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.media-room.is-expanded .theater-copy b {
+  color: var(--bold-bg);
+}
+
+.media-room.is-expanded .theater-copy small {
+  color: #ffffff8c;
+}
+
+.media-room.is-expanded .theater-controls .icon-button,
+.media-room.is-expanded .theater-loop,
+.media-room.is-expanded .theater-expand {
+  color: var(--bold-bg);
+  border-color: #ffffff2e;
+  background: #ffffff14;
+}
+
+.media-room.is-expanded .theater-loop.on,
+.media-room.is-expanded .theater-expand[aria-pressed="true"] {
+  background: var(--bold-bg);
+  border-color: var(--bold-bg);
+  color: var(--bold-ink);
+}
+
+/* 全屏按钮：和循环键同一套尺寸语言，平时不抢戏 */
+.theater-expand {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}

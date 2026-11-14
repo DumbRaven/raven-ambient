@@ -18,5 +18,9 @@
 @import './skin/widgets.css';
 @import './skin/modern.css';
 @import './skin/gallery.css';
+@import './skin/theater.css';
+@import './skin/theater-fix.css';
 @import './skin/stage.css';
+@import './skin/atmosphere.css';
 @import './skin/collage.css';
+@import './skin/collage-type.css';
