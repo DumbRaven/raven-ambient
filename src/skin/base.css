@@ -19,8 +19,21 @@
   --bold-bg: #ffffff;
   --bold-page: #f6f5f2;
   --bold-ink: #101010;
-  --bold-muted: #8b8b85;
-  --bold-faint: #b6b5ae;
+  /* 三层灰阶的深浅必须保持 faint < muted < soft。
+   *
+   * 2026-11-15 之前它们是 #b6b5ae / #8b8b85 / #6f6f6a，实测对白底的对比度
+   * 只有 2.06 / 3.43 / 5.05 —— 前两档远低于正文要求的 4.5:1。也就是说
+   * 「LOCAL ONLY」「SUN · NOV 15」「把喜欢的声音，加入此刻」这些字一直
+   * 是靠猜的，不是靠看。
+   *
+   * 现在三档一起提深（单改 faint 会把它顶到比 muted 还深，层级直接反过来）：
+   * 对白底 5.37 / 6.41 / 7.49，对最深的 sand 底 4.59 / 5.47 / 6.40，全部达标。
+   * 相邻档仍留约 0.85x 的亮度差，三层看得出来。
+   *
+   * 为什么不用更浅的 #77776f：它在白底上 4.51 刚过线，落到 page 底
+   * (#f6f5f2) 就只有 4.14 了。这里的文字经常压在 page / sunken 上。 */
+  --bold-muted: #605f59;
+  --bold-faint: #6b6b63;
   --bold-line: #eceae5;
   --bold-mint: #a8e6c1;
   --bold-lilac: #c7c0f0;
@@ -40,7 +53,7 @@
   --bold-sunken: #f0efea;
   --bold-danger: #c04a34;
   --bold-danger-deep: #a13a26;
-  --bold-soft: #6f6f6a;
+  --bold-soft: #56554d;
 
   color: var(--bold-ink);
   background: var(--bold-page);

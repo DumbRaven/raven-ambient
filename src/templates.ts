@@ -247,8 +247,12 @@ export function collageTone(colors: string[], hint: ToneHint = {}): CollageTone 
     inkSoft: dark ? '#1515158f' : '#f6f2ea9e',
     // 字色也允许用户接管。留空就走「按底色明度自动翻深浅」这条老路——
     // 面板和信息条的明度可能被用户改到很浅，自动翻面仍然要能跟上。
-    onPanel: hint.onPanel || (luminance(panel) > 0.42 ? '#151515' : '#f7f3ec'),
-    onBar: hint.onBar || (luminance(bar) > 0.45 ? '#151515' : '#f7f3ec'),
+    //
+    // 亮字用纯白而不是暖白 #f7f3ec：面板明度落在中间调时（l=0.55 那档，
+    // 实测底色相对亮度约 0.177），暖白只有 4.18:1，差一点不够，纯白是 4.62。
+    // 这一点点色温在这块小字上看不出差别，但少掉的那 0.44 对比度是实打实的。
+    onPanel: hint.onPanel || (luminance(panel) > 0.42 ? '#151515' : '#ffffff'),
+    onBar: hint.onBar || (luminance(bar) > 0.45 ? '#151515' : '#ffffff'),
     // 金色不跟画面取色走：它得在深色面板和浅色信息条上都读得出金，
     // 自动算出来的色相会随画面一路漂，飘到绿或粉就不像「金」了。
     // 默认取参考图实测的中位值。

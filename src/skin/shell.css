@@ -30,7 +30,7 @@
   font-size: 14px;
   font-weight: 400;
   font-style: normal;
-  color: #b6b5ae;
+  color: var(--bold-faint);
   margin-left: 4px;
   letter-spacing: 0;
 }

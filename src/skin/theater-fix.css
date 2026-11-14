@@ -325,7 +325,7 @@ body:has(.media-room.is-expanded) {
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: #8b8b85;
+  color: var(--bold-muted);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -388,7 +388,7 @@ body:has(.media-room.is-expanded) {
   display: grid;
   justify-items: center;
   gap: 10px;
-  color: #8b8b85;
+  color: var(--bold-muted);
 }
 
 .theater-blank p {

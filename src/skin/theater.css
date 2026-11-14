@@ -251,7 +251,7 @@
   justify-items: center;
   gap: 10px;
   height: 100%;
-  color: #8b8b85;
+  color: var(--bold-muted);
 }
 
 .theater-wait p {

@@ -288,7 +288,7 @@
   width: 13px;
   height: 13px;
   border-radius: 50%;
-  border: 1.5px solid #b6b5ae;
+  border: 1.5px solid var(--bold-faint);
   transition: background 140ms ease, border-color 140ms ease;
 }
 

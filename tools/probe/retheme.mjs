@@ -29,7 +29,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const target = path.join(root, 'src', 'skin-bold.css');
+const entry = path.join(root, 'src', 'skin-bold.css');
+
+/**
+ * CSS 已经切成 14 个文件，入口只剩一串 `@import`。
+ * 从入口按层叠顺序收集真实文件，别再写死 skin-bold.css。
+ */
+function sheetFiles(file) {
+  const text = fs.readFileSync(file, 'utf8');
+  const refs = [...text.matchAll(/@import\s+['"]([^'"]+)['"]/g)].map(m => m[1]);
+  if (!refs.length) return [file];
+  return refs.flatMap(ref => sheetFiles(path.resolve(path.dirname(file), ref)));
+}
 
 /**
  * 把 CSS 切成「代码段 / 注释段 / 字符串段」三类片段。
@@ -172,32 +183,32 @@ if (!Array.isArray(rules) || !rules.length) {
   process.exit(2);
 }
 
-const css = fs.readFileSync(target, 'utf8');
-const segs = segments(css);
+const files = sheetFiles(entry);
 
 let changed = 0;
-for (const seg of segs) {
-  if (seg.kind !== 'code') continue;
-  let text = seg.text;
-  for (const rule of rules) {
-    const before = text;
-    text = replaceInCode(text, rule);
-    if (text !== before) {
-      const n = (before.match(colorRe(rule.from)) || []).length;
-      changed += n;
+for (const file of files) {
+  const css = fs.readFileSync(file, 'utf8');
+  const segs = segments(css);
+
+  for (const seg of segs) {
+    if (seg.kind !== 'code') continue;
+    let text = seg.text;
+    for (const rule of rules) {
+      const before = text;
+      text = replaceInCode(text, rule);
+      if (text !== before) {
+        const n = (before.match(colorRe(rule.from)) || []).length;
+        changed += n;
+      }
     }
+    seg.text = text;
   }
-  seg.text = text;
+
+  const next = segs.map(s => s.text).join('');
+  if (next !== css) fs.writeFileSync(file, next);
 }
 
-const next = segs.map(s => s.text).join('');
-if (next === css) {
-  console.log('[retheme] 没有命中任何规则，文件未改动');
-  process.exit(0);
-}
-
-fs.writeFileSync(target, next);
-console.log(`[retheme] 已替换 ${changed} 处，写入 src/skin-bold.css`);
+console.log(`[retheme] 已替换 ${changed} 处，写入 ${files.length} 个文件`);
 console.log('[retheme] 下一步必须验证：');
 console.log('  npx tsc -b --force && npm run build');
 console.log('  node tools/probe/style-diff.mjs .qa/style-before .qa/style-after   # 必须零差异');

@@ -225,7 +225,7 @@
   margin-top: 2px;
   font-size: 10px;
   line-height: 1.5;
-  color: #8b8b85;
+  color: var(--bold-muted);
 }
 
 /* 「自己填」：三行「名字 + 色块 + 色值」。 */
@@ -294,7 +294,7 @@
   letter-spacing: .02em;
 }
 
-.tone-hex::placeholder { color: #b6b5ae; }
+.tone-hex::placeholder { color: var(--bold-faint); }
 .tone-hex:focus { outline: 2px solid var(--bold-ink); outline-offset: -1px; }
 
 .tone-reset {
@@ -316,7 +316,7 @@
   margin: 10px 0 0;
   font-size: 10px;
   line-height: 1.5;
-  color: #b6b5ae;
+  color: var(--bold-faint);
 }
 
 /* 全屏时控制条会淡出，但配色面板开着就不该跟着消失——
@@ -425,7 +425,10 @@
   row-gap: 0;
   font-family: "Playfair Display", Georgia, "Times New Roman", serif;
   font-style: italic;
-  -webkit-text-stroke: 0.025em var(--tpl-gold);
+  /* 描边原来是金色（等于给同一颜色描边，纯装饰）。改成深棕之后它变成
+     可读性的底线：金色压在胶囊那层半透明大理石上只有 1.80:1，
+     而金色与这圈描边是 6.58:1 —— 无论胶囊被取成什么颜色，字都立得住。 */
+  -webkit-text-stroke: 0.03em #2a2318;
   paint-order: stroke fill;
   margin-top: 0;
 }
@@ -435,6 +438,12 @@
   font-size: 6.2cqw;
   opacity: 1;
   color: var(--tpl-gold);
+  /* 星星压在画面块上，画面明度不可控：金色在深画面上是 6.60:1，
+     在积雪那种浅画面只有 2.02:1。单换色号救不了（要同时照顾两头），
+     所以在字底下垫一层深色描边——描边与金色本身是 6.58:1，
+     无论底下是什么，字的轮廓都立得住。 */
+  -webkit-text-stroke: 0.035em #2a2318;
+  paint-order: stroke fill;
   pointer-events: none;
   line-height: 1;
   transform: translate(calc(-50% - 0.06em), calc(-50% - 0.12em));
@@ -595,8 +604,12 @@
   --tpl-bar: #72777d;
   --tpl-ink: #f6f2ea;
   --tpl-ink-soft: #f6f2ea9e;
-  --tpl-on-panel: #f7f3ec;
-  --tpl-on-bar: #f7f3ec;
+  --tpl-on-panel: #ffffff;
+  --tpl-on-bar: #ffffff;
+  /* 压在半透明底上的浅金。主金色 #d4a040 只够压深色画面，
+     而 Produced By 那行底是 #ffffff42 叠在画面上，明度不可控。
+     #f7d075 在实测底色 #585c62 上是 4.56:1，仍属金色系。 */
+  --tpl-gold-lit: #f7d075;
   --tpl-gold: #d4a040;
   position: absolute;
   inset: 0;
@@ -707,7 +720,7 @@
   text-align: left;
   border-radius: 2.6cqw 0 0 2.6cqw;
   background: #ffffff42;
-  color: var(--tpl-gold);
+  color: var(--tpl-gold-lit);
 }
 
 /* 左上的年月角标。AE 里这层叫「2026 1020」：fs=12、track=81、scale=88%，
