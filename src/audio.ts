@@ -411,12 +411,9 @@ export class AmbientEngine {
     if (cached) return cached;
     if (this.loading.has(track.id)) return this.loading.get(track.id)!;
     const pending = (async () => {
-      let buffer: AudioBuffer;
-      if (track.kind === 'file') {
-        const blob = await readAsset(track.id);
-        if (!blob) throw new Error(`“${track.name}”的本地文件不可用，请移除后重新导入。`);
-        buffer = await this.ctx!.decodeAudioData(await blob.arrayBuffer());
-      } else buffer = synthesize(this.ctx!, track.kind);
+      const blob = await readAsset(track.id);
+      if (!blob) throw new Error(`“${track.name}”的本地文件不可用，请移除后重新导入。`);
+      const buffer = await this.ctx!.decodeAudioData(await blob.arrayBuffer());
       if (!this.destroyed) this.buffers.set(track.id, buffer); return buffer;
     })();
     this.loading.set(track.id, pending);
@@ -675,32 +672,6 @@ export class AmbientEngine {
     }
     void this.ctx?.close(); this.listeners.clear(); this.endedListeners.clear(); this.previewEnded.clear(); this.buffers.clear();
   }
-}
-
-function synthesize(ctx: AudioContext, kind: 'rain' | 'fire' | 'wind') {
-  const seconds = 12, rate = ctx.sampleRate;
-  const buffer = ctx.createBuffer(2, seconds * rate, rate);
-  for (let channel = 0; channel < 2; channel++) {
-    const data = buffer.getChannelData(channel);
-    let brown = 0, smooth = 0, crackle = 0;
-    for (let i = 0; i < data.length; i++) {
-      const noise = Math.random() * 2 - 1;
-      brown = (brown + 0.025 * noise) / 1.025;
-      smooth = smooth * 0.985 + noise * 0.015;
-      const phase = i / data.length * Math.PI * 2;
-      if (kind === 'rain') data[i] = (noise * 0.23 + brown * 1.1) * (0.8 + 0.2 * Math.sin(phase * 3));
-      if (kind === 'wind') data[i] = (brown * 2 + smooth) * (0.6 + 0.25 * Math.sin(phase) + 0.12 * Math.sin(phase * 3));
-      if (kind === 'fire') {
-        if (Math.random() < 0.00014) crackle = 0.4 + Math.random() * 0.5;
-        crackle *= 0.995;
-        data[i] = brown * 1.5 + noise * crackle;
-      }
-      // Window the seam to eliminate loop clicks.
-      const fade = Math.min(1, i / (rate * 0.08), (data.length - 1 - i) / (rate * 0.08));
-      data[i] *= fade;
-    }
-  }
-  return buffer;
 }
 
 export function makeDemoMusic(): Blob {

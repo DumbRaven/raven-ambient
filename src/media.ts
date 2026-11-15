@@ -193,22 +193,6 @@ export function restoreMediaDirs(dirs: string[], files: string[] = []) {
   push({ type: 'restore', dirs, files });
 }
 
-/** 主进程是否已经取走队列。只用于测试断言。 */
-export function pendingMediaActions(): number {
-  return raven().__ravenMediaOutbox?.length ?? 0;
-}
-
-/**
- * 问主进程：Wallpaper Engine 现在放的是哪个文件。
- *
- * 不做屏幕采集——抓整屏会把你正在玩的游戏、开着的浏览器一起抓进来，
- * 而用户要的只是壁纸本身。所以直接读 WE 的配置拿到当前壁纸的文件路径，
- * 按普通媒体播放：原生画质、能循环、能拖进度。
- */
-export function askCurrentWallpaper() {
-  push({ type: 'live' });
-}
-
 /**
  * 把扫出来的文件变成媒体库条目。
  * 用绝对路径做稳定 id：同一个文件反复扫描不会变成两条，

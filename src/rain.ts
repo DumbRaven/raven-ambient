@@ -115,5 +115,3 @@ export function drops(count: number): Drop[] {
   }
   return out;
 }
-
-export const dropBudget = MAX_DROPS;

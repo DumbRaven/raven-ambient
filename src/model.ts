@@ -1,6 +1,6 @@
 import { depthRange, percentToDb } from './ducking.ts';
 
-export type SoundKind = 'rain' | 'fire' | 'wind' | 'file';
+export type SoundKind = 'file';
 export type Track = {
   id: string; name: string; detail: string; kind: SoundKind; volume: number; pan: number; warmth: number;
   /** 音乐响起时压低的量，分贝。0 表示这张不避让。 */
@@ -10,18 +10,22 @@ export type Track = {
   enabled: boolean;
 };
 export type Mix = { tracks: Track[]; master: number; musicVolume: number; ducking: boolean; lineVolume?: number };
-export type Scene = { id: string; name: string; description: string; theme: string; mix: Mix };
+/**
+ * 混音基准值。产品里唯一的生产来源是 `records.ts` 的 `cabinetMix(cabinet)`；
+ * 这份只被测试当作 fixture（验混音平衡、避让曲线、限幅）。
+ *
+ * 早先这里还有 rain/fire/wind 三种内置合成音，`audio.ts` 里也留着对应的
+ * `synthesize()`。那条链已经断了：`cabinetMix` 把每一路的 kind 都写死成
+ * `'file'`，合成音分支运行时永远走不到。2026-11-15 删掉了三段合成音和
+ * 三个场景预设（雨夜书房 / 松林微风 / 暖炉独处）——那套「内置白噪音 + 场景」
+ * 的设计早就被「用户自己导入环境音唱片」取代了。
+ */
 export const defaultTracks: Track[] = [
-  { id: 'rain', name: '窗外细雨', detail: '细密雨声 · 合成试听', kind: 'rain', volume: 55, pan: -12, warmth: 48, duckDepth: 9, coverId: 'rain', enabled: true },
-  { id: 'fire', name: '壁炉余温', detail: '低声炉火 · 合成试听', kind: 'fire', volume: 38, pan: 12, warmth: 66, duckDepth: 9, coverId: 'fire', enabled: false },
-  { id: 'wind', name: '林间晚风', detail: '舒缓风声 · 合成试听', kind: 'wind', volume: 25, pan: 0, warmth: 55, duckDepth: 9, coverId: 'wind', enabled: true },
+  { id: 'rain', name: '窗外细雨', detail: '细密雨声 · 合成试听', kind: 'file', volume: 55, pan: -12, warmth: 48, duckDepth: 9, coverId: 'rain', enabled: true },
+  { id: 'fire', name: '壁炉余温', detail: '低声炉火 · 合成试听', kind: 'file', volume: 38, pan: 12, warmth: 66, duckDepth: 9, coverId: 'fire', enabled: false },
+  { id: 'wind', name: '林间晚风', detail: '舒缓风声 · 合成试听', kind: 'file', volume: 25, pan: 0, warmth: 55, duckDepth: 9, coverId: 'wind', enabled: true },
 ];
 export const defaultMix: Mix = { tracks: defaultTracks, master: 65, musicVolume: 65, ducking: true };
-export const scenes: Scene[] = [
-  { id: 'rainy', name: '雨夜书房', description: '一页书，一场温柔的雨。', theme: '#91b9a7', mix: defaultMix },
-  { id: 'forest', name: '松林微风', description: '让思绪沿着风，走进森林。', theme: '#b1bd8a', mix: { ...defaultMix, tracks: defaultTracks.map(t => ({ ...t, enabled: t.id !== 'fire', volume: t.id === 'wind' ? 65 : 18 })) } },
-  { id: 'fireplace', name: '暖炉独处', description: '给自己留一盏灯的时间。', theme: '#d4a67c', mix: { ...defaultMix, tracks: defaultTracks.map(t => ({ ...t, enabled: t.id !== 'wind', volume: t.id === 'fire' ? 65 : 20 })) } },
-];
 export const clamp = (n: number, min = 0, max = 100) => Math.min(max, Math.max(min, Number.isFinite(n) ? n : min));
 export function sanitizeMix(value: unknown): Mix {
   if (!value || typeof value !== 'object') return structuredClone(defaultMix);

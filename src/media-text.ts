@@ -15,12 +15,6 @@ export function titleOf(item: { source?: string; name: string }) {
   return item.source ? item.name : stem(item.name);
 }
 
-export function sizeOf(bytes: number) {
-  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
-  if (bytes >= 1024 * 1024) return `${Math.round(bytes / 1024 / 1024)} MB`;
-  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
-
 /**
  * 文件所在的目录名。票根上「FROM」那一行印的就是它：这份素材从哪个相册来。
  *
