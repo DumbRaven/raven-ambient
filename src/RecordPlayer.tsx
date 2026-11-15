@@ -9,6 +9,7 @@ import type { NowPlaying } from './now-playing';
 import { hasTrack } from './now-playing';
 import { coverPalette, recordPressing, vinylPalette } from './vinyl';
 import { launchSeed, sleeveTones } from './sleeves';
+import { hashText } from './hash.ts';
 
 export type TurntableDisc =
   | { kind: 'local'; record: RecordItem }
@@ -16,13 +17,7 @@ export type TurntableDisc =
 
 /** 从封面里挑一个稳定的背景色，没有封面时用它兜底。 */
 function externalColor(info: NowPlaying): string {
-  let hash = 2166136261;
-  const text = info.title || 'raven';
-  for (let index = 0; index < text.length; index++) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return sleeveTones[(hash >>> 0) % sleeveTones.length].from;
+  return sleeveTones[hashText(info.title || 'raven') % sleeveTones.length].from;
 }
 
 export default function RecordPlayer({

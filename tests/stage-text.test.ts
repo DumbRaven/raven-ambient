@@ -57,13 +57,15 @@ test('缺字段时跳过而不是留下空的那一格', () => {
   );
 });
 
-test('秒数写成 m:ss，超过一小时才补小时位', () => {
+test('秒数写成 m:ss，超过 60 分钟分钟数继续往上加', () => {
   assert.equal(clock(0), '0:00');
   assert.equal(clock(9), '0:09');
   assert.equal(clock(72), '1:12');
   assert.equal(clock(228), '3:48');
   assert.equal(clock(600), '10:00');
-  assert.equal(clock(3661), '1:01:01');
+  // 长播客 / 音乐会录音能走到这里：90 分钟显示 90:00，不出小时位
+  assert.equal(clock(3661), '61:01');
+  assert.equal(clock(5400), '90:00');
 });
 
 test('时长拿不到时写 0:00，不写 NaN 也不写负数', () => {

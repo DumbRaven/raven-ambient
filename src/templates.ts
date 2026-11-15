@@ -11,6 +11,8 @@
  * 不会出现「版式和画面打架」。
  */
 
+import { clamp } from './num.ts';
+
 export type TemplateId = 'collage' | 'photo' | 'desktop';
 
 export type Template = { id: TemplateId; name: string; hint: string };
@@ -91,8 +93,6 @@ function luminance(hex: string): number {
   return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
 }
 
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-
 export type CollageTone = {
   /** 整块画布的底色。 */
   base: string;
@@ -125,15 +125,6 @@ export type CollageTone = {
  *   1. 定一个主色相（画面里面积最大、又不是灰的那个）
  *   2. 沿这个色相排出「底最暗 → 面板中间 → 信息条最亮」三档
  * 饱和度做轻微差异（面板略浓一点，信息条略淡），但不再拉出完全不同的色相。
- */
-/**
- * 从画面的主色推出一整套拼贴配色。
- *
- * 三条规则：
- *   底色 = 面积最大的那个色，压饱和、明度往舒适区拉（暗图压到 0.14，亮图提到 0.62）
- *   面板 = 饱和度最高的那个色，再提一档饱和 —— 拼贴里那块跳出来的颜色
- *   信息条 = 最亮的那个色，再提亮 —— 通常是画面里的天空、墙面、纸
- * 所以同一张图永远是同一套色，换图就换气质。
  *
  * hint 允许用户指定：
  *   hue   强制主色相（0–360），不传就按画面算

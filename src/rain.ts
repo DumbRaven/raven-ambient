@@ -17,6 +17,9 @@
  *   Radius 600 / Velocity 0.1 / Longevity 5s / Gravity 0.1 /
  *   Blob Birth Size 0.20 / Blob Death Size 0.15 / 置换 水平5 垂直20。
  */
+
+import { clamp } from './num.ts';
+
 export type RainMode = 'slide' | 'streak' | 'both';
 
 export type RainSetting = {
@@ -37,10 +40,6 @@ export const rainModes: { id: RainMode; name: string; hint: string }[] = [
 ];
 
 const KEY = 'raven-rain';
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
 
 /** 读存档。坏数据退回默认值——雨层开不开不该让放映页起不来。 */
 export function readRain(raw: string | null): RainSetting {

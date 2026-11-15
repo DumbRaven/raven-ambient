@@ -281,7 +281,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   // 用 IntersectionObserver 记下「露过面」的 id，露过一次就不再收回去——
   // 翻回上一页的时候不该重新白屏一次。
   //
-  // 票根一页只挂八张，翻页会把 DOM 换掉一批，所以 page 必须进依赖：
+  // 票根一页只挂六张，翻页会把 DOM 换掉一批，所以 page 必须进依赖：
   // 不重挂的话新一页的 li 没人观察，封面会一直是空的。
   useEffect(() => {
     const host = grid.current;
@@ -561,7 +561,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               {/* 透明版式不铺画面（见 TemplateStage 里 template-desktop 那段），
                   所以「这是第几张、是图还是视频」在这里没有意义——说「透明」
                   两个字，跟左下角控制条上那三颗版式名对得上。 */}
-              <b title={template === 'desktop' ? '透明' : current.name}>{template === 'desktop' ? '透明' : titleOf(current)}</b>
+              <b title={template === 'desktop' ? '透明' : titleOf(current)}>{template === 'desktop' ? '透明' : titleOf(current)}</b>
               <small>
                 {template === 'desktop'
                   ? '桌面就是底'

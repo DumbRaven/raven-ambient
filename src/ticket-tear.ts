@@ -6,6 +6,8 @@
 // 用户 m14144 定的交互：「点击，票根浮起放大，用户手撕划线部分，
 // 右侧文字部分化为灰烬消失，左侧电影票飘进放映区域」。
 
+import { hashText } from './hash.ts';
+
 /**
  * 画面占整张票的宽度比例。
  *
@@ -192,16 +194,6 @@ export type AshFlake = {
   delay: number;
 };
 
-/** 灰烬粒子的确定性散列：同一张票每次炸开都是同一片灰，不会闪。 */
-function hash(text: string): number {
-  let value = 0x811c9dc5;
-  for (let i = 0; i < text.length; i += 1) {
-    value ^= text.charCodeAt(i);
-    value = Math.imul(value, 0x01000193);
-  }
-  return value >>> 0;
-}
-
 /**
  * 把票根拆成一捧灰。
  *
@@ -212,9 +204,9 @@ function hash(text: string): number {
 export function ashParticles(seed: string, count = 28): AshFlake[] {
   const flakes: AshFlake[] = [];
   for (let i = 0; i < count; i += 1) {
-    const a = hash(`${seed}#${i}`);
-    const b = hash(`${seed}@${i}`);
-    const c = hash(`${seed}!${i}`);
+    const a = hashText(`${seed}#${i}`);
+    const b = hashText(`${seed}@${i}`);
+    const c = hashText(`${seed}!${i}`);
     // 纵向从顶到底铺开：i=0 贴顶（y≈0），i=count-1 贴底（y≈1）。
     const down = (i + 0.5) / count;
     flakes.push({

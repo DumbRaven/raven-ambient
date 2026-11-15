@@ -14,6 +14,9 @@
  * 两边的副行内容不一样，是因为能拿到的数据本来就不一样——
  * 外部播放器的媒体会话只给标题、歌手、专辑，不给播放位置。
  */
+
+import { durationText } from './clock.ts';
+
 export type StageNow =
   | {
       kind: 'local'; title: string; artist: string; playing: boolean;
@@ -65,16 +68,9 @@ export function nowLine(now: StageNow | undefined): string {
   return now.playing ? line : `${line} · 已暂停`;
 }
 
-/** 秒 → `m:ss`。超过一小时才补小时位，绝大多数歌用不上。 */
+/** 秒 → `m:ss`。超过 60 分钟分钟数继续加（`90:00`），不出小时位。 */
 export function clock(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
-  const total = Math.floor(seconds);
-  const s = total % 60;
-  const m = Math.floor(total / 60) % 60;
-  const h = Math.floor(total / 3600);
-  const mm = String(m).padStart(2, '0');
-  const ss = String(s).padStart(2, '0');
-  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+  return durationText(seconds);
 }
 
 /**

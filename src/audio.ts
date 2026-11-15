@@ -212,12 +212,6 @@ export class AmbientEngine {
     // 这一下如果被节流吞掉，界面上的电平条会一直留着。这里强制发一次。
     if (had) { this.lastEmitted = undefined; this.emit(); }
   }
-  /** 外部输入的电平（0–1），给设置里的电平条用。 */
-  get lineInput() { return this.lineLevel; }
-  /** 外部输入的原始 RMS，用来在界面上显示 dB，方便用户判断音量是否太小。 */
-  get lineRms() { return this.lineLevel / 5; }
-  /** 当前校准出来的触发门限（RMS）。 */
-  get lineGate() { return Math.max(this.lineFloor * 1.8, 0.011); }
   /**
    * 正在响的那个声音的原始 RMS，给播放卡上的实时波形用。
    *

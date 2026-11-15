@@ -5,6 +5,8 @@
  * 不读时钟、不碰 DOM、不写存储——副作用留给 FocusRoom.tsx。
  */
 
+import { durationText } from './clock.ts';
+
 export type FocusPhase = 'focus' | 'break' | 'longBreak';
 
 export type FocusSettings = {
@@ -108,8 +110,7 @@ export function initialFocusState(settings: FocusSettings, phase: FocusPhase = '
 
 /** m:ss；向上取整，让 25:00 从第一帧就完整显示。 */
 export function clock(ms: number): string {
-  const total = Math.max(0, Math.ceil(ms / 1000));
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+  return durationText(ms / 1000, { round: 'ceil' });
 }
 
 export function remainingFocus(state: FocusState, now: number): number {

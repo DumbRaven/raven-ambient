@@ -1,4 +1,6 @@
 import { depthRange, percentToDb } from './ducking.ts';
+import { clamp } from './num.ts';
+import { durationText } from './clock.ts';
 
 export type SoundKind = 'file';
 export type Track = {
@@ -26,7 +28,8 @@ export const defaultTracks: Track[] = [
   { id: 'wind', name: '林间晚风', detail: '舒缓风声 · 合成试听', kind: 'file', volume: 25, pan: 0, warmth: 55, duckDepth: 9, coverId: 'wind', enabled: true },
 ];
 export const defaultMix: Mix = { tracks: defaultTracks, master: 65, musicVolume: 65, ducking: true };
-export const clamp = (n: number, min = 0, max = 100) => Math.min(max, Math.max(min, Number.isFinite(n) ? n : min));
+/** 转给 `num.ts`，保留这个导出名是因为 `records.ts` 一直这么引。 */
+export { clamp };
 export function sanitizeMix(value: unknown): Mix {
   if (!value || typeof value !== 'object') return structuredClone(defaultMix);
   const v = value as Partial<Mix> & { duckAmount?: number; duckDepth?: number };
@@ -47,7 +50,12 @@ export function sanitizeMix(value: unknown): Mix {
   }) : structuredClone(defaultTracks);
   return { tracks, master: clamp(v.master ?? 65), musicVolume: clamp(v.musicVolume ?? 65), ducking: v.ducking !== false };
 }
+/**
+ * 曲目时长 / 定时剩余：`m:ss`，超过 60 分钟分钟数继续加（`90:00`）。
+ *
+ * 睡眠定时的上限是 90 分钟（`SettingsModal.tsx` 的选项），
+ * 所以这条路径真的会走到 60 分钟以上。
+ */
 export function formatTime(seconds: number) {
-  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
-  return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+  return durationText(seconds);
 }

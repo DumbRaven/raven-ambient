@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { hashText, launchSeed, pickSleeve, sleeveStyles, sleeveTones } from '../src/sleeves.ts';
+import { hashText } from '../src/hash.ts';
+import { launchSeed, pickSleeve, sleeveStyles, sleeveTones } from '../src/sleeves.ts';
 
 test('同一次启动里同一张唱片总是同一款封套', () => {
   const first = pickSleeve('record-a', 'seed-1');

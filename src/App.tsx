@@ -21,7 +21,7 @@ import RollNumber from './roll-number';
 import { LineIn, lineInError } from './line-in';
 import { appLabel, emptyNowPlaying, hasTrack, parseNowPlaying, type NowPlaying } from './now-playing';
 import { askNowPlaying, commandNowPlaying, listenNowPlaying } from './now-playing-bridge';
-import { askMedia, dropWallpapers, forgetMediaDir as forgetMediaDirGrant, listenMedia, looseMedia, mergeMedia, pickMediaFiles, pickMediaFolder, replaceMediaDir, replaceWallpapers, rescanMediaFolder, restoreMediaDirs, scanWallpapers, toMediaItem, toWallpaperItem, type MediaMessage } from './media';
+import { askMedia, dropWallpapers, forgetMediaDir as forgetMediaDirGrant, isInside, listenMedia, looseMedia, mergeMedia, pickMediaFiles, pickMediaFolder, replaceMediaDir, replaceWallpapers, rescanMediaFolder, restoreMediaDirs, scanWallpapers, toMediaItem, toWallpaperItem, type MediaMessage } from './media';
 import MediaRoom from './MediaRoom';
 import ListeningRoom from './ListeningRoom';
 import type { StageNow } from './TemplateStage';
@@ -50,6 +50,13 @@ export default function App() {
   const [salvage, setSalvage] = useState(false);
   /** 读坏的具体原因。告不告诉人和「备份成没成功」是两件事，所以另存一个字段。 */
   const [salvageReason, setSalvageReason] = useState('');
+  /**
+   * 已经试过一次「恢复原文件」、而且那份原文照样读不出来。
+   *
+   * 恢复做的事情就是把备份原文写回主键，同样的原文再写一遍必然还是读不出来。
+   * 为 true 时横幅里不再给「恢复原文件」那颗按钮——留着它，用户会一遍遍点。
+   */
+  const [salvageRetried, setSalvageRetried] = useState(false);
   const [status, setStatus] = useState<RoomStatus>(emptyStatus);
   const player = useRef<RoomPlayer | null>(null);
   const [view, setView] = useState<'cabinet' | 'listening' | 'focus' | 'media'>('cabinet');
@@ -276,7 +283,9 @@ export default function App() {
   // 退场期间唱盘和标题都停在上一张，走完才换成新的一张
   // 外部音乐模式下唱盘上本来就不是本地唱片，切歌不该再放一遍换碟动画
   const shownOutgoing = cabinet.lineMode ? undefined : outgoing;
-  const titleRecord = outgoing ?? current;
+  // 标题必须跟着唱盘走：只让唱盘乘 lineMode 的话，外部音乐模式下没歌在放时，
+  // 标题会显示 1 秒退场中的上一张，而唱盘已经空着了——两边对不上。
+  const titleRecord = shownOutgoing ?? current;
   // 外部音乐模式下唱盘上转的是别的播放器正在放的那首：没有真唱片，就用封面和歌名拼一张
   const externalDisc: TurntableDisc | undefined = cabinet.lineMode && hasTrack(nowPlaying) ? { kind: 'external', info: nowPlaying } : undefined;
   // 外部音乐模式下唱片柜不显示音乐那一栏，所以「已选择」也只能算环境音。
@@ -482,7 +491,7 @@ export default function App() {
         // 那个字段的意思是「备份有没有写成」，一旦备份失败（配额满、隐私模式）
         // 横幅就跟着不出现了——而备份失败恰恰是最需要告诉用户「你现在别乱动」的时候。
         // 备份成不成功是给「能不能还原」用的，不是用来决定「告不告诉人」的。
-        if (loaded.broken) { setSalvage(true); setSalvageReason(loaded.reason); }
+        if (loaded.broken) { setSalvage(true); setSalvageReason(loaded.reason); setSalvageRetried(loaded.retried); }
         else if (loaded.lost > 0) notify(`有 ${loaded.lost} 张唱片的数据不完整，已跳过；其余照常。`);
         player.current = new RoomPlayer(saved, state => { if (active) setStatus(state); }, error => { if (active) notify(message(error)); });
         const image = await readAsset('background'); if (!active) return;
@@ -654,8 +663,7 @@ export default function App() {
   function openImport(type?: RecordType) { setReport([]); if (type) setImportType(type); setModal('import'); }
   // 媒体库：把选中的目录移出。条目一起清掉，不然界面会留着一堆打不开的缩略图。
   function forgetMediaDir(dir: string) {
-    const keep = cabinetRef.current.media.filter(item => !item.path.toLowerCase().startsWith(dir.replace(/[\\/]+$/, '').toLowerCase() + '\\')
-      && !item.path.toLowerCase().startsWith(dir.replace(/[\\/]+$/, '').toLowerCase() + '/'));
+    const keep = cabinetRef.current.media.filter(item => !isInside(item.path, dir));
     setMediaDirs(dirs => dirs.filter(item => item !== dir));
     change({ media: keep, mediaDirs: cabinetRef.current.mediaDirs.filter(item => item !== dir) });
     // 主进程那边的读取授权也要撤掉。只删前端的条目，`media://` 照样读得到
@@ -776,14 +784,17 @@ export default function App() {
             {salvageReason ? `${salvageReason}，` : '收藏读不出来，'}保存已暂停——先别急着加东西，不然空柜会盖掉原来那份。
           </p>
           <div className="salvage-actions">
-            <button type="button" className="text-button" onClick={() => {
+            {/* 已经试过一次「恢复原文件」而且照样读不出来时，不再给这颗按钮：
+                恢复做的事情就是把那份原文写回主键，同样的原文再写一遍必然还是读不出来，
+                点了只会重载一遍又回到这个横幅。留一颗注定失败的按钮，用户会一遍遍点它。 */}
+            {!salvageRetried && <button type="button" className="text-button" onClick={() => {
               // 备份写回主键，然后整页重载从它重新读——比在这里手工重建
               // 播放器、封面、外部音乐那套状态安全得多。
               // 传的是**本组件正在用的实例**，不是模块单例：那个单例从来没人写盘，
               // 解它等于没解（见 cabinet-storage.ts 底部注释）。
               if (restoreSalvage(cabinetStorage.current)) location.reload();
               else notify('备份读不出来了，没法还原。你可以先另存一份数据再决定。');
-            }}>恢复原文件</button>
+            }}>恢复原文件</button>}
             <button type="button" className="text-button" onClick={() => {
               // 同上：必须解当前实例的锁，否则横幅消失、保存照样失败。
               adoptEmptyCabinet(cabinetStorage.current);
@@ -841,7 +852,7 @@ export default function App() {
         <div ref={shelfRef} className={`cabinet-layout ${!cabinet.records.length ? 'empty-cabinet-layout' : ''}`} data-motion={filterMotion.phase} style={{ '--wipe-x': `${shelfWipe.x}px`, '--wipe-y': `${shelfWipe.y}px`, '--wipe-r': `${shelfWipe.r}px` } as CSSProperties}>
           <section className="cabinet" aria-label="我的唱片柜"><div className="cabinet-corners"><i /><i /><i /><i /></div>
             {!cabinet.records.length ? <div className="empty-cabinet"><div className="empty-art"><Sleeve playing={false} preview /></div><span className="shelf-line" /><div className="empty-copy"><h2>唱片柜还是空的</h2><button className="primary-button" disabled={!ready || !!busy} onClick={() => openImport()}><Plus size={14} />放入第一张唱片</button></div></div> : <>
-              <div className="shelf-label"><span>{filter === 'music' ? '此刻的声音' : filter === 'ambient' ? '此刻的环境音' : '此刻的声音'}</span><span><RollNumber value={visible.length} minDigits={2} /></span></div>
+              <div className="shelf-label"><span>{filter === 'ambient' ? '此刻的环境音' : '此刻的声音'}</span><span><RollNumber value={visible.length} minDigits={2} /></span></div>
 
               <ul className="record-grid">
                 {shown.map(record => <RecordCard
@@ -877,8 +888,8 @@ export default function App() {
                 {filter === 'selected' && !query ? <>
                   <small>在音乐和环境音中点击 ＋，就会出现在这里。</small>
                   <div className="selection-links">
-                    <button className="text-button" onClick={() => setFilter('music')}>挑选音乐<ArrowRight size={12} /></button>
-                    <button className="text-button" onClick={() => setFilter('ambient')}>挑选环境音 <ArrowRight size={12} /></button>
+                    <button className="text-button" onClick={event => selectFilter('music', event.currentTarget)}>挑选音乐<ArrowRight size={12} /></button>
+                    <button className="text-button" onClick={event => selectFilter('ambient', event.currentTarget)}>挑选环境音 <ArrowRight size={12} /></button>
                   </div>
                 </> : <button className="text-button" onClick={() => openImport(filter === 'ambient' ? 'ambient' : 'music')}>收藏本地音频 <Plus size={12} /></button>}
               </div>}

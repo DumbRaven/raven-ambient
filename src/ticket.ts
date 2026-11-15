@@ -15,6 +15,8 @@
 // 这个文件只有纯算术与数组，不 import React：页数、条码纹理这些都要能直接跑测试，
 // 也不必为了验一条除法去起 Electron。
 
+import { hashText } from './hash.ts';
+
 /** 一页六张：一列排下来正好一屏，再多就要滚动。 */
 export const TICKET_PAGE_SIZE = 6;
 
@@ -35,8 +37,14 @@ export function pageCount(total: number): number {
   return Math.max(1, total % TICKET_PAGE_SIZE === 0 ? count : count + 1);
 }
 
-/** 把页码夹进合法范围。翻页按钮和键盘都要过这一道。 */
-export function clampPage(index: number, total: number): number {
+/**
+ * 把票根页码夹进合法范围。翻页按钮和键盘都要过这一道。
+ *
+ * 名字里的 `Page` 是这个文件专用的票根页码，别和 `records.ts` 的
+ * `clampTicketPage` 混——那个是唱片架的分页，`+Infinity` 在它那儿归零，
+ * 在这里顶到最后一页（票根往前翻到头该停在末页，而不是跳回第一页）。
+ */
+export function clampTicketPage(index: number, total: number): number {
   const last = pageCount(total) - 1;
   // NaN / ±Infinity 不该让调用方自己先判断一遍：正穷顶到最后一页，其余归零。
   if (!Number.isFinite(index)) return index > 0 ? last : 0;
@@ -44,13 +52,13 @@ export function clampPage(index: number, total: number): number {
 }
 
 export function pageOf(total: number, index: number): TicketPage {
-  const safe = clampPage(index, total);
+  const safe = clampTicketPage(index, total);
   const from = safe * TICKET_PAGE_SIZE;
   return {
     index: safe,
     pages: pageCount(total),
     from,
-    // to 可以是 from —— 最后一页不满八张时它停在列表末尾。
+    // to 可以是 from —— 最后一页不满六张时它停在列表末尾。
     to: Math.min(total, from + TICKET_PAGE_SIZE),
   };
 }
@@ -68,12 +76,7 @@ export function slipPage<T>(items: T[], index: number): T[] {
 
 /** FNV-1a。条码与座位号都要「同一个文件每次都长一样」，所以不能用 Math.random。 */
 export function ticketHash(text: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < text.length; i += 1) {
-    hash ^= text.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
+  return hashText(text);
 }
 
 /**
@@ -151,6 +154,9 @@ export function ticketSeat(index: number, perPage = TICKET_PAGE_SIZE): {
 function ticketClock(id: string, mtime?: number): {
   year: string; month: string; day: string; hour: string; minute: string;
 } {
+  // mtime 是文件系统给的毫秒时间戳。光判 Number.isFinite 不够：Date 能表示的
+  // 范围只有 ±8.64e15，1e300 也是「有限正数」，但 new Date(1e300) 是 Invalid Date，
+  // 后面 getFullYear() 会返回 NaN，票根上就印出 "NaN" 三个字母。
   if (typeof mtime === 'number' && Number.isFinite(mtime) && mtime > 0) {
     const at = new Date(mtime);
     if (!Number.isNaN(at.getTime())) {
@@ -280,7 +286,7 @@ export const PAGER_WINDOW = 5;
 export function pagerWindow(current: number, total: number, size = PAGER_WINDOW): number[] {
   const pages = pageCount(total);
   if (pages <= size) return Array.from({ length: pages }, (_, index) => index);
-  const index = clampPage(current, total);
+  const index = clampTicketPage(current, total);
   // 窗口减半后往前推，两头夹住：贴边时窗口固定，中间的页才会跟着当前页滑。
   const start = Math.min(pages - size, Math.max(0, index - Math.floor(size / 2)));
   return Array.from({ length: size }, (_, offset) => start + offset);

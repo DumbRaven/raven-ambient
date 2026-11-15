@@ -125,14 +125,14 @@ export class CabinetStorage {
       this.snapshot = current;
       this.overwriteOnce = false;
       return { cabinet, lost: 0, broken: false, reason: '', salvage: false, retried: false };
-    } catch (error) {
+    } catch {
       const salvaged = this.salvage(legacy ?? '');
       return {
         cabinet: structuredClone(emptyCabinet),
         lost: 0,
         broken: true,
-        // 老结构的错误信息同样不该原样丢给用户看。
-        reason: error instanceof Error ? '旧版收藏数据读不出来' : '旧版收藏数据读不出来',
+        // 老结构的错误信息不该原样丢给用户看：JSON.parse 的英文原文对用户没有意义。
+        reason: '旧版收藏数据读不出来',
         salvage: salvaged,
         retried: false,
       };
@@ -230,7 +230,6 @@ export class CabinetStorage {
 export function restoreSalvage(storage: CabinetStorage) { return storage.restore(); }
 /** 用户决定放弃那份读坏的数据，从这个空柜开始。同样必须传当前实例。 */
 export function adoptEmptyCabinet(storage: CabinetStorage) { return storage.adoptEmpty(); }
-export const SALVAGE = SALVAGE_KEY;
 
 type LegacyShape = {
   mix?: { tracks?: { kind?: string; id?: string; name?: string; volume?: number; pan?: number; warmth?: number; duckAmount?: number; master?: number; musicVolume?: number; ducking?: boolean }[]; master?: number; musicVolume?: number; ducking?: boolean; duckAmount?: number };

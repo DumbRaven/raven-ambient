@@ -6,6 +6,8 @@
  * 由 CSS 决定，所以同一张封面在任何尺寸下都不会糊成一团。
  */
 
+import { hashText } from './hash.ts';
+
 /** 压片工艺。每种对应 styles.css 里的一段 .pressing-* 规则。 */
 export type PressingStyle = 'swirl' | 'marble' | 'splatter' | 'glow' | 'halo';
 
@@ -154,13 +156,7 @@ export function vinylPalette(colors: string[], fallback: string): VinylPalette {
 
 /** 同一张唱片在同一次启动里压片工艺固定，翻页、播放都不会换。 */
 export function recordPressing(recordId: string, seed: string): Pressing {
-  let hash = 2166136261;
-  const text = `${seed}:pressing:${recordId}`;
-  for (let index = 0; index < text.length; index++) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  const value = hash >>> 0;
+  const value = hashText(`${seed}:pressing:${recordId}`);
   return pressings[value % pressings.length];
 }
 

@@ -15,6 +15,8 @@
  * 透明版式用 `.dw-*` 那套压在壁纸上的大字，由 `LayerStack` 按版式选。
  */
 
+import { durationText } from './clock.ts';
+
 /** 六种图元。前四种四个版式都能用，唱片与曲目是透明模式才需要的。 */
 export type LayerId = 'clock' | 'date' | 'title' | 'timer' | 'disc' | 'now';
 
@@ -334,12 +336,14 @@ export function dateText(date: Date) {
   return `${months[date.getMonth()]}.${date.getDate()} ${weekdays[date.getDay()]}`;
 }
 
-/** 番茄钟读数：分:秒。 */
+/**
+ * 番茄钟读数：`mm:ss`。超过 60 分钟分钟数继续加（`90:00`），不出小时位。
+ *
+ * 这里四舍五入、分钟补零，因为它每 100ms 刷一次、位置固定：
+ * 向下取整会看着像读数卡住，不补零宽度会跳。
+ */
 export function timerText(ms: number) {
-  const total = Math.max(0, Math.round(ms / 1000));
-  const minutes = Math.floor(total / 60);
-  const seconds = total % 60;
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return durationText(ms / 1000, { round: 'round', padMinutes: true });
 }
 
-export { MAX_LAYERS as layerLimit, SCALE_MAX as layerScaleMax, SCALE_MIN as layerScaleMin };
+export { MAX_LAYERS as layerLimit };

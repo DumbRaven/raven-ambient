@@ -235,7 +235,12 @@ export const fingerprint = (file: File) => `${file.name}:${file.size}:${file.las
 /** 唱片柜每页最多摆 6 张（2 列 × 3 行），超出部分翻页。 */
 export const PAGE_SIZE = 6;
 
-/** 页码收敛到有效范围，空列表也返回 0，避免删除唱片后停在空白页。 */
+/**
+ * 把唱片架页码收敛到有效范围，空列表也返回 0，避免删除唱片后停在空白页。
+ *
+ * 别和 `ticket.ts` 的 `clampTicketPage` 混：同名的那份是票根分页，
+ * `+Infinity` 在那边顶到最后一页，在这里一律归零。
+ */
 export function clampPage(page: number, total: number, size = PAGE_SIZE): number {
   const pages = Math.max(1, Math.ceil(total / size));
   if (!Number.isFinite(page)) return 0;

@@ -35,7 +35,19 @@ function waitFor(element: HTMLVideoElement, event: string, timeout: number): Pro
   });
 }
 
-/** 数一张 36×36 的小图里的主色，逻辑和图片那条完全一致。 */
+/**
+ * 数一张 36×36 的小图里的主色。分桶、排序、挑四色的结构与 `vinyl.ts`
+ * 里的 `coverPalette` 一致，**唯一不同是下面那行去重判据**：
+ *
+ * `vinyl.ts` 的 `distance()` 把十六进制拆成三个字节算真实色距；这里比的是
+ * 字符串里对应字符的编码差（`'f'` 与 `'1'` 差 59），所以同样两个颜色在
+ * 两边算出来的「远不远」并不一样——这里判得**更严**（更容易认为两色不同，
+ * 因此更少被去重掉）。
+ *
+ * 这是有意留着的差异，不是漏改：真实色距版本会让视频壁纸抽到的四个色
+ * 发生变化，而那套配色用户已经在看了，收益抵不上风险。要统一的话，
+ * 得先给视频抽色加一条锁住输出的测试。
+ */
 function sample(context: CanvasRenderingContext2D, size: number): string[] {
   const { data } = context.getImageData(0, 0, size, size);
   const buckets = new Map<string, { r: number; g: number; b: number; count: number; weight: number }>();

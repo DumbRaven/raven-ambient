@@ -110,8 +110,6 @@ export class DuckEnvelope {
   /** 是否正处于避让中（含保持期），用于界面提示。 */
   get active() { return this.loud || this.level > 0; }
 
-  reset() { this.level = 0; this.loud = false; this.loudSince = 0; this.holdUntil = 0; this.lastTime = undefined; }
-
   /**
    * 推进一步。
    * @param rms 音乐当前的电平

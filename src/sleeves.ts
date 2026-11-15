@@ -4,6 +4,8 @@
  * 播放都不会让封面跳动；关掉重开才会换一批。
  */
 
+import { hashText } from './hash.ts';
+
 export type SleeveMotif = 'dawn' | 'horizon' | 'arch' | 'orbit' | 'ripple' | 'tide';
 
 export type SleeveStyle = { id: SleeveMotif; name: string };
@@ -41,16 +43,6 @@ export const sleeveTones: SleeveTone[] = [
  * 所以翻页、切分类、播放都不会让封面跳；关掉重开才换一批。
  */
 export const launchSeed = `${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
-
-/** FNV-1a：把「种子 + 唱片 id」压成一个稳定整数。 */
-export function hashText(text: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < text.length; index++) {
-    hash ^= text.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
 
 /** 给一张唱片挑封套款式和色调；同一张唱片在同一次启动里结果固定。 */
 export function pickSleeve(recordId: string, seed: string): SleeveArt {

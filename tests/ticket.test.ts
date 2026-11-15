@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  clampPage, pageCount, pageOf, pagerWindow, slipPage, ticketBars, ticketBlanks, ticketHash,
+  clampTicketPage, pageCount, pageOf, pagerWindow, slipPage, ticketBars, ticketBlanks, ticketHash,
   ticketCode, ticketLayout, ticketLayouts, ticketNo, ticketSeat, ticketShape, ticketShapes,
   ticketShowtime, ticketStamp,
   TICKET_PAGE_SIZE,
@@ -18,13 +18,13 @@ test('一页六张：0 件也算一页，6 件整一页，7 件两页', () => {
 });
 
 test('页码越界夹回来，小数与 NaN 都不会让页面炸掉', () => {
-  assert.equal(clampPage(-3, 20), 0);
-  assert.equal(clampPage(99, 20), 3);
-  assert.equal(clampPage(1.9, 20), 1);
-  assert.equal(clampPage(Number.NaN, 20), 0);
-  assert.equal(clampPage(Infinity, 20), 3);
+  assert.equal(clampTicketPage(-3, 20), 0);
+  assert.equal(clampTicketPage(99, 20), 3);
+  assert.equal(clampTicketPage(1.9, 20), 1);
+  assert.equal(clampTicketPage(Number.NaN, 20), 0);
+  assert.equal(clampTicketPage(Infinity, 20), 3);
   // 空列表只有第 0 页
-  assert.equal(clampPage(5, 0), 0);
+  assert.equal(clampTicketPage(5, 0), 0);
 });
 
 test('pageOf 给出这一页的下标范围，最后一页不满也停得住', () => {

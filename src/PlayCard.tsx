@@ -9,7 +9,12 @@ import { Music2, Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, V
 import type { PlayOrder } from './records';
 import { orderNames } from './records';
 
-/** 波形柱子的数量。48 根在 640 宽的卡里每根间隔约 5px，够密也够轻。 */
+/**
+ * 波形柱子的数量。
+ *
+ * 32 根配卡片宽度约 400–640px，每根连间隔在 12–20px 之间，疏密刚好能看出
+ * 一段音乐的起伏；再密就成了一片灰，看不出单根在动。
+ */
 const BARS = 32;
 
 export default function PlayCard({

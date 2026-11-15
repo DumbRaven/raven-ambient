@@ -167,6 +167,11 @@ test('文字：时钟补零、日期是月.日 星期、计时器按分:秒', ()
   assert.equal(timerText(25 * 60 * 1000), '25:00');
   assert.equal(timerText(-5000), '00:00');
   assert.equal(timerText(59_400), '00:59');
+  // 专注时长上限 180 分钟能超过 60 分钟。这里**不出小时位**：
+  // 90:00 只需要一位数在变，1:30:00 反而比 59:59 短，宽度会跳。
+  assert.equal(timerText(60 * 60 * 1000), '60:00');
+  assert.equal(timerText(90 * 60 * 1000), '90:00');
+  assert.equal(timerText(180 * 60 * 1000), '180:00');
 });
 
 test('松手先钉住：位置立刻生效，不等上层确认', () => {
