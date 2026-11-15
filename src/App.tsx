@@ -870,7 +870,7 @@ export default function App() {
             <span>{todayStamp}</span>
             <i />
             <span className="today-count">
-              <RollNumber value={view === 'cabinet' ? cabinet.records.length : view === 'listening' ? selectedCount : view === 'media' ? cabinet.media.length : Math.round(status.running ? 1 : 0)} minDigits={2} />
+              <RollNumber value={view === 'cabinet' ? cabinet.records.length : view === 'listening' ? selectedCount : view === 'media' ? cabinet.media.length : Number(status.running)} minDigits={2} />
             </span>
           </div>
         </div>
