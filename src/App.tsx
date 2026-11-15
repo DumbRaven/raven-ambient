@@ -94,6 +94,8 @@ export default function App() {
   // 播放卡：点页签栏右边那颗圆碟，从屏幕底部升上来。
   // 位置交给 CSS（水平居中贴底），这里只管开关。
   const [cardOpen, setCardOpen] = useState(false);
+  // 定时到点要收全屏。全屏是 MediaRoom 的内部状态，这里只递请求号。
+  const [exitFullscreen, setExitFullscreen] = useState(0);
   // 波形要每帧都新鲜的电平，走 status 会被 200ms 的节流卡住，所以单独用定时器推一个计数。
   const [levelTick, setLevelTick] = useState(0);
   const filesInput = useRef<HTMLInputElement>(null), folderInput = useRef<HTMLInputElement>(null), imageInput = useRef<HTMLInputElement>(null), coverInput = useRef<HTMLInputElement>(null);
@@ -522,7 +524,24 @@ export default function App() {
   }, [modal]);
   useEffect(() => {
     if (!sleepUntil) return;
-    const tick = () => { const left = Math.max(0, Math.ceil((sleepUntil - Date.now()) / 1000)); setRemaining(left); if (!left) { player.current?.pause(); setSleepUntil(0); notify('定时结束，晚安。'); } };
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((sleepUntil - Date.now()) / 1000));
+      setRemaining(left);
+      if (left) return;
+      player.current?.pause();
+      setSleepUntil(0);
+      notify('定时结束，晚安。');
+      // 定时到点是「该去睡了」，不光要停声音，还得把界面收回可预期的状态。
+      // 只停播放的话：人回来时可能看到一张还开着的弹窗、一个还铺满的全屏、
+      // 或者一个卡在半途的卡片——都不像「结束了」，得像「已经收好了」。
+      // 这里只管界面，不碰数据：编辑中的草稿、正在导入的进度都原样留着。
+      setModal(null);
+      setCardOpen(false);
+      setView('cabinet');
+      // 全屏由 MediaRoom 自己管（窗口 + 页面要一起退，见它的 toggleFullscreen）。
+      // 这里只递一个递增的请求号，它收到几号就执行一次。
+      setExitFullscreen(at => at + 1);
+    };
     tick(); const timer = setInterval(tick, 1000); return () => clearInterval(timer);
   }, [sleepUntil]);
 
@@ -811,6 +830,7 @@ export default function App() {
           onScanWallpapers={scanWallpapers}
           onPickFiles={pickMediaFiles}
           onForgetWallpapers={forgetWallpapers}
+          exitFullscreen={exitFullscreen}
           disc={miniDiscSource}
           ambience={ambienceStage}
           now={stageNow}

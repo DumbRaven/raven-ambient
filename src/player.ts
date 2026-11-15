@@ -32,6 +32,14 @@ export class RoomPlayer {
    * 用户本来就没在放音乐的话，试听完也不该自己响起来。
    */
   private previewRestore?: { running: boolean; musicPlaying: boolean };
+  /**
+   * 这一轮里读不出文件的唱片。
+   *
+   * 只活在内存里，不进存档：用户可能只是暂时拔了移动硬盘，
+   * 下次启动该再试一次。手动切歌 / 重新点播放都会清空它，
+   * 否则「修好了文件还是要重启软件」。
+   */
+  private broken = new Set<string>();
 
   constructor(cabinet: Cabinet, listener: (status: RoomStatus) => void, onError: (error: unknown) => void) {
     this.cabinet = cabinet; this.listener = listener; this.onError = onError;
@@ -58,7 +66,41 @@ export class RoomPlayer {
     this.engine.setMix(mix);
     return mix;
   }
-  private wantsMusic() { return this.running && this.musicOn && !this.cabinet.lineMode && this.cabinet.queue.length > 0; }
+  /**
+   * 跳过读不出文件的唱片，挑下一张还能放的。返回是否真换了一张（false = 一张都放不了）。
+   *
+   * 只在 schedule() 的 catch 里调。要点：
+   *   - 把当前这张记进 broken，下次选曲时绕开；
+   *   - 队列里全坏时不要无限重试——直接停掉音乐那一路，
+   *     环境音照旧（这里不碰 engine.stopAmbience）。
+   *   - 不在这里 emit：调用方自己会 emit。
+   *
+   * 为什么不用 nextInOrder：它会做 shuffle / repeat-one 的取舍，
+   * 而这里要的是「跳过已知坏掉的」，跟播放顺序无关。
+   */
+  private skipBroken() {
+    const failed = this.currentId;
+    if (failed) this.broken.add(failed);
+    const queue = this.cabinet.queue;
+    const left = queue.filter(id => !this.broken.has(id));
+    if (!left.length) {
+      // 全都没文件了。音乐这一路停掉，别让总播放开关继续「看起来在放」。
+      this.currentId = undefined;
+      this.musicOn = false;
+      this.loadedId = undefined;
+      return false;
+    }
+    // 从坏掉的那张往后找第一张还能用的；走到队尾就绕回开头。
+    // 注意顺序要**排除掉 failed 自己**再找：把 failed 放回候选会原地选中它，等于没跳过。
+    const at = failed ? queue.indexOf(failed) : -1;
+    const order = at >= 0 ? [...queue.slice(at + 1), ...queue.slice(0, at)] : queue;
+    this.currentId = order.find(id => left.includes(id)) ?? left[0];
+    return true;
+  }
+  private wantsMusic() {
+    return this.running && this.musicOn && !this.cabinet.lineMode
+      && this.cabinet.queue.some(id => !this.broken.has(id));
+  }
   private wantsAmbient() { return this.running && this.ambientOn && this.cabinet.ambience.length > 0; }
   start() {
     // 外部音乐模式下本地音乐不参与，「有没有东西可放」只看环境音
@@ -131,6 +173,9 @@ export class RoomPlayer {
   playRecord(id: string) {
     if (this.cabinet.lineMode || !this.cabinet.queue.includes(id)) return;
     const from = this.currentId;
+    // 用户又主动点了这张：可能是刚把文件补回去。清掉坏标记再试一次，
+    // 不然「修好了还是要重启软件」。
+    this.broken.delete(id);
     this.currentId = id; this.musicOn = true; this.running = true;
     this.armTransition(true, from);
     this.emit(); this.schedule();
@@ -210,7 +255,29 @@ export class RoomPlayer {
         // 只有「换歌前本来就在响」之外的情况才需要补一次。
         if (!this.audio.musicPlaying) await this.engine.playMusic();
         if (valid()) this.emit();
-      } catch (error) { if (valid()) { this.pause(); this.onError(error); } }
+      } catch (error) {
+        if (!valid()) return;
+        // 一首歌的文件没了，不该把整间屋子关掉。
+        //
+        // 原来这里无条件 this.pause()，而 pause() 走的是 engine.stopAll()——
+        // 连环境音一起停。用户删了一个 mp3，结果是「雨声也跟着没了」，
+        // 而且界面上看是「播放自己停了」，找不到原因。
+        //
+        // 现在的处理：只掐掉音乐这一路；有下一张能放的就直接接过去，
+        // 一张都放不了才把音乐关掉。环境音全程不动。
+        this.loadedId = undefined;
+        this.engine.pauseMusic();
+        const moved = this.skipBroken();
+        this.onError(error);
+        if (moved) {
+          // 还有能放的：接着排下一次。每失败一张就少一个候选，
+          // 所以这个循环最多走队列长度那么多次，不会转不出来。
+          this.emit();
+          this.schedule();
+          return;
+        }
+        this.emit();
+      }
     });
   }
   dispose() { this.disposed = true; this.running = false; ++this.revision; this.engine.stopPreview(); this.engine.dispose(); }

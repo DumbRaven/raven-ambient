@@ -148,3 +148,46 @@ test('顺序播放接下一首：新的一首真的播起来，不是装上就�
   assert.equal(status.musicPlaying, true, '第二首应该已经在响');
   assert.equal(deck.paused, false, '接上的这一首不该停在暂停态');
 });
+
+test('一张唱片的文件读不出来：只停音乐，环境音继续流动', async t => {
+  installAudio(t);
+  // 让 'b' 的资产读不到，模拟用户把那个 mp3 删了。
+  // broken 是个可变集合，后面要能「把文件补回来」再验一次。
+  let restoreBlob: (key: string) => void = () => {};
+  const missing = new Set(['b']);
+  useStore({
+    name: 'audio-tests', getText: () => null, setText() {}, removeText() {},
+    readBlob: async (key: string) => (missing.has(key) ? undefined : new Blob(['fixture'])),
+    writeBlob: async () => {},
+  });
+  restoreBlob = (key: string) => missing.delete(key);
+  let status: any; const errors: unknown[] = [];
+  const player = new RoomPlayer(cabinet(), s => { status = s; }, e => errors.push(e));
+  t.after(() => player.dispose());
+  player.start(); await inspect(player).pending;
+  const ambientSources = () => Context.current.sources.length;
+
+  assert.equal(status.currentId, 'a');
+  assert.equal(status.musicPlaying, true);
+  assert.ok(ambientSources() > 0, '环境音应该已经起来了');
+
+  const before = ambientSources();
+  // 切到那张坏唱片
+  player.next(); await inspect(player).pending;
+
+  // 关键：不能因为一首歌没了就把整间屋子关掉
+  assert.equal(status.running, true, '总播放不该停');
+  assert.equal(status.playing, true, '环境音应该还在响');
+  assert.equal(ambientSources(), before, '环境音声部一个都不该被撤掉');
+  assert.equal(status.musicPlaying, false, '音乐这一路要停下来');
+  assert.equal(errors.length, 1, '要报一次错，不能静默');
+  // 跳过了坏的那张，落在下一张好唱片上
+  assert.equal(status.currentId, 'c');
+
+  // 再点一次同一首：坏标记要清掉，不能永远跳过。
+  // 这次让文件「修好了」，模拟用户把 mp3 放回原位。
+  restoreBlob('b');
+  player.playRecord('b'); await inspect(player).pending;
+  assert.equal(status.currentId, 'b', '文件补回来后该能正常播这一张');
+  assert.equal(status.musicPlaying, true, '补回来之后音乐要真的响');
+});

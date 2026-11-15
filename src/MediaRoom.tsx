@@ -42,6 +42,14 @@ type Props = {
   onScanWallpapers: () => void;
   /** 把壁纸库读进来的那批清掉。自己加的文件夹和单独导入的文件不受影响。 */
   onForgetWallpapers: () => void;
+  /**
+   * 父级要求「把全屏收回去」（定时休息到点）。
+   *
+   * 全屏状态住在这个组件里，父级改不了它。以前定时到点只停声音，
+   * 用户回来时窗口还铺满着——「该睡了」的结果不该是一面亮着的墙。
+   * 用一个递增的计数而不是布尔：同一次会话里可能设两次定时。
+   */
+  exitFullscreen?: number;
   /** 「正在听」的那张碟，拼贴版右下角画的就是它。 */
   disc: StageDisc | null;
   /** 此刻的环境音状况，拼贴版面板上半画的是它。没在叠环境音时为 null。 */
@@ -105,7 +113,7 @@ function AddMenu({ open, onClose, onPick, onPickFiles }: { open: boolean; onClos
   );
 }
 
-export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, onRescan, onForgetDir, onScanWallpapers, onForgetWallpapers, disc, ambience, now, onPrevTrack, onNextTrack }: Props) {
+export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, onRescan, onForgetDir, onScanWallpapers, onForgetWallpapers, exitFullscreen, disc, ambience, now, onPrevTrack, onNextTrack }: Props) {
   // 只有图片和视频两档，不再有「全部」。
   // 混在一起看意义不大：两种东西的缩略图行为不同（一张解码、一段读首帧），
   // 而且用户来这儿通常心里已经知道要看哪一种。
@@ -342,6 +350,17 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
       afterResize(() => setExpanded(true));
     }
   }, [expanded, afterResize]);
+
+  // 父级要求收全屏（定时休息到点）。走的是同一条 toggleFullscreen，
+  // 不是直接 setExpanded(false)——窗口和页面必须一起退，否则会错开。
+  // 用 ref 记住已经处理到第几次，避免重新挂载时把旧请求再执行一遍。
+  const handledExit = useRef(exitFullscreen ?? 0);
+  useEffect(() => {
+    const at = exitFullscreen ?? 0;
+    if (at === handledExit.current) return;
+    handledExit.current = at;
+    if (expanded) toggleFullscreen();
+  }, [exitFullscreen, expanded, toggleFullscreen]);
 
   // 全屏时控制条的呼吸：出现 → 静止 2.6 秒 → 淡出。
   // 鼠标移动、按键、点画面都会把它叫回来。
