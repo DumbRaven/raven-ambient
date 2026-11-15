@@ -102,6 +102,8 @@ export class AmbientEngine {
   private previewGain?: GainNode;
   private previewUrl?: string;
   private previewTimer?: ReturnType<typeof setTimeout>;
+  /** stopPreview 收尾那 120ms 的定时器，dispose 时要能全部取消。 */
+  private cleanups = new Set<ReturnType<typeof setTimeout>>();
   private previewEnded = new Set<() => void>();
   private destroyed = false;
 
@@ -171,6 +173,20 @@ export class AmbientEngine {
     this.lineSource = this.ctx!.createMediaStreamSource(stream);
     this.lineSource.connect(this.lineGain!);
     this.lineSource.connect(this.lineAnalyser!);
+    /**
+     * 设备被拔掉、或者被别的程序抢走时，track 会自己走到 ended，
+     * 但 `this.lineSource` 仍然在——于是 status.lineLive 一直是 true，
+     * 界面上那块「外部音乐」一直显示已接上，而实际上一点声音都没有。
+     *
+     * 这里把源断开、清掉，让下一次 tick 把 lineLive 写成 false。
+     * 不动 revision（那是混音代次，跟外部输入没关系，见 detachLineIn 的注释）。
+     */
+    for (const track of stream.getAudioTracks()) {
+      track.addEventListener('ended', () => {
+        if (this.lineSource?.mediaStream !== stream) return;
+        this.detachLineIn();
+      });
+    }
     this.tick();
   }
   detachLineIn() {
@@ -428,8 +444,23 @@ export class AmbientEngine {
     this.previewEl = undefined; this.previewSource = undefined; this.previewGain = undefined; this.previewUrl = undefined;
     if (gain && this.ctx) gain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03);
     if (this.ctx) this.ambient?.gain.setTargetAtTime(1, this.ctx.currentTime, 0.12);
-    // 30ms 之后再掐断，让上面那条淡出真正走完，不然收尾会有一声脆响
-    if (el) setTimeout(() => { el.pause(); el.removeAttribute('src'); el.load(); source?.disconnect(); gain?.disconnect(); if (url) URL.revokeObjectURL(url); }, 120);
+    // 120ms 之后再掐断，让上面那条淡出真正走完，不然收尾会有一声脆响。
+    //
+    // 每个定时器都记进集合里，只为让 dispose() 能把还没跑的那些取消掉：
+    // 那时 AudioContext 已经 close、source/gain 都断了，再去 pause、disconnect
+    // 就是在碰已经死掉的对象。
+    //
+    // **不能**在这里取消上一个定时器。换段试听是「停旧的、开新的」，
+    // 取消上一个就等于旧元素永远停在 paused 状态没人收尾——
+    // 那正是「再点一次停止，不会留下第二份试听」这条测试守住的东西。
+    // 每个定时器闭包里只有自己那一组 el/source/gain/url，互不干扰。
+    if (el) {
+      const cleanup = setTimeout(() => {
+        this.cleanups.delete(cleanup);
+        el.pause(); el.removeAttribute('src'); el.load(); source?.disconnect(); gain?.disconnect(); if (url) URL.revokeObjectURL(url);
+      }, 120);
+      this.cleanups.add(cleanup);
+    }
     if (had) for (const listener of this.previewEnded) listener();
   }
   /**
@@ -583,6 +614,10 @@ export class AmbientEngine {
   dispose() {
     this.destroyed = true;
     this.stopAll(); this.stopPreview(); clearInterval(this.timer);
+    // stopPreview 会排一个 120ms 的收尾定时器，这里必须一并取消：
+    // 走到 dispose 时 AudioContext 马上要 close，那个定时器再去碰 source/gain 就是空的。
+    for (const cleanup of this.cleanups) clearTimeout(cleanup);
+    this.cleanups.clear();
     for (const deck of this.decks) {
       deck.el.pause(); deck.el.removeAttribute('src'); deck.el.load();
       if (deck.url) URL.revokeObjectURL(deck.url);

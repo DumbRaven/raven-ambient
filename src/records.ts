@@ -123,7 +123,18 @@ export function sanitizeCabinet(value: unknown): Cabinet {
     transition: trackTransitions.includes(v.transition as TrackTransition) ? (v.transition as TrackTransition) : emptyCabinet.transition,
     lineMode: v.lineMode === true,
     lineVolume: clamp(v.lineVolume ?? 100),
-    muted: Array.isArray(v.muted) ? v.muted.filter((id): id is string => typeof id === 'string').slice(0, 8) : [],
+    // 只留「还在库里、还是环境音」的 id。
+    //
+    // 原来只校验类型，于是删掉一张唱片后它的 id 会永远留在 muted 里，
+    // 而且 slice(0, 8) 会把它当成占位——用户明明只静音了 3 条，却因为
+    // 4 个已删除的 id 占着名额，后面的静音根本存不进去。
+    // 这也让「重开软件后某条环境音自己静音了」变得可能：
+    // 备份里那条 id 一旦被别的唱片复用，它一进来就是静音的。
+    muted: Array.isArray(v.muted)
+      ? [...new Set(v.muted)]
+        .filter((id): id is string => typeof id === 'string' && records.some(r => r.id === id))
+        .slice(0, 8)
+      : [],
     theme: /^#[0-9a-f]{6}$/i.test(v.theme ?? '') ? v.theme! : emptyCabinet.theme,
     imageName: typeof v.imageName === 'string' ? v.imageName : '',
     // 媒体只做最轻的校验：路径得像路径、类型得认识，剩下的交给主进程的白名单。

@@ -292,7 +292,21 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, d
     setSwipe(null);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     if (hit === 1) fireRef.current.onNext?.();
-    else if (hit === -1) fireRef.current.onPrev?.();
+    if (hit === -1) fireRef.current.onPrev?.();
+  };
+  /**
+   * 手势被系统打断（来电、切窗口、浏览器抢走指针）。
+   *
+   * 这里**不能**直接接 swipeEnd：swipeEnd 会按已经滑出去的距离判断要不要切歌，
+   * 于是「手指划到一半被系统打断」会被当成「用户松手了」——歌就这么跳了一首，
+   * 而他根本没有松手。中断就是中断，回到原位、不切。
+   */
+  const swipeCancel = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    if (swipeIdRef.current !== event.pointerId) return;
+    swipeIdRef.current = null;
+    trackRef.current = null;
+    setSwipe(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   };
 
   const style = {
@@ -470,7 +484,7 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, d
               onPointerDown={swipable ? swipeDown : undefined}
               onPointerMove={swipable ? swipeMove : undefined}
               onPointerUp={swipable ? swipeEnd : undefined}
-              onPointerCancel={swipable ? swipeEnd : undefined}
+              onPointerCancel={swipable ? swipeCancel : undefined}
               aria-hidden="true"
             >
               <span
