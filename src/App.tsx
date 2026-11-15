@@ -565,6 +565,17 @@ export default function App() {
     try { cabinetStorage.current.assertWritable(); } catch (error) { notify(message(error)); return; }
     busyRef.current = true;
     const files = all.filter(isAudioFile), errors: string[] = [];
+    // 同一条失败原因只报一次。
+    // 磁盘满的时候，二十个文件会依次在同一处失败，全照实列出就是二十行
+    // 一模一样的「空间不足」——用户看不到「这其实是同一个问题」。
+    // 相同文案合并成一条，后面挂个次数。
+    const seen = new Map<string, number>();
+    const pushError = (text: string) => {
+      const count = (seen.get(text) ?? 0) + 1;
+      seen.set(text, count);
+      if (count === 1) errors.push(text);
+      else errors[errors.findIndex(item => item === text)] = `${text}（共 ${count} 次）`;
+    };
     let added = 0, duplicates = 0, unmatched = 0;
     try {
       const known = new Set(cabinetRef.current.records.map(r => r.fingerprint));
@@ -580,7 +591,7 @@ export default function App() {
           if (record.coverId) await loadCover(record.id, record.coverId);
           known.add(record.fingerprint); added++; setFocusId(record.id);
           if (record.category === 'ambient' && !record.coverId && !record.coverPreset) unmatched++;
-        } catch (error) { errors.push(message(error)); }
+        } catch (error) { pushError(message(error)); }
       }
       if (!files.length) errors.push('没有找到支持的音频文件。');
       setReport(errors); setFilter(importType); setView('cabinet');

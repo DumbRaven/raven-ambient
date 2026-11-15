@@ -133,10 +133,16 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   // TemplateStage 取到的原始色板，配色面板用它画「从这里挑」的色块。
   const [palette, setPalette] = useState<string[]>([]);
   const [template, setTemplate] = useState<TemplateId>(() => {
-    const saved = localStorage.getItem('raven-stage-template');
-    return templates.some(item => item.id === saved) ? (saved as TemplateId) : 'collage';
+    // 读也要兜住：隐私模式下 getItem 同样会抛，而这里是 useState 的初始化，
+    // 抛出去整块放映视图就白掉了。
+    try {
+      const saved = localStorage.getItem('raven-stage-template');
+      return templates.some(item => item.id === saved) ? (saved as TemplateId) : 'collage';
+    } catch { return 'collage'; }
   });
-  useEffect(() => { localStorage.setItem('raven-stage-template', template); }, [template]);
+  // 存不下也别让放映中断：版式只是偏好，下次回到默认那个而已。
+  // 裸写会在存储被禁（隐私模式、配额满）时抛进 React 的渲染链，整个视图白掉。
+  useEffect(() => { try { localStorage.setItem('raven-stage-template', template); } catch { /* 偏好丢了不影响放映 */ } }, [template]);
   useEffect(() => { writeTone(tone); }, [tone]);
   // 「从本地添加」的下拉开着没有。Windows 的原生对话框没法同时当文件和文件夹选择器
   // （Electron 文档明说会退化成只能选目录），所以只能让用户先在这里挑一种。

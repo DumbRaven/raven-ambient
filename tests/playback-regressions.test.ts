@@ -246,3 +246,46 @@ test('环境音起不来不能把正在正常播放的歌记成坏文件', async
   assert.equal(status.currentId, 'a', '正在播的那首不能被换掉');
   assert.ok(errors.length >= 1, '环境音失败也要说出来');
 });
+
+test('连着试听两张：中间不该把背景音乐放出来', async t => {
+  // 换段时 engine.preview() 第一件事就是 stopPreview()，它会同步触发
+  // previewEnded → restoreAfterPreview → playMusic()。于是「点第二张试听」
+  // 这个动作会先把背景音乐唤醒，试听和音乐同时响。
+  installAudio(t); memory();
+  let status: any;
+  const player = new RoomPlayer(cabinet(), s => { status = s; }, () => {});
+  t.after(() => player.dispose());
+
+  player.start(); await inspect(player).pending;
+  assert.equal(status.musicPlaying, true, '前置条件：音乐在放');
+
+  await player.preview('a');
+  assert.equal(status.musicPlaying, false, '试听期间音乐该停');
+
+  // 换第二张：这一步不能把音乐放出来
+  await player.preview('b');
+  assert.equal(status.musicPlaying, false, '换段中间不能放出背景音乐');
+
+  // 真正停下之后，才按原样恢复
+  player.stopPreview();
+  // playMusic 是 fire-and-forget，不在这条 pending 链上，等它落地。
+  await flushUntil(() => status.musicPlaying);
+  assert.equal(status.musicPlaying, true, '试听结束后音乐恢复');
+});
+
+test('试听读到一半按了总暂停，声音不许冒出来', async t => {
+  installAudio(t); memory();
+  let status: any;
+  const player = new RoomPlayer(cabinet(), s => { status = s; }, () => {});
+  t.after(() => player.dispose());
+  player.start(); await inspect(player).pending;
+
+  // 不 await：让 preview 卡在 await readAsset 之后
+  const pending = player.preview('a');
+  player.pause();
+  await pending;
+  await inspect(player).pending;
+
+  const live = Media.created.filter(el => !el.paused);
+  assert.deepEqual(live, [], '总暂停之后不该有任何元素还在播');
+});

@@ -32,6 +32,10 @@ export class RoomPlayer {
    * 用户本来就没在放音乐的话，试听完也不该自己响起来。
    */
   private previewRestore?: { running: boolean; musicPlaying: boolean };
+  /** 试听换段的中间态：此时 previewEnded 不是「真的结束」，不能顺手把音乐恢复起来。 */
+  private previewSwitching = false;
+  /** 每次试听一个号，异步读文件回来时用它判断这次还算不算数。 */
+  private previewToken = 0;
   /**
    * 这一轮里读不出文件的唱片。
    *
@@ -135,7 +139,15 @@ export class RoomPlayer {
     this.emit();
     this.schedule();
   }
-  pause() { this.running = false; ++this.revision; this.pendingTransition = undefined; this.previewRestore = undefined; this.engine.stopPreview(); this.engine.stopAll(); this.emit(); }
+  /**
+   * 总暂停。
+   *
+   * 末尾的 previewToken++ 是给「试听正读到一半时按了暂停」准备的：preview() 里
+   * 有两次 await（读文件、加载音频），暂停发生在这中间时 stopPreview() 还掐不到
+   * 任何东西——此时 previewEl 是空的。等 await 回来，声音才凭空响起来。
+   * 加号之后 preview() 回来时发现号变了，直接作废。
+   */
+  pause() { this.running = false; ++this.revision; ++this.previewToken; this.pendingTransition = undefined; this.previewRestore = undefined; this.engine.stopPreview(); this.engine.stopAll(); this.emit(); }
   toggle() { if (this.running) this.pause(); else this.start(); }
   /** 单独开关音乐：只影响音乐，环境音继续流动。 */
   toggleMusic() {
@@ -205,14 +217,30 @@ export class RoomPlayer {
   async preview(recordId: string) {
     const record = this.cabinet.records.find(r => r.id === recordId);
     if (!record) throw new Error('这张唱片已经不在了。');
+    // 每发起一次试听就换一个号。读文件是异步的，读完时可能：
+    //   - 用户已经点了另一张（这次作废）；
+    //   - 用户已经按了总暂停（这次不该再响）。
+    // 没有这个号的话，慢一点的读取会在两步之后突然把声音放出来。
+    const token = ++this.previewToken;
     const blob = await readAsset(record.assetId);
     if (!blob) throw new Error(`找不到「${record.name}」的文件，请重新导入。`);
+    if (token !== this.previewToken || this.disposed) return;
     if (!this.previewRestore) this.previewRestore = { running: this.running, musicPlaying: this.audio.musicPlaying };
     if (this.running && this.audio.musicPlaying) this.engine.pauseMusic();
-    await this.engine.preview(blob);
+    // engine.preview 第一件事就是 stopPreview()，而那会同步触发 previewEnded →
+    // restoreAfterPreview → 把音乐重新放起来。于是「开始试听第二张」这个动作，
+    // 会先把背景音乐唤醒，两路声音叠在一起。换段的这一刻必须压住恢复。
+    this.previewSwitching = true;
+    try {
+      await this.engine.preview(blob);
+    } finally {
+      this.previewSwitching = false;
+    }
   }
-  stopPreview() { this.engine.stopPreview(); }
+  stopPreview() { this.previewToken++; this.engine.stopPreview(); }
   private restoreAfterPreview() {
+    // 换段中间态：不是真的结束，恢复留到下一段结束时再做（previewRestore 还在）。
+    if (this.previewSwitching) return;
     const restore = this.previewRestore;
     this.previewRestore = undefined;
     if (!restore) return;

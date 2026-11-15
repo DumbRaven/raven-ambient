@@ -454,7 +454,9 @@ export class AmbientEngine {
     deck.el.load();
     // play() 的 promise 才是「真正开始响」，元数据的 promise 只说明文件认得出来。
     // 失败（编解码不支持等）交给下面的 error 事件统一报，这里只吞掉自己的拒绝。
-    const playing = autoplay ? deck.el.play().catch(() => undefined) : Promise.resolve();
+    // 但**要记住它到底响没响**：吞掉之后调用方无从判断，loadMusic 会照样置
+    // musicPlaying = true，于是界面显示在放、其实一点声音没有。
+    const playing = autoplay ? deck.el.play().catch(() => false) : Promise.resolve(true);
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => finish(new Error('读取音乐超时，请换一个文件。')), 12000);
       const success = () => finish();
@@ -470,7 +472,7 @@ export class AmbientEngine {
       signal.addEventListener('abort', cancel, { once: true });
       if (signal.aborted) cancel();
     });
-    await playing;
+    return (await playing) !== false;
   }
   /**
    * 把一首歌装到当前唱盘上并开始播。
@@ -484,11 +486,14 @@ export class AmbientEngine {
     for (const deck of this.decks) this.silence(deck);
     const { revision, signal } = this.beginMusicWork(), deck = this.decks[this.activeDeck];
     deck.owner = revision;
-    await this.arm(deck, blob, signal, true);
+    const played = await this.arm(deck, blob, signal, true);
     if (!this.musicValid(revision)) return false;
     // arm 里已经按下播放，这里把这块唱盘的增益放回来（silence 刚把它清零）
     deck.gain.gain.cancelScheduledValues(this.ctx!.currentTime);
     deck.gain.gain.setValueAtTime(1, this.ctx!.currentTime); deck.level = 1;
+    // 没真的响起来就如实说没播成，别让界面显示「播放中」骗人。
+    // 文件本身是好的（arm 已确认元数据读出来了），多半是自动播放策略或设备被占用。
+    if (!played) return false;
     this.status.musicPlaying = true;
     this.tick(); return true;
   }
@@ -509,7 +514,15 @@ export class AmbientEngine {
     if (!this.musicValid(revision)) return false;
     // 新唱盘先静音播放，从 0 开始推，避免出现半拍的爆音
     to.level = 0; to.gain.gain.cancelScheduledValues(this.ctx!.currentTime); to.gain.gain.setValueAtTime(0, this.ctx!.currentTime);
-    await to.el.play();
+    // play() 被拒 ≠ 文件坏了。
+    // 最常见的原因是浏览器自动播放策略（页面还没有用户手势），其次是设备被独占。
+    // 原来这里是裸 await，拒绝会一路抛到 player.schedule() 的 catch，被当成
+    // 「读不出这个文件」而把这张唱片记进 broken——文件明明是好的。
+    // 这里只吞掉拒绝并按「没换成功」返回，坏文件仍然由 arm() 里的 error 事件判。
+    try { await to.el.play(); } catch {
+      if (to.owner === revision) this.silence(to);
+      return false;
+    }
     if (!this.musicValid(revision)) { if (to.owner === revision) this.silence(to); return false; }
     this.activeDeck = 1 - this.activeDeck;
     this.status.musicPlaying = true;
