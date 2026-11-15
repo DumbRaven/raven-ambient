@@ -105,11 +105,20 @@ export class AmbientEngine {
   /** stopPreview 收尾那 120ms 的定时器，dispose 时要能全部取消。 */
   private cleanups = new Set<ReturnType<typeof setTimeout>>();
   private previewEnded = new Set<() => void>();
+  /** 订阅「某几张环境音起不来了」。 */
+  private ambientLost = new Set<(lost: Track[]) => void>();
   private destroyed = false;
 
   subscribe(listener: (status: AudioStatus) => void) { this.listeners.add(listener); listener({ ...this.status }); return () => { this.listeners.delete(listener); }; }
   onMusicEnded(listener: () => void) { this.endedListeners.add(listener); return () => { this.endedListeners.delete(listener); }; }
   onPreviewEnded(listener: () => void) { this.previewEnded.add(listener); return () => { this.previewEnded.delete(listener); }; }
+  /**
+   * 某几张环境音起不来了（文件被删、解码失败）。
+   *
+   * 单独一条通道而不是复用 onError：onError 的语义是「这次播放整体失败了」，
+   * 而这里是「大部分照响，只有这几张没了」——两者的处理完全不同。
+   */
+  onAmbientLost(listener: (lost: Track[]) => void) { this.ambientLost.add(listener); return () => { this.ambientLost.delete(listener); }; }
   private emit() {
     const previous = this.lastEmitted, next = this.status, now = this.ctx?.currentTime ?? 0;
     if (previous && (Object.keys(next) as (keyof AudioStatus)[]).every(key => previous[key] === next[key])) return;
@@ -289,11 +298,30 @@ export class AmbientEngine {
       // 已有声部无需重新解码，所以热路径上这里通常是空数组。
       const pending = mix.tracks.filter(t => t.enabled && !this.voices.has(t.id));
       const buffers: { track: Track; buffer: AudioBuffer }[] = [];
+      /**
+       * 解码失败的那些。
+       *
+       * 原来这里没有任何缓冲：`Promise.all([lane(), lane(), lane()])` 里任意一条
+       * 抛出来，整段就落到下面那个 catch，而 catch 第一句是 `stopAmbience()`——
+       * 一张环境音的文件没了，另外七张也跟着停。
+       *
+       * 这跟音乐那一路是同一类错误：**一个坏文件不该把整间屋子关掉**。
+       * 现在坏掉的单独跳过、记进 failures 交给播放器提示，其它照常起。
+       */
+      const failures: unknown[] = [];
+      /** 起不来的那几张，用来告诉用户「哪张没了」。 */
+      const lost: Track[] = [];
       const lane = async () => {
         for (let next = pending.shift(); next; next = pending.shift()) {
-          const buffer = await this.getBuffer(next);
-          if (!valid()) return;
-          buffers.push({ track: next, buffer });
+          try {
+            const buffer = await this.getBuffer(next);
+            if (!valid()) return;
+            buffers.push({ track: next, buffer });
+          } catch (error) {
+            if (!valid()) return;
+            failures.push(error);
+            lost.push(next);
+          }
         }
       };
       await Promise.all([lane(), lane(), lane()]);
@@ -312,6 +340,18 @@ export class AmbientEngine {
         this.voices.set(track.id, { source, gain, duck, filter, pan, clip, envelope: new DuckEnvelope(), coverId: track.coverId, depth: track.duckDepth, loudness: loudnessGain(measureLevel(buffer)) });
       }
       this.status.playing = this.voices.size > 0; this.setMix(this.mix ?? mix); this.tick();
+      // 一张都起不来才算整体失败，往上抛让调用方整段停掉。
+      //
+      // 只坏了一部分就不抛：已经起来的那些照响。抛出去会让 player 认为
+      // 「环境音整体失败了」而提前 return——音乐也跟着不响了，
+      // 明明只是三张环境音里坏了一张。
+      //
+      // 但也**不能**静默跳过：坏掉的是哪几张要告诉用户，
+      // 走 onAmbientLost 单独报，不跟「整体失败」混在一起。
+      if (failures.length) {
+        if (!this.voices.size) throw failures[0];
+        for (const listener of this.ambientLost) listener(lost);
+      }
     } catch (error) { if (valid()) { this.stopAmbience(); throw error; } }
   }
   stopAmbience() {

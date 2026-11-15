@@ -289,3 +289,54 @@ test('试听读到一半按了总暂停，声音不许冒出来', async t => {
   const live = Media.created.filter(el => !el.paused);
   assert.deepEqual(live, [], '总暂停之后不该有任何元素还在播');
 });
+
+test('一张环境音解码失败，不该把其它环境音一起停掉', async t => {
+  installAudio(t);
+  // 三条环境音，其中 rain2 的文件读不出来。
+  const many = sanitizeCabinet({
+    ...emptyCabinet,
+    records: [rec('a'), rec('rain', 'ambient'), rec('rain2', 'ambient'), rec('rain3', 'ambient')],
+    queue: ['a'], ambience: ['rain', 'rain2', 'rain3'], transition: 'fade',
+  });
+  const missing = new Set(['rain2']);
+  useStore({
+    name: 'audio-tests', getText: () => null, setText() {}, removeText() {},
+    readBlob: async (key: string) => (missing.has(key) ? undefined : new Blob(['fixture'])),
+    writeBlob: async () => {},
+  });
+  let status: any;
+  const errors: unknown[] = [];
+  const player = new RoomPlayer(many, s => { status = s; }, e => errors.push(e));
+  t.after(() => player.dispose());
+
+  player.start();
+  await inspect(player).pending;
+
+  // 关键断言：另外两条照响。修之前这里只有 0 条——
+  // Promise.all 里任意一条抛，整段落到 catch，而 catch 第一句是 stopAmbience()。
+  const engine = (player as unknown as { engine: AmbientEngine }).engine;
+  assert.equal(status.playing, true, '两条好的环境音应该还在响');
+  assert.equal(engine['voices'].size, 2, '坏掉的那条跳过，其余两个声部照常起');
+
+  // 坏掉的那条要让人知道，不能静默消失
+  assert.equal(errors.length, 1, '有一条起不来就要报一次');
+});
+
+test('环境音一条都起不来时才算失败：整段停掉并报错', async t => {
+  installAudio(t);
+  useStore({
+    name: 'audio-tests', getText: () => null, setText() {}, removeText() {},
+    readBlob: async () => undefined,
+    writeBlob: async () => {},
+  });
+  let status: any;
+  const errors: unknown[] = [];
+  const player = new RoomPlayer(cabinet(), s => { status = s; }, e => errors.push(e));
+  t.after(() => player.dispose());
+
+  player.start();
+  await inspect(player).pending;
+
+  assert.equal(status.playing, false, '一条都没起来，就是没声音');
+  assert.equal(errors.length, 1);
+});

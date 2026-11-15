@@ -54,6 +54,15 @@ export class RoomPlayer {
     this.engine.subscribe(status => { this.audio = status; this.emit(); });
     this.engine.onMusicEnded(() => { if (this.running && this.musicOn) this.next(false); });
     this.engine.onPreviewEnded(() => { this.restoreAfterPreview(); });
+    // 几张环境音起不来时，说清是哪几张。
+    // 这条和 onError 分开：onError 表示「这次播放整体失效」，
+    // 而这里是「其余照响，只有这几张没了」——用户要的是名字，不是「失败了」。
+    this.engine.onAmbientLost(lost => {
+      if (this.disposed || !lost.length) return;
+      const names = lost.map(track => track.name);
+      const detail = names.length <= 3 ? names.join('、') : `${names.slice(0, 3).join('、')} 等 ${names.length} 张`;
+      this.onError(new Error(`这几张环境音起不来了：${detail}。文件可能被移走，重新添加一次就好。`));
+    });
   }
   private emit() {
     if (!this.disposed) this.listener({ ...this.audio, running: this.running, currentId: this.currentId, musicOn: this.musicOn, ambientOn: this.ambientOn });
