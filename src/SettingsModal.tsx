@@ -81,9 +81,15 @@ export default function SettingsModal({ cabinet, busy, background, lineError, st
           </label>
         )}
         {lineError && (
-          <p className="line-in-error" role="alert">
-            {lineError}
-          </p>
+          <div className="line-in-error" role="alert">
+            <p>{lineError}</p>
+            {/* 失败之后没有出路，用户只能关掉设置再开一遍。
+                这个按钮就是那条出路：连着上一次失败的原因再试一次。 */}
+            <button type="button" className="text-button" disabled={!!busy} onClick={() => onToggleLineMode(true)}>
+              <RotateCcw size={12} />
+              再试一次
+            </button>
+          </div>
         )}
       </div>
 

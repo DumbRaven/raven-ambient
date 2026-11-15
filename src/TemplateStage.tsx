@@ -259,6 +259,9 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, d
      state 只留给渲染（`is-swiping` 类、`--disc-drag` 的值），判断一律看 ref。 */
   const swipeIdRef = useRef<number | null>(null);
   const [swipe, setSwipe] = useState<{ id: number; dx: number } | null>(null);
+  // 读不出来的那一件（文件被删 / 移走 / 权限没了）。存 id 而不是布尔，
+  // 换到下一件时自然就复位了，不用再写一个 effect 去清。
+  const [missing, setMissing] = useState('');
   const trackRef = useRef<ReturnType<typeof beginSwipe> | null>(null);
   const fireRef = useRef({ onPrev: onPrevTrack, onNext: onNextTrack });
   useEffect(() => { fireRef.current = { onPrev: onPrevTrack, onNext: onNextTrack }; });
@@ -319,8 +322,17 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, d
   // `key` 必须跟着 item.id 变：换件时整块重挂载，入场动画（`tpl-media-in`）
   // 才有一次「从头播」的机会。不是每帧都会变的 key，放心用。
   const blank = !item.path;
+  const lost = missing === item.id;
+  // 文件在选中之后被删掉 / 移走是常事（Wallpaper Engine 取消订阅、清理下载目录）。
+  // 没有 onError 的话这里只剩一块空白，用户以为「这软件坏了」。
+  // 记下坏掉的 id 而不是布尔：换件时自动复位，不用再写一个 effect。
   const media = blank ? (
     <div className="tpl-blank" aria-hidden="true" />
+  ) : lost ? (
+    <div className="tpl-blank tpl-lost">
+      <p>这张{item.kind === 'video' ? '影片' : '图片'}找不到了</p>
+      <small>文件被删掉或移走了</small>
+    </div>
   ) : item.kind === 'video' ? (
     <video
       key={item.id}
@@ -336,9 +348,10 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, d
       muted
       onPlay={() => onPlayState(true)}
       onPause={() => onPlayState(false)}
+      onError={() => setMissing(item.id)}
     />
   ) : (
-    <img key={item.id} className="tpl-media" src={mediaSrc(item)} alt={title} />
+    <img key={item.id} className="tpl-media" src={mediaSrc(item)} alt={title} onError={() => setMissing(item.id)} />
   );
 
   return (

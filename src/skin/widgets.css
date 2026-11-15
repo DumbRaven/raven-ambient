@@ -290,6 +290,17 @@
   color: var(--bold-danger);
 }
 
+/* 失败之后要留一条出路：原因是红的，下面的「再试一次」是普通文字按钮。
+   以前这里只有一个 <p>，用户读完知道为什么不行，却不知道下一步做什么。 */
+.line-in-error p {
+  margin: 0;
+}
+
+.line-in-error .text-button {
+  margin-top: 6px;
+  color: var(--bold-ink);
+}
+
 /* 复选框：方形小勾，不用系统默认样式，避免在纯白底上显脏 */
 .line-in-auto {
   display: inline-flex;

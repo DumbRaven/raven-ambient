@@ -492,7 +492,15 @@ export default function App() {
             player.current?.startAmbientOnly();
           } catch (error) {
             // 虚拟声卡没装或没插，退回本地模式：界面不能停在「只有环境音」却收不到外部声音
-            if (active) { change({ lineMode: false }); setLineError(lineInError(error)); }
+            if (active) {
+              change({ lineMode: false });
+              const text = lineInError(error);
+              setLineError(text);
+              // 必须说出来。此前这里只是把错误塞进设置弹窗里的一个 <p>，
+              // 而用户没理由为了「声音怎么不对」去翻设置——他看到的只是
+              // 「明明开着外部音乐模式，重启之后却没声了」。
+              notify(`上次开着外部音乐，这次没接上：${text}。装好之后在设置里点「再试一次」。`);
+            }
           }
         }
       } catch (error) {
