@@ -124,19 +124,6 @@
   background: #0a0a0a;
 }
 
-.theater-note {
-  position: absolute;
-  left: 14px;
-  bottom: 14px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #ffffff1f;
-  color: var(--bold-on-dark);
-  font-size: 11px;
-  font-weight: 600;
-  backdrop-filter: blur(8px);
-}
-
 /* 控制条自带深色底。以前靠台面那层黑底，去掉黑框之后必须自己就是那块暗色，
    否则白字压白底整条看不见。 */
 .theater-bar {
@@ -208,13 +195,15 @@
 }
 
 /* 循环：开着的时候是白字，关掉压暗，一眼能看出状态 */
+/* 2026-11-15：.theater-loop 在 TSX 里零命中（按钮已改成 .theater-modes 那一套），
+   这三条连同 !important 一起是空转的。先留着，等确认没有动态添加的地方再删。 */
 .theater-loop {
-  color: #ffffff66 !important;
+  color: #ffffff66;
 }
 
 .theater-loop.on {
-  background: #ffffff2e !important;
-  color: var(--bold-on-dark) !important;
+  background: #ffffff2e;
+  color: var(--bold-on-dark);
 }
 
 @media (max-width: 599px) {
@@ -274,13 +263,6 @@
 @keyframes live-pulse {
   0%, 100% { box-shadow: 0 0 0 0 #a8e6c166; }
   50% { box-shadow: 0 0 0 5px #a8e6c100; }
-}
-
-/* 「桌面壁纸」按钮按下时反白，和播放台上的循环键同一套状态语言。 */
-.media-pick.on {
-  background: var(--bold-ink);
-  border-color: var(--bold-ink);
-  color: var(--bold-bg);
 }
 
 @media (max-width: 599px) {

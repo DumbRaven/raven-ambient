@@ -95,19 +95,33 @@ for (const file of loadOrder()) {
 
 const norm = s => s.replace(/\s+/g, ' ').trim();
 
+/**
+ * 一条声明要算死，必须是**每个**选择器片段都被后面的规则覆盖到。
+ *
+ * 2026-11-15 的第一版只要求「任一片段重叠」，于是
+ * `.media-empty-actions > .media-add, .media-empty-actions > button { width: 100% }`
+ * 被误判成整条死——后面那条确实重写了 `> button` 的 width，但 `> .media-add`
+ * 这一支没有，删掉按钮区就窄了。
+ * 反过来，只比整串又漏掉真死声明（逗号组与单条永远对不上字符串）。
+ * 所以按片段逐个判，全部有着落才算死。
+ */
+function selParts(sel) { return sel.split(',').map(norm).filter(Boolean); }
+
 const found = [];
 for (const rule of rules) {
+  const mine = selParts(rule.sel);
   for (const d of decls(rule.body)) {
-    for (const later of rules) {
-      if (later.pos <= rule.pos) continue;
-      if (later.media !== rule.media) continue;
-      if (norm(later.sel) !== norm(rule.sel)) continue;
-      if (!decls(later.body).some(x => x.prop === d.prop)) continue;
-      // !important 只能被 !important 压住
-      if (d.important && !decls(later.body).some(x => x.prop === d.prop && x.important)) continue;
-      found.push({ rule, prop: d.prop, val: d.val, killer: later });
-      break;
-    }
+    // 每个片段各自去找「后面有没有同样带这个片段、又重写了这个属性」的规则
+    const covered = mine.every(part =>
+      rules.some(later =>
+        later.pos > rule.pos
+        && later.media === rule.media
+        && selParts(later.sel).includes(part)
+        // !important 只能被 !important 压住
+        && decls(later.body).some(x => x.prop === d.prop && (!d.important || x.important)),
+      ),
+    );
+    if (covered) found.push({ rule, prop: d.prop, val: d.val });
   }
 }
 
@@ -168,7 +182,8 @@ if (list) {
     const tag = g.items.length >= total ? '整条死' : `部分 ${g.items.length}/${total}`;
     const where = g.rule.media ? `  @${g.rule.media}` : '';
     console.log(`\n[${tag}] ${g.rule.file}:${g.rule.line}  ${g.rule.sel}${where}`);
-    console.log(`   ${g.items.map(i => i.prop).join(', ')}  →  被 ${g.items[0].killer.file}:${g.items[0].killer.line} 覆盖`);
+    // 覆盖它的可能不止一条（每个选择器片段各自被不同的规则盖住），所以只说「被后面的规则」。
+    console.log(`   ${g.items.map(i => i.prop).join(', ')}  →  已被后面的同名规则覆盖`);
   }
   for (const k of deadKeyframes) {
     console.log(`\n[整块死] ${k.block.file}:${k.block.line}  @keyframes ${k.name}  →  被 ${k.survivor.file}:${k.survivor.line} 的同名定义替换`);

@@ -81,34 +81,8 @@
 .local-status i { background: var(--bold-ink); box-shadow: none; width: 5px; height: 5px; }
 
 /* ---------- 首屏标题 ---------- */
-.intro { padding: 26px 2px 30px; }
-.edition {
-  font: 600 10px/1 "Inter", sans-serif;
-  letter-spacing: 1.6px;
-  color: var(--bold-faint);
-  text-transform: uppercase;
-}
-.intro-title { margin-top: 18px; }
-.intro h1 {
-  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
-  font-size: 46px;
-  line-height: 1.14;
-  letter-spacing: -1.4px;
-  font-weight: 800;
-  color: var(--bold-ink);
-}
-.intro h1 em {
-  font-style: normal;
-  font-weight: 800;
-  color: var(--bold-ink);
-}
-.intro > p {
-  color: var(--bold-muted);
-  font-size: 13px;
-  letter-spacing: 0;
-  line-height: 1.7;
-  margin-top: 18px;
-}
+/* 2026-11-15 删：.intro / .edition / .intro-title 在源码里零引用（首屏那套大标题早换成了 masthead） */
+
 
 .view-tabs {
   position: relative;

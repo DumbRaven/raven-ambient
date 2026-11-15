@@ -203,13 +203,6 @@
 
 /* ---------- 右侧介绍 ---------- */
 .record-notes { padding-top: 14px; }
-.notes-eyebrow {
-  font: 700 9px/1 "Inter", sans-serif;
-  letter-spacing: 1.4px;
-  color: var(--bold-faint);
-  text-transform: uppercase;
-}
-.notes-eyebrow > span { font-size: 12px; }
 .notes-disc { display: none; }
 
 .record-type {

@@ -687,12 +687,6 @@
 /* 3. 乌鸦压住 pick by 那三行字。乌鸦再往右下挪、缩小，
    并且给它一个深色底托，别在浅色面板上糊成一团。 */
 
-/* 4. pick by 在面板左下角，和圆形/乌鸦都不碰 */
-.tpl-pick {
-  max-width: 40%;
-  font-size: 7.5px;
-}
-
 @media (max-width: 900px) {
   .media-theater .theater-templates > button {
     padding: 0 7px;

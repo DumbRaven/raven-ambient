@@ -82,15 +82,6 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 50%;
   box-shadow: 0 1px 4px #0000002e;
 }
-.dock-bottom input[type="range"] {
-  background: linear-gradient(to right, var(--bold-bg) 0 var(--fill), #ffffff2e var(--fill) 100%);
-}
-.dock-bottom input[type="range"]::-webkit-slider-thumb {
-  background: var(--bold-ink);
-  border-color: var(--bold-edge);
-  box-shadow: none;
-}
-
 /* ---------- 声音微调 ---------- */
 .sound-tweaks { border-top: 1px solid var(--bold-line); margin-top: 20px; padding-top: 14px; }
 .sound-tweaks summary {
@@ -117,23 +108,6 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .toggle.on { background: var(--bold-ink); }
 .toggle.on span { transform: translateX(18px); }
-
-/* ---------- 底部致谢 ---------- */
-.dedication { padding: 26px 0 18px; }
-.dedication > span:first-child {
-  font: 700 9px/1 "Inter", sans-serif;
-  letter-spacing: 1.6px;
-  color: var(--bold-faint);
-  text-transform: uppercase;
-}
-.dedication p {
-  font-family: "Inter", "Microsoft YaHei UI", sans-serif;
-  font-size: 12px;
-  letter-spacing: 0;
-  color: var(--bold-muted);
-  margin: 12px 0 14px;
-}
-.dedication-signature { font: 500 11px "Inter", sans-serif; color: var(--bold-faint); }
 
 /* ---------- 空状态 ---------- */
 .empty-cabinet { padding: 30px 4px 26px; }
@@ -268,12 +242,7 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--bold-ink);
 }
 .modal-close:not(:disabled):hover { background: var(--bold-ink); color: var(--bold-on-dark); border-color: var(--bold-ink); }
-.eyebrow {
-  font: 700 9px/1 "Inter", sans-serif;
-  letter-spacing: 1.5px;
-  color: var(--bold-faint);
-  text-transform: uppercase;
-}
+/* 2026-11-15 删：.eyebrow 在源码里零引用 */
 .modal h2 {
   font-family: "Inter", "Microsoft YaHei UI", sans-serif;
   font-size: 27px;
@@ -283,7 +252,7 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--bold-ink);
   margin-top: 14px;
 }
-.modal-lead { font-size: 12px; color: var(--bold-muted); margin-top: 8px; line-height: 1.7; }
+/* 2026-11-15 删：.modal-lead 在源码里零引用 */
 
 .import-types { gap: 12px; margin: 24px 0 20px; }
 .import-types button {

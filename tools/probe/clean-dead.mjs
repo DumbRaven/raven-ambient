@@ -146,24 +146,34 @@ const norm = s => s.replace(/\s+/g, ' ').trim();
  * 各删一次，删的是重叠的两段偏移，第二次删就会切错位置。
  */
 const inKeyframes = r => /^@keyframes\s/.test(r.media);
+/**
+ * 选择器按逗号拆开逐段比。
+ *
+ * 与 dead-decls.mjs 保持同一套判据：一条声明要算死，**每个**片段都得被后面的
+ * 规则重写。只比整串会漏掉「逗号组压单条」（collage.css 里那两条字号）；
+ * 只要求任一片段重叠又会误删（`.media-add, > button` 的 width 只有一支被重写，
+ * 删了按钮区就窄了）。
+ */
+const selParts = sel => sel.split(',').map(norm).filter(Boolean);
 /** key = `${file}:${line}` → { rule, props } */
 const deadProps = new Map();
 for (const rule of rules) {
   if (inKeyframes(rule)) continue;
+  const mine = selParts(rule.sel);
   for (const d of decls(rule.body)) {
-    for (const later of rules) {
-      if (later.pos <= rule.pos) continue;
-      if (inKeyframes(later)) continue;
-      if (later.media !== rule.media) continue;
-      if (norm(later.sel) !== norm(rule.sel)) continue;
-      const winner = decls(later.body).find(x => x.prop === d.prop);
-      if (!winner) continue;
-      if (d.important && !winner.important) continue;
-      const key = `${rule.file}:${rule.line}`;
-      if (!deadProps.has(key)) deadProps.set(key, { rule, props: new Set() });
-      deadProps.get(key).props.add(d.prop);
-      break;
-    }
+    const covered = mine.every(part =>
+      rules.some(later =>
+        later.pos > rule.pos
+        && !inKeyframes(later)
+        && later.media === rule.media
+        && selParts(later.sel).includes(part)
+        && decls(later.body).some(x => x.prop === d.prop && (!d.important || x.important)),
+      ),
+    );
+    if (!covered) continue;
+    const key = `${rule.file}:${rule.line}`;
+    if (!deadProps.has(key)) deadProps.set(key, { rule, props: new Set() });
+    deadProps.get(key).props.add(d.prop);
   }
 }
 

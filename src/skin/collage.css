@@ -5,33 +5,14 @@
   display: grid;
 }
 
-.template-collage .tpl-fields > div > b {
-  font-size: clamp(6px, 1.15vw, 8.5px);
-  letter-spacing: 0.16em;
-  font-weight: 400;
-  opacity: 0.72;
-}
-
 .template-collage .tpl-fields > div > span {
-  font-size: 2.2cqw;
-  font-style: italic;
   letter-spacing: 0.01em;
   opacity: 0.92;
   margin-top: 0.4cqw;
 }
 
-.template-collage .tpl-list > b {
-  font-size: clamp(6px, 1.15vw, 8.5px);
-  letter-spacing: 0.16em;
-  font-weight: 400;
-  opacity: 0.72;
-}
-
 .template-collage .tpl-list > span {
   margin-top: 0.25cqw;
-  font-size: 1.8cqw;
-  font-style: italic;
-  line-height: 1.55;
   opacity: 0.66;
   display: block;
   max-height: 5.4cqw;
@@ -73,14 +54,6 @@
    `> div:first-child > b` 多一个伪类、刚好压过它。
    所以这里只保留 gap。 */
 .media-room.is-expanded .template-collage .tpl-block-bar { gap: 1.1em; }
-
-@media (max-width: 760px) {
-
-}
-
-@media (prefers-reduced-motion: reduce) {
-
-}
 
 /* ---------- 放映：拼贴的尺寸全部按容器走 ---------- */
 

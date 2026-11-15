@@ -1535,90 +1535,6 @@
   color: var(--bold-muted);
 }
 
-/* 放大。这一版是「看一眼」的灯箱，不是放映器——模板和叠加元素接在这里。 */
-.media-stage {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: grid;
-  place-items: center;
-  padding: 4vmin;
-  background: #101010d9;
-  backdrop-filter: blur(10px);
-  animation: media-stage-in 200ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
-}
-
-.media-stage-inner {
-  display: flex;
-  flex-direction: column;
-  max-width: min(1100px, 92vw);
-  max-height: 88vh;
-  border-radius: 20px;
-  overflow: hidden;
-  background: var(--bold-ink);
-  box-shadow: 0 30px 90px #00000066;
-  animation: media-stage-rise 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
-}
-
-.media-stage-inner img,
-.media-stage-inner video {
-  display: block;
-  max-width: 100%;
-  max-height: calc(88vh - 48px);
-  object-fit: contain;
-}
-
-.media-stage-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 10px 10px 16px;
-  background: var(--bold-ink);
-}
-
-.media-stage-bar b {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--bold-on-dark);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.media-stage-bar .icon-button {
-  width: 30px;
-  height: 30px;
-  flex: none;
-  border: 0;
-  background: #ffffff1a;
-  color: var(--bold-on-dark);
-}
-
-.media-stage-bar .icon-button:hover {
-  background: #ffffff2e;
-  color: var(--bold-on-dark);
-}
-
-@keyframes media-stage-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes media-stage-rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
 
 @media (max-width: 599px) {
   .media-sources {
@@ -1632,10 +1548,9 @@
 }
 
 @media (max-width: 440px) {
-  /* 极窄时两列会窄到票根里那行日期换行，退回一列。 */
-  .ticket-grid {
-    --ticket-min: 100%;
-  }
+  /* 这里原本有一条 `.ticket-grid { --ticket-min: 100% }`，想表达「极窄时退回一列」。
+     但网格早就是 `grid-template-columns: minmax(0, 1fr)` 单列了（见 :164），
+     而 --ticket-min 全库没有任何地方消费——2026-11-15 删掉。 */
 
   .media-empty {
     padding: 44px 8px 52px;
@@ -1643,20 +1558,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ticket,
-  .ticket-stub,
-  .ticket-body {
-    transition: none;
-  }
 
   /* 关了动效就别再飘那一下，存根直接消失——MediaTickets 那边
      连 300ms 都不等，这里只防它原地闪一帧。 */
   .is-tearing .ticket-stub {
-    animation-duration: 1ms;
-  }
-
-  .media-stage,
-  .media-stage-inner {
     animation-duration: 1ms;
   }
 }

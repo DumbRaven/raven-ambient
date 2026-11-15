@@ -119,44 +119,11 @@
 .tpl-dot-bl { bottom: 10px; left: 10px; }
 .tpl-dot-br { bottom: 10px; right: 10px; }
 
-/* with + 三个平台 + 三个小图标 */
-.tpl-with {
-  margin: 16px 0 0;
-  display: grid;
-  gap: 1px;
-  font-size: 8.5px;
-  line-height: 1.45;
-  opacity: 0.72;
-}
-
-/* 窗口态下这块只有 220px 宽，8.5px 已经到可读下限；
-   再小就只剩灰点，看不出是字。 */
-
-.tpl-with i { font-style: normal; }
-.tpl-with em {
-  display: block;
-  font-style: normal;
-  letter-spacing: 0.26em;
-  margin-top: 4px;
-  opacity: 0.8;
-}
-
 /* pick by vanilla soda：左对齐小字，靠底部但不贴边——右下角要留给彩胶。 */
 /* 圆压在面板下半截，pick by 只能缩在它左侧那一窄条里。
    原版就是这么处理的——字很轻，压在画面边上，不抢圆。 */
 /* 圆从面板 48% 高度起、往左下伸出 -10%，所以左下这块只有很窄一条安全区。
    pick by 缩在那一窄条里，字很小、很轻，压在画面边上，不抢圆。 */
-/* 紧跟在 with 下面，不是被推到面板底部——原版就是一路排下来的，
-   底部那大片空白是留给彩胶的。 */
-.tpl-pick {
-  margin: 26px 0 0;
-  width: auto;
-  line-height: 1.55;
-  opacity: 0.72;
-  position: relative;
-  z-index: 6;
-}
-
 /* 星的位置统一在文件末尾那套 `.template-collage .tpl-star-*` 里定义。
    这里原来是 px 写法（`top: 42px; right: 6px`），非 collage 版式用不上，
    而 collage 版式下它会被末尾那套按实测换来的百分比覆盖，属于死规则。 */
@@ -290,8 +257,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .template-collage .tpl-disc { animation: none; }
-  .template-collage .tpl-disc::after { animation: none; }
+  
+  
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -642,18 +609,6 @@
   }
 }
 
-.media-room.is-expanded .tpl-note { font-size: 15px; margin-top: 26px; }
-.media-room.is-expanded .tpl-with {
-  font-size: 14px;
-  margin-top: 26px;
-}
-.media-room.is-expanded .tpl-with em { font-size: 14px; margin-top: 8px; }
-
-.media-room.is-expanded .tpl-pick {
-  font-size: 13px;
-  width: 22%;
-  max-width: 42%;
-}
 .media-room.is-expanded .tpl-fields b,
 .media-room.is-expanded .tpl-list b { font-size: 13px; }
 .media-room.is-expanded .tpl-fields span { font-size: 17px; max-width: 30ch; }

@@ -31,21 +31,6 @@ body:has(.media-room.is-expanded) {
   overflow: hidden;
 }
 
-.theater-screen .theater-live {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* 全屏时铺满，不留黑边。壁纸和屏幕通常都是 16:9，差值很小；
-   宁可裁掉几个像素也不要上下两条黑带。 */
-.media-room.is-expanded .theater-screen .theater-live {
-  object-fit: cover;
-}
-
 /* ---------- 放映：场景壁纸 ---------- */
 
 /* 场景壁纸只有一张正方形的小预览图（实测 192×192 到 300×300），
@@ -382,19 +367,6 @@ body:has(.media-room.is-expanded) {
 .media-theater.is-blank .theater-screen {
   display: grid;
   place-items: center;
-}
-
-.theater-blank {
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  color: var(--bold-muted);
-}
-
-.theater-blank p {
-  margin: 0;
-  font-size: 12px;
-  letter-spacing: 0.02em;
 }
 
 /* 窄屏：工具栏只剩分类胶囊一行，胶囊铺满（见上文 599px 那条）。 */

@@ -19,14 +19,6 @@
   overflow: hidden;
 }
 .turntable::before { display: none; }
-.turntable-label {
-  top: 22px;
-  left: 26px;
-  font: 700 9px/1 "Inter", sans-serif;
-  letter-spacing: 1.5px;
-  color: #ffffff5c;
-  text-transform: uppercase;
-}
 .platter {
   left: 8%;
   top: 17%;
@@ -159,20 +151,6 @@
   padding: 26px 22px 26px;
 }
 .focus-head { margin-bottom: 4px; }
-.focus-head > .notes-eyebrow {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font: 700 10px/1 "Inter", sans-serif;
-  letter-spacing: 1.4px;
-  color: var(--bold-faint);
-  text-transform: uppercase;
-}
-.focus-head > .notes-eyebrow > span {
-  font: 700 10px/1 "Inter", sans-serif;
-  letter-spacing: .6px;
-  color: var(--bold-ink);
-}
 .focus-mode {
   font: 700 9px/1 "Inter", sans-serif;
   letter-spacing: 1.4px;
@@ -189,12 +167,6 @@
 .focus-progress { stroke: var(--bold-ink); stroke-width: 10; stroke-linecap: round; }
 .focus-dial.is-break .focus-progress { stroke: var(--bold-lilac); }
 
-.focus-phase {
-  font: 700 10px/1 "Inter", sans-serif;
-  letter-spacing: 2px;
-  color: var(--bold-faint);
-  text-transform: uppercase;
-}
 .focus-time {
   font-family: "Inter", "Segoe UI", sans-serif;
   font-size: 62px;
@@ -303,9 +275,6 @@
 @media (max-width: 599px) {
   .portrait-shell { padding: 0 20px 80px; }
   .masthead { height: 72px; }
-  .intro { padding-top: 20px; }
-  .intro h1 { font-size: 38px; letter-spacing: -1.2px; }
-  .edition { font-size: 9px; letter-spacing: 1.3px; }
   .brand > span { font-size: 14px; }
   
   .view-tabs > button { font-size: 11px; }
@@ -317,7 +286,6 @@
   .record-name { font-size: 12px; }
   .record-notes h2 { font-size: 21px; }
   .record-description { font-size: 11px; }
-  .dock-record strong { max-width: 150px; font-size: 12px; }
   .main-play { width: 42px; height: 42px; }
   .transport .icon-button, .order-button, .channel-button { width: 30px; height: 30px; }
   .turntable { aspect-ratio: 1.5; }
@@ -329,8 +297,6 @@
 
 @media (max-width: 440px) {
   .portrait-shell { padding-left: 16px; padding-right: 16px; }
-  .intro h1 { font-size: 34px; }
-  .intro > p { font-size: 12px; }
   .view-tabs { width: 100%; justify-content: space-between; }
   .view-tabs > button { padding: 8px 10px; font-size: 10px; }
   .cabinet-layout { grid-template-columns: 1fr; gap: 26px; }
@@ -342,7 +308,6 @@
   .record-notes { border-top: 1px solid var(--bold-line); padding-top: 22px; display: block; }
   .record-notes > .fine-rule { display: none; }
   .notes-disc { display: none; }
-  .dock-record strong { max-width: 128px; font-size: 11px; }
   .main-play { width: 40px; height: 40px; }
   .transport { gap: 0; }
   .transport .icon-button, .order-button, .channel-button { width: 28px; height: 28px; }
