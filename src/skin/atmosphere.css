@@ -41,17 +41,28 @@
   inset: -10px -14px;
   border: 1px dashed #ffffff00;
   border-radius: 10px;
+  /* 只给 border-color 做过渡。这圈虚线画在用户自选的壁纸上（可能是照片），
+     色号深浅两头都可能；光晕用 filter 挂上去，颜色本身照旧过渡。 */
   transition: border-color 160ms ease;
 }
 
+/* 这圈虚线画在用户自选的壁纸上，底色深浅两头都可能。
+ *
+ * 只写白色是不行的：浅色壁纸（比如 #f6f2ea）上白虚线合成完是 #fcfaf8，
+ * 对比度 1.07，等于没画。只写深色也不行——深色壁纸上同样看不见。
+ * 换颜色号救不了这种「两头都可能」的情况，所以给虚线加一圈深色投影：
+ * 白色虚线本体在深色壁纸上可辨，深色光晕在浅色壁纸上可辨，任何壁纸下都至少有一条。
+ * （票面上的金色文字用的是同一招——`-webkit-text-stroke` 描边。） */
 .overlay:hover::after {
   border-color: #ffffff5c;
+  filter: drop-shadow(0 0 1px #10101099);
 }
 
-/* 键盘停在这块上：复用悬停那圈虚线，只是更亮。
+/* 键盘停在这块上：复用悬停那圈虚线，只是更亮、光晕更实。
    （重画一个有边框的兄弟节点会改变元素尺寸，而这几块的位置是百分比定位的。） */
 .overlay:focus-visible::after {
-  border-color: #ffffffa6;
+  border-color: #ffffffd9;
+  filter: drop-shadow(0 0 1.5px #101010cc);
 }
 
 .overlay.is-dragging::after {

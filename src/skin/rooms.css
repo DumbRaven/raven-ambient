@@ -298,7 +298,10 @@
 @media (max-width: 440px) {
   .portrait-shell { padding-left: 16px; padding-right: 16px; }
   .view-tabs { width: 100%; justify-content: space-between; }
-  .view-tabs > button { padding: 8px 10px; font-size: 10px; }
+  /* 这里曾经有 `.view-tabs > button { padding: 8px 10px; ... }`——
+     它永远输给 modern.css 里 599 断点的那条 8px 8px（同特异性、更晚加载），
+     10px 从 v0.3.0 起就没生效过。真正生效的规则只留一处。 */
+  .view-tabs > button { font-size: 10px; }
   .cabinet-layout { grid-template-columns: 1fr; gap: 26px; }
   /* .record-grid 的窄屏间距搬到 modern.css 了：它在这条更早加载的文件里
      会被 modern.css 的基础规则整条压掉，等于没写。 */
@@ -322,6 +325,7 @@
 @media (hover: none) {
   .record-card[data-flip="open"] .case-front { transform: rotateY(-65deg); opacity: .9; }
   .record-card[data-flip="closed"] .case-front { transform: none !important; }
-  .record-card.inspected .disc-pocket { transform: translateX(17%); }
-  .record-card.inspected .record-case { transform: rotate(-3deg); }
+  /* 触屏的展开走的是 data-flip（上面两条），不是 inspected：
+     `inspected` 在 src/** 里零引用（RecordCard.tsx 只输出 selected 和 data-flip），
+     这条规则从写下来那天起就没命中过——原版 styles.css 里那条同样零引用。 */
 }

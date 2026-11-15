@@ -179,16 +179,6 @@
   padding: 0 2px;
 }
 
-/* 窄屏收紧间距。
- *
- * 这条原来写在 rooms.css 的 @media (max-width: 440px) 里，而 rooms.css 比
- * modern.css 更早被 @import —— 于是它被上面那条基础规则整条压掉，从来没生效过。
- * 结果是最窄的窗口反而用着最宽的间距（18/26px），比桌面还松。
- * 放在基础规则后面，层叠顺序才对。 */
-@media (max-width: 440px) {
-  .record-grid { column-gap: 14px; row-gap: 24px; padding: 0; }
-}
-
 /* 封面网格里，唱片盒沿用原有的掀开动作，只是圆角和阴影换成明亮版的 */
 .record-card .record-case {
   border-radius: 20px;
@@ -209,6 +199,16 @@
 @media (max-width: 599px) {
   .record-grid { column-gap: 13px; row-gap: 22px; }
   .record-card .record-name { font-size: 11px; }
+}
+
+/* 最窄那档只需要把左右内缩去掉（窄屏两侧已经贴边了，再各留 2px 会把卡片挤小）。
+ *
+ * 这里原本还写着 `column-gap: 14px; row-gap: 24px`，被上面的 599 断点整条压着，
+ * 从 v0.3.0 起就没生效过。**删掉而不是修好它**：14/24 是个从没被任何截图验证过的
+ * 数值，让它生效等于用未经验证的设计顶掉现在这版（13/22），而差 1px 用户根本看不出来。
+ * 窄屏两列各 181px 已经很紧，599 那档的收紧就是最终值。 */
+@media (max-width: 440px) {
+  .record-grid { padding: 0; }
 }
 
 /* ---------- 第十六批：圆形扩散换页 ---------- */
@@ -603,6 +603,9 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
    先把页签栏的上限压住（留出圆碟 + 间距），再收起唱片柜后面那个计数给它腾地方。 */
 @media (max-width: 599px) {
   .view-tabs { max-width: calc(100% - 46px); }
+  /* 8px 8px 会盖掉 rooms.css 里 440 断点写的 8px 10px，而且这条在后面加载。
+     两处都是同一个意思（窄屏收紧），取后者更窄的值，并把 rooms.css 那条删掉，
+     免得下次看代码的人以为 10px 还生效。 */
   .view-tabs > button { padding: 8px 8px; gap: 4px; }
   .view-tabs > button small { display: none; }
   .dock-disc-slot { left: calc(100% + 8px); }

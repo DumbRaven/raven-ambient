@@ -194,17 +194,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 循环：开着的时候是白字，关掉压暗，一眼能看出状态 */
-/* 2026-11-15：.theater-loop 在 TSX 里零命中（按钮已改成 .theater-modes 那一套），
-   这三条连同 !important 一起是空转的。先留着，等确认没有动态添加的地方再删。 */
-.theater-loop {
-  color: #ffffff66;
-}
-
-.theater-loop.on {
-  background: #ffffff2e;
-  color: var(--bold-on-dark);
-}
 
 @media (max-width: 599px) {
   .media-theater {
@@ -382,14 +371,12 @@
 }
 
 .media-room.is-expanded .theater-controls .icon-button,
-.media-room.is-expanded .theater-loop,
 .media-room.is-expanded .theater-expand {
   color: var(--bold-bg);
   border-color: #ffffff2e;
   background: #ffffff14;
 }
 
-.media-room.is-expanded .theater-loop.on,
 .media-room.is-expanded .theater-expand[aria-pressed="true"] {
   background: var(--bold-bg);
   border-color: var(--bold-bg);

@@ -33,7 +33,7 @@ import SettingsModal from './SettingsModal';
 import ImportModal from './ImportModal';
 import EditModal from './EditModal';
 
-const emptyStatus: RoomStatus = { running: false, playing: false, musicPlaying: false, ducked: false, level: 0, currentTime: 0, duration: 0, musicOn: true, ambientOn: true, lineInput: 0, lineLive: false };
+const emptyStatus: RoomStatus = { running: false, playing: false, musicPlaying: false, ducked: false, level: 0, currentTime: 0, duration: 0, musicOn: true, ambientOn: true, lineInput: 0, lineLive: false, ambientIds: [] };
 type Modal = 'import' | 'settings' | 'edit' | 'guide' | null;
 function message(error: unknown) { return error instanceof Error ? error.message : '没有完成，请重试。'; }
 // 大标题与右上角那个计数都跟着当前空间走。放在一张表里，
@@ -48,6 +48,8 @@ export default function App() {
   // 收藏整份读不出来时为 true：界面照常开，但保存是锁着的，
   // 得先让用户决定「恢复原文件」还是「就从空柜开始」，见下面的恢复条。
   const [salvage, setSalvage] = useState(false);
+  /** 读坏的具体原因。告不告诉人和「备份成没成功」是两件事，所以另存一个字段。 */
+  const [salvageReason, setSalvageReason] = useState('');
   const [status, setStatus] = useState<RoomStatus>(emptyStatus);
   const player = useRef<RoomPlayer | null>(null);
   const [view, setView] = useState<'cabinet' | 'listening' | 'focus' | 'media'>('cabinet');
@@ -364,7 +366,10 @@ export default function App() {
 
   const artFor = (record: RecordItem) => pickSleeve(record.id, launchSeed);
   const selected = (record: RecordItem) => (record.category === 'music' ? cabinet.queue : cabinet.ambience).includes(record.id);
-  const isPlaying = (record: RecordItem) => status.running && (record.category === 'music' ? status.musicPlaying && status.currentId === record.id : status.playing && cabinet.ambience.includes(record.id));
+  // 「这一张在响吗」不能只看 status.playing：那是引擎级语义（任意一路在响就算），
+  // 三张环境音坏了一张时它仍是 true，那张坏掉的封套照样转、队列里照样写「循环叠加」，
+  // 用户会以为它在响、只是听不见。环境音这条按 ambientIds 逐张判。
+  const isPlaying = (record: RecordItem) => status.running && (record.category === 'music' ? status.musicPlaying && status.currentId === record.id : status.ambientIds.includes(record.id));
 
   function commit(next: Cabinet) {
     try { cabinetStorage.current.save(next); cabinetRef.current = next; setCabinet(next); player.current?.update(next); }
@@ -472,7 +477,12 @@ export default function App() {
         // 读坏和「丢了一两条」是两种严重程度，处理也不该一样：
         //   丢几条——自动跳过，一句话说清，然后照常用；
         //   整份读不出来——空柜摆在这儿，但保存是锁着的，等用户决定。
-        if (loaded.broken) setSalvage(loaded.salvage);
+        //
+        // 注意这里**不能**写成 `setSalvage(loaded.salvage)`：
+        // 那个字段的意思是「备份有没有写成」，一旦备份失败（配额满、隐私模式）
+        // 横幅就跟着不出现了——而备份失败恰恰是最需要告诉用户「你现在别乱动」的时候。
+        // 备份成不成功是给「能不能还原」用的，不是用来决定「告不告诉人」的。
+        if (loaded.broken) { setSalvage(true); setSalvageReason(loaded.reason); }
         else if (loaded.lost > 0) notify(`有 ${loaded.lost} 张唱片的数据不完整，已跳过；其余照常。`);
         player.current = new RoomPlayer(saved, state => { if (active) setStatus(state); }, error => { if (active) notify(message(error)); });
         const image = await readAsset('background'); if (!active) return;
@@ -569,12 +579,20 @@ export default function App() {
     // 磁盘满的时候，二十个文件会依次在同一处失败，全照实列出就是二十行
     // 一模一样的「空间不足」——用户看不到「这其实是同一个问题」。
     // 相同文案合并成一条，后面挂个次数。
-    const seen = new Map<string, number>();
+    //
+    // 索引必须和计数一起记下来。曾经写成「第二次把元素替换成带后缀的文案、
+    // 第三次再用 findIndex 找原文」——第三次就已经找不到（元素变了），
+    // 于是写到 errors[-1] 上，20 个文件永远只显示「共 2 次」。
+    const seen = new Map<string, { count: number; at: number }>();
     const pushError = (text: string) => {
-      const count = (seen.get(text) ?? 0) + 1;
-      seen.set(text, count);
-      if (count === 1) errors.push(text);
-      else errors[errors.findIndex(item => item === text)] = `${text}（共 ${count} 次）`;
+      const hit = seen.get(text);
+      if (!hit) {
+        seen.set(text, { count: 1, at: errors.length });
+        errors.push(text);
+        return;
+      }
+      hit.count += 1;
+      errors[hit.at] = `${text}（共 ${hit.count} 次）`;
     };
     let added = 0, duplicates = 0, unmatched = 0;
     try {
@@ -587,7 +605,17 @@ export default function App() {
           cabinetStorage.current.assertWritable();
           await storeAsset(record.assetId, file);
           if (cover && record.coverId) await storeAsset(record.coverId, cover);
-          commit({ ...cabinetRef.current, records: [...cabinetRef.current.records, record] });
+          try {
+            commit({ ...cabinetRef.current, records: [...cabinetRef.current.records, record] });
+          } catch (error) {
+            // 资产已经写进 IndexedDB 了，但 cabinet 里没有这条记录——
+            // 不收拾的话它就是永久孤儿：没人引用、没人删，一直吃配额。
+            // 攒够了之后连正常保存都开始失败，用户看到的是「软件突然什么都存不进去了」。
+            // 所以这一步失败必须把刚写进去的资产撤回。
+            await storeAsset(record.assetId).catch(() => undefined);
+            if (record.coverId) await storeAsset(record.coverId).catch(() => undefined);
+            throw error;
+          }
           if (record.coverId) await loadCover(record.id, record.coverId);
           known.add(record.fingerprint); added++; setFocusId(record.id);
           if (record.category === 'ambient' && !record.coverId && !record.coverPreset) unmatched++;
@@ -608,9 +636,18 @@ export default function App() {
     try {
       const { blob, color } = await prepareImage(file);
       cabinetStorage.current.assertWritable();
-      const id = forCover ? `cover-${record!.id}` : 'background'; await storeAsset(id, blob);
-      if (forCover) { editRecord(record!.id, { coverId: id, coverPreset: undefined, color }); await loadCover(record!.id, id); }
-      else { const previous = urls.current.get('background'); if (previous) URL.revokeObjectURL(previous); const url = URL.createObjectURL(blob); urls.current.set('background', url); setBackground(url); change({ theme: color, imageName: file.name }); }
+      const id = forCover ? `cover-${record!.id}` : 'background';
+      // 先把文本落盘，再写资产。反过来的话，文本保存失败（配额满、快照过期）
+      // 会留下「档案里有这张封面/背景的名字、资产却是刚写进去又没人认领」的半截状态。
+      // 封面那条走 editRecord → change（吞异常），所以这里单独用 commit 确认能写。
+      if (forCover) commit({ ...cabinetRef.current, records: cabinetRef.current.records.map(r => r.id === record!.id ? { ...r, coverId: id, coverPreset: undefined, color } : r) });
+      else commit({ ...cabinetRef.current, theme: color, imageName: file.name });
+      await storeAsset(id, blob);
+      if (forCover) await loadCover(record!.id, id);
+      else {
+        const previous = urls.current.get('background'); if (previous) URL.revokeObjectURL(previous);
+        const url = URL.createObjectURL(blob); urls.current.set('background', url); setBackground(url);
+      }
       notify(forCover ? '唱片换上了新的封面。' : '空间已染上这张照片的色彩。');
     } catch (error) { notify(message(error)); } finally { busyRef.current = false; setBusy(''); }
   }
@@ -709,7 +746,23 @@ export default function App() {
     // Remove only the catalog entry; preserve the stored asset and source file.
     try { commit(removeRecord(cabinetRef.current, record.id)); setFocusId(undefined); setModal(null); notify('已从唱片柜移除，源文件不受影响。'); } catch { /* notice already shown */ }
   }
-  async function clearBackground() { try { cabinetStorage.current.assertWritable(); await storeAsset('background'); const url = urls.current.get('background'); if (url) URL.revokeObjectURL(url); urls.current.delete('background'); setBackground(''); change({ theme: emptyCabinet.theme, imageName: '' }); } catch (error) { notify(message(error)); } }
+  async function clearBackground() {
+    try {
+      cabinetStorage.current.assertWritable();
+      // 顺序反了会留下半截状态：先删资产、再存文本，如果存文本失败（配额满、
+      // 快照过期），图没了但 imageName 还留着，下次保存就把「有名字没图」写进存档。
+      // 所以先落文本，再动资产——文本成了之后资产删不干净最多是多占一点空间。
+      //
+      // 这里必须用会抛异常的 commit，不能用 change：change 把异常吞了，
+      // 吞掉之后代码会继续往下删资产，等于又走回了「图没了、名字还在」。
+      commit({ ...cabinetRef.current, theme: emptyCabinet.theme, imageName: '' });
+      await storeAsset('background');
+      const url = urls.current.get('background');
+      if (url) URL.revokeObjectURL(url);
+      urls.current.delete('background');
+      setBackground('');
+    } catch (error) { notify(message(error)); }
+  }
   return <div className={`app ${background ? 'has-scenery' : ''}`} style={{ '--accent': cabinet.theme, '--scenery': background ? `url("${background}")` : 'none' } as CSSProperties}>
     <input ref={filesInput} type="file" multiple accept="audio/*,.flac,.ogg,.wav,.mp3,.m4a" className="hidden" aria-label="选择本地音频文件" onChange={importFiles} />
     <input ref={folderInput} type="file" multiple {...{ webkitdirectory: '', directory: '' }} className="hidden" aria-label="选择本地音频文件夹" onChange={importFiles} />
@@ -719,15 +772,22 @@ export default function App() {
     <div className="portrait-shell">
       {salvage && (
         <div className="salvage-bar" role="alert">
-          <p>收藏读不出来，保存已暂停——先别急着加东西，不然空柜会盖掉原来那份。</p>
+          <p>
+            {salvageReason ? `${salvageReason}，` : '收藏读不出来，'}保存已暂停——先别急着加东西，不然空柜会盖掉原来那份。
+          </p>
           <div className="salvage-actions">
             <button type="button" className="text-button" onClick={() => {
               // 备份写回主键，然后整页重载从它重新读——比在这里手工重建
               // 播放器、封面、外部音乐那套状态安全得多。
-              if (restoreSalvage()) location.reload();
+              // 传的是**本组件正在用的实例**，不是模块单例：那个单例从来没人写盘，
+              // 解它等于没解（见 cabinet-storage.ts 底部注释）。
+              if (restoreSalvage(cabinetStorage.current)) location.reload();
+              else notify('备份读不出来了，没法还原。你可以先另存一份数据再决定。');
             }}>恢复原文件</button>
             <button type="button" className="text-button" onClick={() => {
-              adoptEmptyCabinet(); setSalvage(false);
+              // 同上：必须解当前实例的锁，否则横幅消失、保存照样失败。
+              adoptEmptyCabinet(cabinetStorage.current);
+              setSalvage(false);
             }}>不要了，从空柜开始</button>
           </div>
         </div>

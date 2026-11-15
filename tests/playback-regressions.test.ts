@@ -320,6 +320,14 @@ test('一张环境音解码失败，不该把其它环境音一起停掉', async
 
   // 坏掉的那条要让人知道，不能静默消失
   assert.equal(errors.length, 1, '有一条起不来就要报一次');
+
+  // 而且「谁在响」必须是逐张的。只报一个引擎级的 playing 不够：
+  // 界面上三张的封套都会转，坏了的那张看着也在响，只是听不见。
+  assert.deepEqual(
+    [...status.ambientIds].sort(),
+    ['rain', 'rain3'],
+    '只报真正起了声部的那几张，坏掉的那张不能算在响',
+  );
 });
 
 test('环境音一条都起不来时才算失败：整段停掉并报错', async t => {
@@ -339,4 +347,10 @@ test('环境音一条都起不来时才算失败：整段停掉并报错', async
 
   assert.equal(status.playing, false, '一条都没起来，就是没声音');
   assert.equal(errors.length, 1);
+
+  // 而且总开关要跟着下来。留着一句「正在播放」而满屏没声音，
+  // 用户下一步一定是去按那个播放键——而 running 还是 true 的时候，
+  // 那个键走的是 pause()，按下去等于把已经起不来的环境音又停一遍，
+  // 屏幕纹丝不动。用户只能反复按，怎么都回不到能播的状态。
+  assert.equal(status.running, false, '一条都没响，就不该还挂着「正在播放」');
 });

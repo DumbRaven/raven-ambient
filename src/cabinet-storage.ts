@@ -12,6 +12,15 @@ const KEY = 'raven-cabinet-v2', LEGACY_KEY = 'raven-settings';
  * 不是「再也找不回来的那几条」。
  */
 const SALVAGE_KEY = 'raven-cabinet-v2-unreadable';
+/**
+ * 上一次「恢复原文件」写回去的是哪份文本。
+ *
+ * 恢复操作是把备份的原文写回主键，而那份原文本来就是读不出来的——
+ * 写回去之后重载必然再次进 broken 分支。没有这个标记的话，
+ * 用户会「点恢复 → 重载 → 横幅又出现 → 再点恢复」无限转，
+ * 而另一个按钮（从空柜开始）才是他真正该走的路。
+ */
+const RESTORED_KEY = 'raven-cabinet-v2-restored';
 
 export class CabinetWriteError extends Error {}
 
@@ -35,6 +44,13 @@ export type CabinetLoad = {
   reason: string;
   /** 读坏时有没有留下备份（`restoreSalvage()` 能把原文拿回来）。 */
   salvage: boolean;
+  /**
+   * 这份坏掉的原文之前已经点过一次「恢复原文件」并且仍然读不出来。
+   *
+   * 为 true 时界面只该给「不要了，从空柜开始」——把一条注定失败的按钮
+   * 摆在那里，用户只会一遍遍点它、一遍遍看同一个横幅。
+   */
+  retried: boolean;
 };
 
 /** 每个窗口持有自己的读取快照；读失败或快照已过期时，绝不覆盖原文。 */
@@ -64,7 +80,10 @@ export class CabinetStorage {
       }
     } catch (error) {
       broken = true;
-      reason = error instanceof Error ? error.message : String(error);
+      // 不把 JSON.parse 的原文递出去：那是给开发者看的英文，用户读到
+      // 「Unexpected end of JSON input」除了慌之外没有别的用处。
+      // 但仍然要能区分「就是坏了」和「版本不认识」——两者的正确操作完全不同。
+      reason = error instanceof RangeError ? '收藏数据太大' : '收藏文件损坏';
       parsed = null;
     }
 
@@ -82,7 +101,11 @@ export class CabinetStorage {
         // 调一下音量，空柜就把主键盖掉了。所以改成：备份照旧做（用户想恢复时
         // 有东西可恢复），但锁住保存，把「要不要拿空柜重开」交给人。
         const salvaged = this.salvage(current);
-        return { cabinet: structuredClone(emptyCabinet), lost: 0, broken: true, reason, salvage: salvaged };
+        // retried 告诉界面：这份原文已经试过一次「恢复原文件」而且仍然读不出来。
+        // 备份没写成时也照样报 retried=false，界面会给出「恢复原文件」——
+        // 那条路能不能走通由 restore() 的返回值决定，不再由「备份成没成」决定要不要显示横幅。
+        const retried = this.alreadyRestored(current);
+        return { cabinet: structuredClone(emptyCabinet), lost: 0, broken: true, reason, salvage: salvaged, retried };
       }
 
       // 只是个别唱片坏掉：直接放行。用户损失的是一两条，不值得为它弹窗，
@@ -92,7 +115,7 @@ export class CabinetStorage {
       this.writable = true;
       this.snapshot = current;
       this.overwriteOnce = false;
-      return { cabinet, lost, broken: false, reason: '', salvage: lost > 0 };
+      return { cabinet, lost, broken: false, reason: '', salvage: lost > 0, retried: false };
     }
 
     // 没有 v2 数据，试试 v0.1 的老结构。
@@ -101,15 +124,17 @@ export class CabinetStorage {
       this.writable = true;
       this.snapshot = current;
       this.overwriteOnce = false;
-      return { cabinet, lost: 0, broken: false, reason: '', salvage: false };
+      return { cabinet, lost: 0, broken: false, reason: '', salvage: false, retried: false };
     } catch (error) {
       const salvaged = this.salvage(legacy ?? '');
       return {
         cabinet: structuredClone(emptyCabinet),
         lost: 0,
         broken: true,
-        reason: error instanceof Error ? error.message : String(error),
+        // 老结构的错误信息同样不该原样丢给用户看。
+        reason: error instanceof Error ? '旧版收藏数据读不出来' : '旧版收藏数据读不出来',
         salvage: salvaged,
+        retried: false,
       };
     }
   }
@@ -129,18 +154,34 @@ export class CabinetStorage {
    *
    * 这是「已备份」这句承诺的兑现入口：只有用户明确点了「恢复原文件」才调用它。
    * 写完把当前窗口置为不可写，避免这个窗口的快照跟主键对不上后把人锁在外面。
+   *
+   * 注意这条路**天生可能无效**：备份的就是那份读不出来的原文，写回去大概率
+   * 还是读不出来。所以这里记一笔「这份原文已经试过恢复了」，下次 load 看到
+   * 同样的文本就不再给这个按钮——否则用户会「点恢复 → 重载 → 横幅又出现 →
+   * 再点恢复」，转到他自己放弃为止。
    */
   restore(): boolean {
     const text = getText(SALVAGE_KEY);
     if (text === null) return false;
     try {
       setText(KEY, text);
+      setText(RESTORED_KEY, text);
     } catch {
       return false;
     }
     this.writable = false;
     this.overwriteOnce = false;
     return true;
+  }
+
+  /**
+   * 这份读不出来的原文之前是不是已经点过「恢复原文件」了。
+   *
+   * 用来让界面第二次只给「不要了，从空柜开始」，不再拿一条注定失败的按钮骗人。
+   */
+  alreadyRestored(current: string | null): boolean {
+    if (current === null) return false;
+    return getText(RESTORED_KEY) === current;
   }
 
   /**
@@ -178,13 +219,17 @@ export class CabinetStorage {
   }
 }
 
-const storage = new CabinetStorage();
-export function saveCabinet(cabinet: Cabinet) { storage.save(cabinet); }
-export function loadCabinet() { return storage.load(); }
-/** 把读坏时留下的备份写回主键。只有用户明确要求时才该调用。 */
-export function restoreSalvage() { return storage.restore(); }
-/** 用户决定放弃那份读坏的数据，从这个空柜开始。 */
-export function adoptEmptyCabinet() { return storage.adoptEmpty(); }
+/**
+ * 把读坏时留下的备份写回主键。只有用户明确要求时才该调用。
+ *
+ * 参数必须是**调用方自己正在用的那个实例**——这个文件底部曾经有一个模块级
+ * 单例供这些函数用，但 App 每次启动都会 `new CabinetStorage()`，两者不是同一个
+ * 对象，于是 `adoptEmpty()` 解的是别人的锁：横幅消失了，保存却照样失败，
+ * 用户点「不要了，从空柜开始」等于没点。所以这里把实例改成必填参数。
+ */
+export function restoreSalvage(storage: CabinetStorage) { return storage.restore(); }
+/** 用户决定放弃那份读坏的数据，从这个空柜开始。同样必须传当前实例。 */
+export function adoptEmptyCabinet(storage: CabinetStorage) { return storage.adoptEmpty(); }
 export const SALVAGE = SALVAGE_KEY;
 
 type LegacyShape = {

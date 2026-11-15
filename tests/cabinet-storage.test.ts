@@ -84,6 +84,44 @@ test('读坏之后，用户也可以选择放弃那份数据从空柜开始', as
   assert.equal(JSON.parse(text.get(KEY)!).master, 7);
 });
 
+test('恢复原文件之后，重载会认出「这份已经试过了」', async () => {
+  const { text } = memory(), session = new CabinetStorage();
+  const broken = '{"version":2,"records":[{"id":"x"';
+  text.set(KEY, broken);
+  assert.equal((await session.load()).retried, false, '第一次不该说人家试过了');
+  session.restore();
+  // 恢复就是把那份读不出来的原文写回主键，所以重载之后必然还是坏的——
+  // 这是这条路径的本质，不是 bug。界面要靠 retried 认出「别再给同一个按钮」。
+  const again = new CabinetStorage();
+  const loaded = await again.load();
+  assert.ok(loaded.broken);
+  assert.equal(loaded.retried, true, '第二次必须知道这条路已经走过，否则用户会一直点下去');
+});
+
+test('换一份新的坏数据，retried 要重新算', async () => {
+  const { text } = memory(), session = new CabinetStorage();
+  text.set(KEY, '{"version":2,"records":[{"id":"x"');
+  await session.load();
+  session.restore();
+  // 用户用别的办法换了一份坏数据（比如从旧机器拷过来）
+  const other = '{"version":2,"records":[{"id":"y"';
+  text.set(KEY, other);
+  const loaded = await new CabinetStorage().load();
+  assert.equal(loaded.retried, false, '文本不是同一份，不该继承上一次的判断');
+});
+
+test('读坏的原因要说人话，不能把 JSON.parse 的英文原文丢给用户', async () => {
+  const { text } = memory(), session = new CabinetStorage();
+  text.set(KEY, '{"version":2,"records":[{"id":"x"');
+  const loaded = await session.load();
+  assert.equal(loaded.reason, '收藏文件损坏');
+  // 版本不认识是另一回事：数据其实是好的，升级回去就能用，
+  // 和「文件坏了」的正确操作完全不同，所以原因必须能区分。
+  text.set(KEY, '{"version":9,"records":[]}');
+  const future = await new CabinetStorage().load();
+  assert.match(future.reason, /未知的收藏版本 9/);
+});
+
 test('只是丢了几条记录时直接放行，但原文同样留一份', async () => {
   const { text } = memory(), session = new CabinetStorage();
   const good = { id: 'ok-1', assetId: 'a1', name: '好的', category: 'music', artist: '', description: '',

@@ -137,6 +137,18 @@ input[type="range"]::-webkit-slider-thumb {
   margin: 12px 0 10px;
 }
 .empty-copy p { font-size: 12px; color: var(--bold-muted); line-height: 1.8; }
+/* 空柜首屏那个「放入第一张唱片」。
+ *
+ * 原版 styles.css 里是 `.empty-copy .primary-button{font-size:9px;padding:10px 14px}`
+ * 特异性 0,2,0，而皮肤层的 `.primary-button` 只有 0,1,0 —— 压不住。
+ * 结果是整个空柜首屏上唯一可点的东西，字号反而比标题小一半（9px 对 19px）。
+ * 必须用同样具体的 0,2,0 才能赢，跟 rooms.css 里 `.focus-actions .primary-button`
+ * 的做法一致。 */
+.empty-copy .primary-button {
+  font-size: 13px;
+  margin-top: 20px;
+  padding: 13px 22px;
+}
 
 .empty-notes { padding-top: 6px; }
 .empty-notes > svg { color: var(--bold-faint); margin: 34px 0 22px; }

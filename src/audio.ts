@@ -6,8 +6,8 @@ import { loudnessGain, measureLevel } from './loudness.ts';
 
 type Voice = { source: AudioBufferSourceNode; gain: GainNode; duck: GainNode; filter: BiquadFilterNode; pan: StereoPannerNode; clip: WaveShaperNode; envelope: DuckEnvelope; coverId?: string; depth: number; loudness: number };/** 一块唱盘：一个音频元素加它自己的音量，两块交替用来做切歌过渡。 */
 type Deck = { el: HTMLAudioElement; gain: GainNode; level: number; url?: string; owner?: number };
-export type AudioStatus = { playing: boolean; musicPlaying: boolean; ducked: boolean; level: number; currentTime: number; duration: number; lineInput: number; lineLive: boolean };
-const initialStatus: AudioStatus = { playing: false, musicPlaying: false, ducked: false, level: 0, currentTime: 0, duration: 0, lineInput: 0, lineLive: false };
+export type AudioStatus = { playing: boolean; musicPlaying: boolean; ducked: boolean; level: number; currentTime: number; duration: number; lineInput: number; lineLive: boolean; ambientIds: string[] };
+const initialStatus: AudioStatus = { playing: false, musicPlaying: false, ducked: false, level: 0, currentTime: 0, duration: 0, lineInput: 0, lineLive: false, ambientIds: [] };
 
 /**
  * 每一路环境音自己的软限幅曲线。
@@ -339,7 +339,13 @@ export class AmbientEngine {
         source.start();
         this.voices.set(track.id, { source, gain, duck, filter, pan, clip, envelope: new DuckEnvelope(), coverId: track.coverId, depth: track.duckDepth, loudness: loudnessGain(measureLevel(buffer)) });
       }
-      this.status.playing = this.voices.size > 0; this.setMix(this.mix ?? mix); this.tick();
+      this.status.playing = this.voices.size > 0;
+      // 光有 playing 不够：它是引擎级语义（「有任意一路在响」），
+      // 而界面要回答的是「**这一张**在响吗」。三张环境音坏了一张时，
+      // playing 仍是 true，那张坏的封套照样转、队列里照样写「循环叠加」，
+      // 用户以为它在响、只是听不见。所以把真正起了声部的 id 一起报上去。
+      this.status.ambientIds = [...this.voices.keys()];
+      this.setMix(this.mix ?? mix); this.tick();
       // 一张都起不来才算整体失败，往上抛让调用方整段停掉。
       //
       // 只坏了一部分就不抛：已经起来的那些照响。抛出去会让 player 认为
@@ -357,7 +363,7 @@ export class AmbientEngine {
   stopAmbience() {
     ++this.revision;
     for (const voice of this.voices.values()) { voice.source.stop(); voice.source.disconnect(); voice.gain.disconnect(); voice.duck.disconnect(); voice.filter.disconnect(); voice.pan.disconnect(); voice.clip.disconnect(); }
-    this.voices.clear(); this.status.playing = false; this.status.ducked = false; this.tick(); this.emit();
+    this.voices.clear(); this.status.playing = false; this.status.ducked = false; this.status.ambientIds = []; this.tick(); this.emit();
   }
   stopAll() { this.stopAmbience(); this.pauseMusic(); }
   /** 调度器一接到新意图就取消旧加载，不必等串行队列轮到新任务。 */
@@ -428,6 +434,11 @@ export class AmbientEngine {
     const voice = this.voices.get(id);
     if (voice) { voice.source.stop(); voice.source.disconnect(); voice.gain.disconnect(); voice.duck.disconnect(); voice.filter.disconnect(); voice.pan.disconnect(); voice.clip.disconnect(); this.voices.delete(id); }
     this.buffers.delete(id);
+    // 删掉的那张不该还留在「正在响的名单」里，否则界面会继续转它的封套。
+    if (this.status.ambientIds.includes(id)) {
+      this.status.ambientIds = this.status.ambientIds.filter(key => key !== id);
+      this.status.playing = this.voices.size > 0;
+    }
   }
   /**
    * 试听一张唱片：播一段就停，用来「听一下这张到底是什么」。

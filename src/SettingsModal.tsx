@@ -15,7 +15,7 @@ export default function SettingsModal({ cabinet, busy, background, lineError, st
   busy: string;
   background: string;
   lineError: string;
-  status: { lineInput: number; ducked: boolean };
+  status: { lineInput: number; ducked: boolean; lineLive: boolean };
   sleepUntil: number;
   remaining: number;
   imageInput: RefObject<HTMLInputElement | null>;
@@ -69,7 +69,13 @@ export default function SettingsModal({ cabinet, busy, background, lineError, st
                 ? status.ducked
                   ? '收到外部音乐 · 环境音正在退让'
                   : '收到外部音乐 · 环境音没有退让'
-                : '已接上虚拟声卡，等待声音'}
+                : /* 设备被拔掉、或者被别的程序抢走之后，lineLive 会变 false，
+                     而 lineInput 在没声音的时候本来就一直是 0——只读 lineInput
+                     的话，「已接上虚拟声卡，等待声音」这句话在源断开后照样成立，
+                     用户会一直等一个已经不可能来的声音。 */
+                  status.lineLive
+                  ? '已接上虚拟声卡，等待声音'
+                  : '虚拟声卡断开了 · 关掉再打开这个开关可以重连'}
             </small>
           </div>
         )}

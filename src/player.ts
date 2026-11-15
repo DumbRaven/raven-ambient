@@ -22,7 +22,7 @@ export class RoomPlayer {
   private disposed = false;
   private pending = Promise.resolve();
   private pendingTransition?: TrackTransition;
-  private audio: AudioStatus = { playing: false, musicPlaying: false, ducked: false, level: 0, currentTime: 0, duration: 0, lineInput: 0, lineLive: false };
+  private audio: AudioStatus = { playing: false, musicPlaying: false, ducked: false, level: 0, currentTime: 0, duration: 0, lineInput: 0, lineLive: false, ambientIds: [] };
   private listener: (status: RoomStatus) => void;
   private onError: (error: unknown) => void;
   /**
@@ -242,6 +242,15 @@ export class RoomPlayer {
     this.previewSwitching = true;
     try {
       await this.engine.preview(blob);
+    } catch (error) {
+      // 试听失败（文件读不出来、格式不支持）时，engine.preview 的 catch 会调
+      // stopPreview()，而那会**同步**触发 previewEnded → restoreAfterPreview。
+      // 可这一刻 previewSwitching 还是 true（要到 finally 才复位），恢复被跳过；
+      // 等 finally 执行完，就再也没人触发恢复了。
+      // 结果：用户试听一张坏唱片，正在放的背景音乐永久停掉，只能自己再点一次播放。
+      this.previewSwitching = false;
+      this.restoreAfterPreview();
+      throw error;
     } finally {
       this.previewSwitching = false;
     }
@@ -281,6 +290,10 @@ export class RoomPlayer {
         if (!wantsMusic) {
           this.engine.pauseMusic();
           if (this.musicOn) this.currentId = undefined;
+          // 环境音整体失败、又没有音乐可放：屏幕上写着「正在播放」，实际一点声音都没有。
+          // 更要命的是这时候按播放键走的是 pause()（running 还是 true），
+          // 用户按「播放」，结果是把已经起不来的环境音又停了一遍，屏幕纹丝不动。
+          if (ambientFailed) { this.running = false; this.engine.stopAll(); }
           this.emit();
           return;
         }
@@ -329,7 +342,15 @@ export class RoomPlayer {
         this.engine.pauseMusic();
         // 环境音已经在上面的分支里报过错了，这里再报一次就成了两条提示；
         // 而且不能因此把一首好歌判成坏文件。
-        if (ambientFailed) { this.emit(); return; }
+        if (ambientFailed) {
+          // 但总开关要跟着下来：环境音全没起来、这首歌也放不出来，
+          // 屏幕上却写着「正在播放」。这时候按播放键走的是 pause()
+          // （running 还是 true），按下去只是把已经起不来的环境音又停一遍，
+          // 屏幕纹丝不动——用户反复按，怎么都回不到能播的状态。
+          if (!this.audio.musicPlaying && !this.audio.playing) { this.running = false; this.engine.stopAll(); }
+          this.emit();
+          return;
+        }
         const moved = this.skipBroken();
         this.onError(error);
         if (moved) {

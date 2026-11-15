@@ -235,4 +235,16 @@
   color: var(--bold-ink);
   padding: 0;
 }
+/* 搜索框得看得见键盘焦点。
+ *
+ * 原版有一句全局 `input:focus-visible{outline:2px solid #8e9a8f}`（特异性 0,1,1），
+ * 但更晚的 `.search input{...outline:none...}` 同样是 0,1,1，把它整条压死了。
+ * 结果是用 Tab 进搜索框时边框、底色、图标全都不变，屏幕上没有任何提示。
+ *
+ * 画在胶囊容器上而不是 input 上：input 自己铺满胶囊内部，描边会贴着文字。
+ * 用 :focus-within 而不是 :focus-visible，因为焦点落在里面的 input 上。 */
+.search:focus-within {
+  border-color: var(--bold-ink);
+  box-shadow: 0 0 0 1px var(--bold-ink);
+}
 .search input::placeholder { color: var(--bold-faint); }

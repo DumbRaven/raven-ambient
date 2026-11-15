@@ -202,11 +202,6 @@
   --ticket-mute: #5c5544;
   --ticket-faint: #69614f;
   --ticket-rule: #a0957f;
-  /* 虚线内框。参考图 y=1400 行实测：虚线处亮度 209、纸面 227，差 18 级。
-     #d4cdbd 只差 9 级，缩到列表尺寸就看不见了。 */
-  /* 参考图上的虚线是实实在在看得见的一圈：#b5a68c、1.2px、dash 4 gap 3。
-     早先用 #c6b9a2 + 1px，缩到列表尺寸只剩一层淡淡的影子。 */
-  --ticket-frame: #c2b5a0;
   /* 砖红票号。ref-1 实测最红像素 rgb(210,147,142)。
      票根挂了 `filter: url(#tpl-ticket-paper)`，纸纹滤镜会把这行稍微提亮：
      令牌 (193,120,115) 渲出 (195,127,122)，大约 +2/+7/+7。按这个偏移反推，
@@ -565,12 +560,8 @@
   pointer-events: none;
 }
 
-/* 票根里那圈虚线内框。参考图四边内收并不等距（左 18px、右 28px、上 26px、
-   下 50px），取中位 25px ÷ 1098 = 2.3cqw。四角是圆的，半径取 1.6cqw。
-   它压在纸面之上、文字之下：z-index -1 落在纸色伪元素之后、内容之前
-   （同为 -1 时按 DOM 顺序，::before 先画，所以虚线在纸面之上）。 */
 /* 参考图的票根上没有内框线：纸面就是纸面，分隔靠细横线。
-   早先那圈虚线（--ticket-frame）在缩到列表尺寸后读成一圈毛边，删掉。 */
+   早先那圈虚线（令牌已删）在缩到列表尺寸后读成一圈毛边。 */
 
 /* ── 票面上的字 ─────────────────────────────────────────────────
    字号一律相对整票宽（cqw）。每一档都从 ref-1 的行节奏反算：那张图整票
@@ -1335,10 +1326,15 @@
 }
 
 /* 票面现在也是键盘的一个停靠点（role=button + tabIndex），得看得见焦点。
-   用画在纸里面的内阴影而不是外描边：外描边会被 .ticket-lift 的
-   preserve-3d + drop-shadow 裁掉一圈，看起来像漏了一个角。 */
+   用内缩的描边而不是外描边：外描边会被 .ticket-lift 的 preserve-3d +
+   drop-shadow 裁掉一圈，看起来像漏了一个角。
+
+   颜色必须用纸面上的深墨（--ticket-ink），不能用浅色。
+   原来写的是 #efeada——那是暗幕上的提示色（.ticket-tip 在 #0b0f14 上有 15.97:1），
+   搬到纸面上就只剩 1.01:1，等于没画。键盘用户 Tab 到票面时屏幕上毫无变化，
+   按空格又因为 onKeyDown 拦了默认行为而不滚动，看着就像卡死了。 */
 .ticket-lift-panel:focus-visible {
-  outline: 2px solid #efeada;
+  outline: 2px solid var(--ticket-ink);
   outline-offset: -4px;
   border-radius: 2px;
 }
@@ -1557,11 +1553,3 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-
-  /* 关了动效就别再飘那一下，存根直接消失——MediaTickets 那边
-     连 300ms 都不等，这里只防它原地闪一帧。 */
-  .is-tearing .ticket-stub {
-    animation-duration: 1ms;
-  }
-}
