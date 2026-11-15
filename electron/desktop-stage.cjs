@@ -13,7 +13,7 @@
  * 数据怎么走：和 focus-mini.cjs 同一套——两个渲染进程之间没有 IPC，
  * 主进程定时从主窗口取快照推给桌面窗，再把桌面窗攒下的点击转回主窗口。
  */
-const { BrowserWindow, screen } = require('electron');
+const { BrowserWindow, screen, ipcMain } = require('electron');
 const path = require('node:path');
 
 /** 多久搬一次。200ms 跟 focus-mini 一致：拖动叠加元素时足够跟手，又不至于把 CPU 喂饱。 */
@@ -36,6 +36,8 @@ class DesktopStage {
     this.timer = undefined;
     /** 上一份推过去的快照，用来跳过没变化的重绘。 */
     this.lastPushed = '';
+    /** 桌面窗有没有用 preload 发过动作。详见 tick() 的注释。 */
+    this.viaIpc = false;
   }
 
   attach(host) {
@@ -108,6 +110,9 @@ class DesktopStage {
         // 和主窗口一样：这块画面不在前台时也要继续播，
         // 否则切到别的程序上画面就冻住了，那就不叫「桌面上的画」了。
         backgroundThrottling: false,
+        // 桌面窗是另一个渲染进程，靠 preload 收放映快照、发点击，
+        // 不必等主进程每 200ms 来取一次。
+        preload: path.join(__dirname, 'preload.cjs'),
       },
     });
 
@@ -122,7 +127,12 @@ class DesktopStage {
       this.win = null;
       this.lastPushed = '';
       // 窗口关掉就告诉主窗口一声，让那个按钮回到「未按下」的状态。
-      this.toHost('window.__ravenStageClosed && window.__ravenStageClosed()');
+      if (this.viaIpc) {
+        const host = this.host;
+        if (host && !host.isDestroyed()) host.webContents.send('stage:closed');
+      } else {
+        this.toHost('window.__ravenStageClosed && window.__ravenStageClosed()');
+      }
     });
     this.start();
   }
@@ -148,6 +158,23 @@ class DesktopStage {
     }
   }
 
+  /**
+   * 主窗口通过 preload 推来的放映快照。
+   *
+   * 走这条就不必每 200ms 去主窗口问一次「现在放的是什么」——
+   * 那条路每轮都要过一遍沙箱边界、把快照序列化过来。
+   * 只在有桌面窗时才转发，窗口没开就没有收件人。
+   */
+  acceptSnapshot(snapshot) {
+    const win = this.win;
+    if (!win || win.isDestroyed() || win.webContents.isLoading()) return;
+    if (!snapshot || typeof snapshot !== 'object') return;
+    const stamp = JSON.stringify(snapshot);
+    if (stamp === this.lastPushed) return;
+    this.lastPushed = stamp;
+    win.webContents.send('stage:paint', snapshot);
+  }
+
   async tick() {
     const host = this.host;
     const win = this.win;
@@ -155,14 +182,22 @@ class DesktopStage {
     if (!win || win.isDestroyed() || win.webContents.isLoading()) return;
 
     // 1) 桌面窗上按下的东西 → 主窗口
-    try {
-      const actions = await win.webContents.executeJavaScript('window.__ravenDesktopDrain ? window.__ravenDesktopDrain() : []');
-      for (const action of Array.isArray(actions) ? actions : []) {
-        await this.toHost('window.__ravenStageCommand ? window.__ravenStageCommand(' + JSON.stringify(action) + ') : null');
-      }
-    } catch { /* 桌面窗正在加载或已关，下一轮再说 */ }
+    //
+    // 走 IPC 时这条在 acceptCommand 里已经即时转过去了，不必再轮询。
+    if (!this.viaIpc) {
+      try {
+        const actions = await win.webContents.executeJavaScript('window.__ravenDesktopDrain ? window.__ravenDesktopDrain() : []');
+        for (const action of Array.isArray(actions) ? actions : []) {
+          await this.toHost('window.__ravenStageCommand ? window.__ravenStageCommand(' + JSON.stringify(action) + ') : null');
+        }
+      } catch { /* 桌面窗正在加载或已关，下一轮再说 */ }
+    }
 
     // 2) 主窗口的状态 → 桌面窗
+    //
+    // 主窗口用 preload 推快照时（acceptSnapshot），这里就没什么可问的了：
+    // 快照已经在变的那一刻送过来了，轮询只会重复读同一份。
+    if (this.viaIpc) return;
     try {
       const snapshot = await this.toHost('window.__ravenStageSnapshot || null');
       if (!snapshot) return;
@@ -175,6 +210,19 @@ class DesktopStage {
         'window.__ravenDesktopPaint ? window.__ravenDesktopPaint(' + stamp + ') : null',
       );
     } catch { /* 同上 */ }
+  }
+
+  /**
+   * 桌面窗通过 preload 发来的动作，立刻转给主窗口。
+   *
+   * 不等下一轮 tick：一次点击要走 200ms 轮询才能到主窗口，用户
+   * 会觉得切歌键「按下去慢半拍」。
+   */
+  acceptCommand(event, command) {
+    this.viaIpc = true;
+    const host = this.host;
+    if (!host || host.isDestroyed()) return;
+    host.webContents.send('stage:command', command);
   }
 
   destroy() {
@@ -190,6 +238,32 @@ const stage = new DesktopStage();
 
 function attachDesktopStage(host) {
   stage.attach(host);
+
+  /**
+   * 桌面窗发来的动作。
+   *
+   * 只认桌面窗本人发的：主窗口也在同一个通道名上听（它收的是 stage:paint，
+   * 不在这条上发），但将来要是有第三处往这条通道说话，不该被当成桌面窗的点击。
+   */
+  ipcMain.on('stage:command', (event, command) => {
+    const win = stage.win;
+    if (!win || win.isDestroyed() || event.sender !== win.webContents) return;
+    if (!command || typeof command !== 'object') return;
+    stage.acceptCommand(event, command);
+  });
+
+  /**
+   * 主窗口通过 preload 推来的放映快照。
+   *
+   * 只认主窗口发的：桌面窗自己不会往这条通道写，但要是将来写了，
+   * 不该被当成「主窗口的新状态」再推回给自己。
+   */
+  ipcMain.on('stage:snapshot', (event, snapshot) => {
+    const host = stage.host;
+    if (!host || host.isDestroyed() || event.sender !== host.webContents) return;
+    stage.acceptSnapshot(snapshot);
+  });
+
   host.on('closed', () => stage.destroy());
   return stage;
 }

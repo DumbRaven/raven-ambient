@@ -209,12 +209,24 @@
   </div>
 
 <script>
-  // 主进程每 200ms 来取一次。小窗自己不认识计时逻辑，
-  // 只负责把状态画出来、把按钮点击攒进队列等人取走。
+  // 两条路，按有没有 preload 自动选：
+  //
+  //   有 preload（正常启动）：点击直接 `raven.send('focus:action', ...)`，
+  //     这行代码在 ipcRenderer.send 里同步送出，主进程立刻收到。
+  //   没有 preload（探针自己建的窗口）：攒进 outbox，主进程每 200ms 来取一次。
+  //
+  // 两条都留着是因为探针需要旧的；判断只在 `ipc()` 一处。
   var outbox = [];
   var last = null;
   var lastDiscKey = null;
   var CIRCUMFERENCE = 2 * Math.PI * 27;
+
+  function ipc() { return window.raven; }
+  function act(name) {
+    var bridge = ipc();
+    if (bridge) bridge.send('focus:action', name);
+    else outbox.push(name);
+  }
 
   var card = document.getElementById('card');
   var bar = document.getElementById('bar');
@@ -319,14 +331,21 @@
     return list;
   };
 
-  toggleEl.addEventListener('click', function () { outbox.push('toggle'); });
-  prevEl.addEventListener('click', function () { if (!prevEl.disabled) outbox.push('prev'); });
-  nextEl.addEventListener('click', function () { if (!nextEl.disabled) outbox.push('next'); });
-  document.getElementById('close').addEventListener('click', function () { outbox.push('close'); });
+  // 有 preload 时改走 IPC：不再等主进程每 200ms 来取一次。
+  // poll 那段旧代码保留着（下面 `__ravenMiniDrain`），探针的窗口没有 preload，
+  // 仍然靠它。
+  if (ipc()) {
+    ipc().on('focus:snapshot', paint);
+  }
+
+  toggleEl.addEventListener('click', function () { act('toggle'); });
+  prevEl.addEventListener('click', function () { if (!prevEl.disabled) act('prev'); });
+  nextEl.addEventListener('click', function () { if (!nextEl.disabled) act('next'); });
+  document.getElementById('close').addEventListener('click', function () { act('close'); });
   // 键盘也能用：小窗被点中时按空格暂停，Esc 收起。
   document.addEventListener('keydown', function (event) {
-    if (event.key === ' ' || event.code === 'Space') { event.preventDefault(); outbox.push('toggle'); }
-    else if (event.key === 'Escape') { outbox.push('close'); }
+    if (event.key === ' ' || event.code === 'Space') { event.preventDefault(); act('toggle'); }
+    else if (event.key === 'Escape') { act('close'); }
   });
 </script>
 </body>

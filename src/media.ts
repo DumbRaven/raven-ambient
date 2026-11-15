@@ -21,6 +21,22 @@ function raven(): RavenWindow {
   return window as RavenWindow;
 }
 
+/**
+ * preload 暴露进来的通道（见 electron/preload.cjs）。
+ *
+ * 有它就走 IPC：调用即送达，不用等主进程那一轮 400ms 的轮询。
+ * 没有它（探针自己建的窗口不会装 preload）就退回 window 全局量那一套，
+ * 所以下面每个函数都保留了两条路，而不是换掉旧路。
+ */
+type RavenChannel = {
+  send: (channel: string, payload: unknown) => boolean;
+  on: (channel: string, handler: (payload: unknown) => void) => () => void;
+};
+
+function channel(): RavenChannel | undefined {
+  return (window as Window & { raven?: RavenChannel }).raven;
+}
+
 /** 主进程扫出来的一个文件，比 MediaItem 多了绝对路径和可以直接用的 src。 */
 export type ScannedFile = {
   path: string;
@@ -61,6 +77,13 @@ export function listenMedia(onMessage: (message: MediaMessage) => void): () => v
     if (message.type !== 'ready' && message.type !== 'scan' && message.type !== 'files' && message.type !== 'wallpapers' && message.type !== 'rejected') return;
     onMessage(message);
   };
+  // 收的方向与发的一致：有 preload 就只听 IPC，没有才挂全局量。
+  // 两边都用「有没有 raven 通道」这一个判据，所以不会出现「发走 IPC、收回轮询」
+  // 这种错配——主进程那边也是靠第一次收到 IPC 请求才切过去的。
+  const ipc = channel();
+  if (ipc) {
+    return ipc.on('media:message', receiver);
+  }
   bridge.__ravenMedia = receiver;
   return () => {
     if (bridge.__ravenMedia === receiver) delete bridge.__ravenMedia;
@@ -68,6 +91,13 @@ export function listenMedia(onMessage: (message: MediaMessage) => void): () => v
 }
 
 function push(action: unknown) {
+  // 有 preload 就直接发：这条路上班即送达，主进程收到就处理，
+  // 不必等轮询，也不必再敲一次门把那一轮提前。
+  const ipc = channel();
+  if (ipc) {
+    ipc.send('media:request', action);
+    return;
+  }
   const bridge = raven();
   bridge.__ravenMediaOutbox = [...(bridge.__ravenMediaOutbox ?? []), action];
   knock();

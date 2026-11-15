@@ -89,6 +89,16 @@ type RavenWindow = Window & {
   __ravenStageClosed?: () => void;
 };
 
+/** 见 electron/preload.cjs。有它就走 IPC，没有就退回下面的 window 全局量。 */
+type RavenChannel = {
+  send: (channel: string, payload: unknown) => boolean;
+  on: (channel: string, handler: (payload: unknown) => void) => () => void;
+};
+
+function channel(): RavenChannel | undefined {
+  return (window as Window & { raven?: RavenChannel }).raven;
+}
+
 /**
  * 拿 window 上的桥接对象。
  *
@@ -109,8 +119,19 @@ export function drainCommands(host: { __ravenDesktopQueue?: StageCommand[] }): S
 
 /* ---------- 主窗口侧 ---------- */
 
-/** 把当前放映状态挂出去，等主进程来取。 */
+/**
+ * 把当前放映状态挂出去，给桌面窗用。
+ *
+ * 有 preload 时直接发：主进程收到就转给桌面窗，不必等它每 200ms 来问一次
+ * 「主窗口现在放的是什么」——那条路每轮都要 eval 一段字符串进去。
+ * 没有 preload 时仍然挂到 window 上，探针靠这个读。
+ */
 export function publishStage(snapshot: StageSnapshot) {
+  const ipc = channel();
+  if (ipc) {
+    ipc.send('stage:snapshot', snapshot);
+    return;
+  }
   raven().__ravenStageSnapshot = snapshot;
 }
 
@@ -121,11 +142,26 @@ export function publishStage(snapshot: StageSnapshot) {
  * 一次点击被处理两遍（切歌会跳两首）。
  */
 export function listenStageCommand(onCommand: (command: StageCommand) => void) {
+  const ipc = channel();
+  if (ipc) return ipc.on('stage:command', payload => { if (isStageCommand(payload)) onCommand(payload); });
   const host = raven();
   host.__ravenStageCommand = onCommand;
   return () => {
     if (host.__ravenStageCommand === onCommand) host.__ravenStageCommand = undefined;
   };
+}
+
+/**
+ * 收窄 IPC 那头送来的 unknown。
+ *
+ * 主进程那边发的是我们自己序列化过去的东西，但通道本身没有类型约束，
+ * 所以在这里判一次——错的数据应该被丢掉，而不是让下游的 switch 走到
+ * 一个不存在的分支。
+ */
+function isStageCommand(value: unknown): value is StageCommand {
+  if (!value || typeof value !== 'object') return false;
+  const type = (value as { type?: unknown }).type;
+  return type === 'stone' || type === 'prev' || type === 'next' || type === 'rain' || type === 'layers';
 }
 
 /**
@@ -136,6 +172,8 @@ export function listenStageCommand(onCommand: (command: StageCommand) => void) {
  * 而画面其实已经没了。
  */
 export function listenStageClosed(onClosed: () => void) {
+  const ipc = channel();
+  if (ipc) return ipc.on('stage:closed', () => onClosed());
   const host = raven();
   host.__ravenStageClosed = onClosed;
   return () => {
@@ -147,6 +185,8 @@ export function listenStageClosed(onClosed: () => void) {
 
 /** 主进程把主窗口的快照推过来，桌面窗存下来。 */
 export function installStagePaint(onPaint: (snapshot: StageSnapshot) => void) {
+  const ipc = channel();
+  if (ipc) return ipc.on('stage:paint', payload => onPaint(payload as StageSnapshot));
   const host = raven();
   host.__ravenDesktopPaint = onPaint;
   return () => {
@@ -157,10 +197,15 @@ export function installStagePaint(onPaint: (snapshot: StageSnapshot) => void) {
 /**
  * 桌面窗上攒一个动作，等主进程来取。
  *
- * 为什么攒着而不是立刻想办法发出去：桌面窗没有 ipcRenderer，
- * 唯一的出口就是让主进程定时来读。攒成一个队列，连点两下也不会丢。
+ * 有 preload 时直接发出去（即时），没有时攒进队列等主进程来读——
+ * 桌面窗在探针里是同一个页面，但探针建的窗口没有 preload。
  */
 export function sendStageCommand(command: StageCommand) {
+  const ipc = channel();
+  if (ipc) {
+    ipc.send('stage:command', command);
+    return;
+  }
   const host = raven();
   const queue = host.__ravenDesktopQueue ?? [];
   queue.push(command);

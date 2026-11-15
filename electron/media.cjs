@@ -8,7 +8,7 @@
 //   页面把请求压进 window.__ravenMediaOutbox
 //   主进程每 400ms 取一次，处理完调 window.__ravenMedia(payload) 推回去
 // 页面永远是被动的一方，不放开任何沙箱设置。
-const { protocol, dialog, BrowserWindow } = require('electron');
+const { protocol, dialog, BrowserWindow, ipcMain } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { mediaResponse } = require('./media-response.cjs');
@@ -260,12 +260,25 @@ class MediaBridge {
   constructor() {
     this.timer = undefined;
     this.target = null;
+    /** 页面有没有用 preload 发过请求。详见 push() 的注释。 */
+    this.viaIpc = false;
   }
 
-  /** 推一份结果给页面。页面没挂接收器时静默丢掉。 */
+  /**
+   * 推一份结果给页面。页面没挂接收器时静默丢掉。
+   *
+   * 只走一条路，不两条一起发：同一个消息送两遍会让「追加文件」这类处理
+   * 执行两次（媒体库会多出一份重复条目）。走哪条由页面自己决定——
+   * 它一旦用 preload 发过请求（accept），我们就知道该用 IPC 回。
+   * 探针建的窗口没有 preload，**从不会**调 accept，于是继续用旧的全局量。
+   */
   push(webContents, payload) {
     const win = webContents && !webContents.isDestroyed() ? webContents : this.target;
     if (!win || win.isDestroyed()) return;
+    if (this.viaIpc) {
+      win.send('media:message', payload);
+      return;
+    }
     win.executeJavaScript(`window.__ravenMedia && window.__ravenMedia(${JSON.stringify(payload)})`, true)
       .catch(() => undefined);
   }
@@ -445,8 +458,27 @@ class MediaBridge {
     // 主窗口的选文件、全屏这些动作就没人处理了。谁先跑起来谁说了算。
     if (this.timer !== undefined) return;
     this.target = webContents;
+    // 轮询只在页面没有 preload 时才需要。这里不判断，先起轮询；
+    // 一旦收到第一条 IPC 请求（handleIpc 里）就把它停掉——那条路只有当页面
+    // 真装了 preload 才会走到，比在这里嗅探 webPreferences 可靠。
     this.timer = setInterval(() => { void this.take(webContents); }, POLL);
     webContents.once('destroyed', () => this.stop());
+  }
+
+  /**
+   * 页面通过 preload 进来的请求。
+   *
+   * 走这条就不再需要轮询：调用即处理，`poke()` 那套「敲门提前取一次」
+   * 也随之退休（它存在的唯一理由就是轮询有 400ms 延迟）。
+   */
+  accept(webContents, action) {
+    if (this.timer !== undefined) {
+      clearInterval(this.timer);
+      this.timer = undefined;
+    }
+    this.target = webContents;
+    this.viaIpc = true;
+    return this.handle(webContents, action);
   }
 
   /**
@@ -500,6 +532,19 @@ function attachMedia() {
   });
 
   bridge = new MediaBridge();
+
+  /**
+   * 页面通过 preload 发进来的请求。
+   *
+   * 这条通道一旦有流量，说明页面装了 preload，轮询就没必要了——
+   * `accept()` 会顺手把它停掉。探针建的窗口没有 preload，永远走不到这里，
+   * 于是继续用轮询，两边互不干扰。
+   */
+  ipcMain.on('media:request', (event, action) => {
+    if (!action || typeof action !== 'object') return;
+    void bridge.accept(event.sender, action);
+  });
+
   const { app } = require('electron');
   app.on('browser-window-created', (_event, win) => {
     // 只挂主窗口：小组件和桌面放映窗都不需要媒体库，多挂一份只会白跑轮询，

@@ -1,10 +1,16 @@
 // 页面和主进程之间的最小约定。
 //
-// 页面是 sandbox: true、没有 preload，里面既没有 ipcRenderer 也没有 require，
-// 而主进程可以通过 executeJavaScript 在页面里执行代码。所以方向反过来定：
-//   主进程 -> 页面：调 window.__ravenNowPlaying(snapshot)
-//   页面 -> 主进程：把动作写进 window.__ravenNowPlayingOutbox，主进程每 400ms 取一次
-// 轮询看着笨，但这是在不放开沙箱的前提下唯一能用的办法，空数组时几乎不花钱。
+// 两条路并存：
+//
+//   有 preload（正常启动）：`window.raven.send('now:action', ...)` 直接送达，
+//   `raven.on('now:snapshot', ...)` 收推送。
+//
+//   没有 preload（tools/probe 里自己建的窗口）：退回旧的 window 全局量，
+//   主进程每 400ms 来取一次 outbox。
+//
+// 为什么保留旧路：探针和基线脚本自己定 webPreferences、自己建窗口，
+// 它们的窗口上不会装 preload。删掉旧路等于让 130 个探针全部失灵，
+// 而那些探针正是这个仓库唯一能证明「视觉和时序没被改坏」的东西。
 import type { MediaAction, NowPlaying } from './now-playing';
 
 type RavenWindow = Window & {
@@ -12,13 +18,29 @@ type RavenWindow = Window & {
   __ravenNowPlayingOutbox?: string[];
 };
 
-const raven = window as RavenWindow;
+type RavenChannel = {
+  send: (channel: string, payload: unknown) => boolean;
+  on: (channel: string, handler: (payload: unknown) => void) => () => void;
+};
+
+/** 见 electron/preload.cjs。 */
+function channel(): RavenChannel | undefined {
+  return (window as Window & { raven?: RavenChannel }).raven;
+}
+
+/** 拿 window 上的桥接对象。写成函数是为了 Node 里跑测试时不会在加载期就炸。 */
+function raven(): RavenWindow {
+  return window as RavenWindow;
+}
 
 /** 注册接收器。返回取消函数，组件卸载时调。 */
 export function listenNowPlaying(onChange: (raw: unknown) => void): () => void {
-  raven.__ravenNowPlaying = onChange;
+  const ipc = channel();
+  if (ipc) return ipc.on('now:snapshot', onChange);
+  const bridge = raven();
+  bridge.__ravenNowPlaying = onChange;
   return () => {
-    if (raven.__ravenNowPlaying === onChange) delete raven.__ravenNowPlaying;
+    if (bridge.__ravenNowPlaying === onChange) delete bridge.__ravenNowPlaying;
   };
 }
 
@@ -26,7 +48,13 @@ export function listenNowPlaying(onChange: (raw: unknown) => void): () => void {
 type BridgeAction = MediaAction | 'start' | 'stop' | 'ping';
 
 function push(action: BridgeAction) {
-  raven.__ravenNowPlayingOutbox = [...(raven.__ravenNowPlayingOutbox ?? []), action];
+  const ipc = channel();
+  if (ipc) {
+    ipc.send('now:action', action);
+    return;
+  }
+  const bridge = raven();
+  bridge.__ravenNowPlayingOutbox = [...(bridge.__ravenNowPlayingOutbox ?? []), action];
 }
 
 /**
@@ -44,11 +72,6 @@ export function askNowPlaying(action: 'start' | 'stop' | 'ping') {
  */
 export function commandNowPlaying(action: MediaAction) {
   push(action);
-}
-
-/** 主进程已经取走队列。这里只用于测试断言。 */
-export function pendingActions(): number {
-  return raven.__ravenNowPlayingOutbox?.length ?? 0;
 }
 
 export type { NowPlaying };

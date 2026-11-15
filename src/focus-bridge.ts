@@ -58,6 +58,16 @@ type RavenWindow = Window & {
 
 const raven = window as RavenWindow;
 
+/** 见 electron/preload.cjs。有它就走 IPC，没有就退回上面的 window 全局量。 */
+type RavenChannel = {
+  send: (channel: string, payload: unknown) => boolean;
+  on: (channel: string, handler: (payload: unknown) => void) => () => void;
+};
+
+function channel(): RavenChannel | undefined {
+  return (window as Window & { raven?: RavenChannel }).raven;
+}
+
 /** 把当前计时状态挂到 window 上，等主进程来取。每次状态变化调一次即可。 */
 export function publishFocus(snapshot: FocusSnapshot) {
   raven.__ravenFocusSnapshot = snapshot;
@@ -78,6 +88,11 @@ export function readFocus(): FocusSnapshot | null {
  * 主进程读取后会把标记清掉（见 electron/focus-mini.cjs）。
  */
 export function requestMiniFocus() {
+  const ipc = channel();
+  if (ipc) {
+    ipc.send('focus:action', 'reveal');
+    return;
+  }
   raven.__ravenFocusWanted = true;
 }
 
@@ -86,6 +101,11 @@ export function requestMiniFocus() {
  * 返回取消函数，卸载时调用。
  */
 export function listenFocusCommand(onCommand: (action: string) => void) {
+  const ipc = channel();
+  // IPC 那头是 unknown（主进程可以发任何东西过来），在这里收窄一次。
+  // 不把 onCommand 的签名放宽成 unknown：调用方要的是 string，放宽等于把
+  // 类型检查推给每一个使用点。
+  if (ipc) return ipc.on('focus:action', payload => { if (typeof payload === 'string') onCommand(payload); });
   raven.__ravenFocusCommand = onCommand;
   return () => {
     if (raven.__ravenFocusCommand === onCommand) raven.__ravenFocusCommand = undefined;

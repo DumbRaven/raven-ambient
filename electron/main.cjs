@@ -43,6 +43,9 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       backgroundThrottling: false,
+      // 沙箱里也能用 preload：拿不到 fs / child_process，但 contextBridge 与
+      // ipcRenderer 是允许的。有它之后媒体库、外部音乐、番茄钟都不必再靠轮询。
+      preload: path.join(__dirname, 'preload.cjs'),
     },
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));

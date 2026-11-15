@@ -4,12 +4,14 @@
  * 为什么是独立窗口而不是主窗口里的浮层：用户主窗口最小化之后，
  * 小窗还得留在桌面上，子窗口做不到这一点（主窗最小化会带走它）。
  *
- * 数据怎么走：页面（sandbox: true，没有 ipcRenderer）把番茄钟状态挂到
- * window.__ravenFocusSnapshot 上，这里定时取；小窗上的点击攒在
- * window.__ravenMiniDrain() 里，这里定时取走，再调页面里的
- * window.__ravenFocusCommand('toggle') 转给 React。
+ * 数据怎么走（两条路，按页面有没有 preload 自动选）：
+ *
+ *   有 preload：小窗发 `focus:action`、收 `focus:snapshot`，走 IPC 即送即达。
+ *   没有 preload（探针自己建的窗口）：页面把状态挂到 window.__ravenFocusSnapshot，
+ *     这里每 200ms 取一次；小窗上的点击攒在 window.__ravenMiniDrain() 里，
+ *     这里取走再调页面的 window.__ravenFocusCommand('toggle')。
  */
-const { BrowserWindow, screen } = require('electron');
+const { BrowserWindow, screen, ipcMain } = require('electron');
 const path = require('node:path');
 
 // 宽度跟着 mini.html 的 .card 走。切歌键与暂停/关闭各自竖成一列之后，
@@ -28,6 +30,8 @@ class FocusMini {
     /** 用户按过收起之后就别再自动冒出来，直到重新开始计时。 */
     this.dismissed = false;
     this.lastVisible = false;
+    /** 小窗或主窗口用过 preload 的 IPC 通道。详见 tick() 的注释。 */
+    this.viaIpc = false;
   }
 
   attach(host) {
@@ -79,6 +83,9 @@ class FocusMini {
         nodeIntegration: false,
         sandbox: true,
         backgroundThrottling: false,
+        // 小窗也要 preload：它每 200ms 被推一次番茄钟读数，
+        // 走 IPC 就不必让主进程去 eval 一段字符串。
+        preload: path.join(__dirname, 'preload.cjs'),
       },
     });
     // 'screen-saver' 是最硬的一档，主窗最小化、别的程序全屏都能压住。
@@ -107,16 +114,16 @@ class FocusMini {
     if (host.webContents.isLoading()) return;
     const mini = this.win;
 
-    // 小窗存在时才从它那里收点击
-    if (mini && !mini.isDestroyed() && !mini.webContents.isLoading()) {
+    // 小窗存在时才从它那里收点击。
+    //
+    // 装了 preload 时这条走 ipcMain（见 attachFocusMini），这里的轮询就只剩
+    // 一个用处：探针自己建的小窗没有 preload。轮询没取到东西时几乎不花钱，
+    // 但要过一次沙箱边界——所以迷你窗一旦用过 IPC，就把这段关掉。
+    if (!this.viaIpc && mini && !mini.isDestroyed() && !mini.webContents.isLoading()) {
       try {
         const actions = await mini.webContents.executeJavaScript('window.__ravenMiniDrain ? window.__ravenMiniDrain() : []');
         for (const action of Array.isArray(actions) ? actions : []) {
-          if (action === 'close') { this.hide(); continue; }
-          // 转给页面，由 FocusRoom 真正改状态（小窗不碰计时逻辑）
-          await host.webContents.executeJavaScript(
-            'window.__ravenFocusCommand ? window.__ravenFocusCommand(' + JSON.stringify(action) + ') : null',
-          );
+          await this.toHost(action);
         }
       } catch { /* 小窗正在加载或已关，下一轮再说 */ }
     }
@@ -126,20 +133,47 @@ class FocusMini {
       const snap = await host.webContents.executeJavaScript('window.__ravenFocusSnapshot || null');
       if (!snap) return;
       // 用户在主界面里按了「显示小窗」，这里把收起状态解除。
-      const wanted = await host.webContents.executeJavaScript('window.__ravenFocusWanted === true');
-      if (wanted) {
-        await host.webContents.executeJavaScript('window.__ravenFocusWanted = false; true');
-        this.dismissed = false;
+      // 走 IPC 的话 reveal 已经在 accept 里处理过了，这里只看标记。
+      if (!this.viaIpc) {
+        const wanted = await host.webContents.executeJavaScript('window.__ravenFocusWanted === true');
+        if (wanted) {
+          await host.webContents.executeJavaScript('window.__ravenFocusWanted = false; true');
+          this.dismissed = false;
+        }
       }
       if (snap.visible && !this.dismissed) this.reveal();
       else if (this.win && !this.win.isDestroyed()) this.win.hide();
-      const target = this.win;
-      if (target && !target.isDestroyed() && !target.webContents.isLoading()) {
-        await target.webContents.executeJavaScript(
-          'window.__ravenMiniPaint ? window.__ravenMiniPaint(' + JSON.stringify(snap) + ') : null',
-        );
-      }
+      this.publish(snap);
     } catch { /* 同上 */ }
+  }
+
+  /** 把读数画到小窗上。有 preload 走 IPC，否则 eval 那段旧代码。 */
+  publish(snap) {
+    const target = this.win;
+    if (!target || target.isDestroyed() || target.webContents.isLoading()) return;
+    if (this.viaIpc) {
+      target.webContents.send('focus:snapshot', snap);
+      return;
+    }
+    target.webContents.executeJavaScript(
+      'window.__ravenMiniPaint ? window.__ravenMiniPaint(' + JSON.stringify(snap) + ') : null',
+    ).catch(() => undefined);
+  }
+
+  /** 小窗上按下的动作转给主窗口，由 FocusRoom 真正改状态（小窗不碰计时逻辑）。 */
+  async toHost(action) {
+    if (action === 'close') { this.hide(); return; }
+    const host = this.host;
+    if (!host || host.isDestroyed()) return;
+    if (this.viaIpc) {
+      host.webContents.send('focus:action', action);
+      return;
+    }
+    try {
+      await host.webContents.executeJavaScript(
+        'window.__ravenFocusCommand ? window.__ravenFocusCommand(' + JSON.stringify(action) + ') : null',
+      );
+    } catch { /* 主窗口正在加载 */ }
   }
 
   /** 主窗口说「这一轮彻底结束了」，收起并解除 dismissed 锁。 */
@@ -160,6 +194,30 @@ const mini = new FocusMini();
 
 function attachFocusMini(host) {
   mini.attach(host);
+
+  /**
+   * 页面通过 preload 发进来的动作。
+   *
+   * 同一个通道名两边都在用，所以要按**谁发的**分开处理：
+   *   - 小窗发来的（toggle / skip / prev / next / close）转给主窗口，由 FocusRoom 改状态；
+   *   - 主窗口发来的只有 'reveal'，意思是「把小窗找回来」。
+   * 不分开的话，主窗口发 reveal 会被当成小窗动作再转回去，形成一个自己转自己的圈。
+   */
+  ipcMain.on('focus:action', (event, action) => {
+    if (typeof action !== 'string') return;
+    const senderIsMini = !!mini.win && !mini.win.isDestroyed() && event.sender === mini.win.webContents;
+    if (senderIsMini) {
+      mini.viaIpc = true;
+      void mini.toHost(action);
+      return;
+    }
+    if (action === 'reveal') {
+      mini.viaIpc = true;
+      mini.dismissed = false;
+      mini.reveal();
+    }
+  });
+
   // 主窗口关掉就一起收掉，别留一个孤儿小窗在桌面上。
   host.on('closed', () => mini.destroy());
   return mini;

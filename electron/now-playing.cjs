@@ -6,6 +6,7 @@
 //   主进程每 400ms 去读它；想要推送，页面把 window.__ravenNowPlaying 挂上。
 // 也就是说页面永远是被动的一方，不依赖任何 Node 能力。
 const { spawn } = require('node:child_process');
+const { ipcMain } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -31,6 +32,23 @@ class NowPlayingBridge {
     // 最后一次推给页面的快照。页面切走再切回来时发 'ping'，直接把这份重发一遍，
     // 不用等辅助程序下一次变化（一首歌可能播好几分钟都不变）。
     this.last = EMPTY;
+    /** 页面有没有用 preload 发过动作。详见 handle() 的注释。 */
+    this.viaIpc = false;
+  }
+
+  /**
+   * 页面通过 preload 进来的动作。走这条就不再需要轮询 outbox。
+   *
+   * 与 `attachNowPlaying` 里那个 400ms 循环是同一个分发逻辑，
+   * 只是入口不同：那边从页面数组里取，这边直接从 IPC 参数来。
+   */
+  async accept(webContents, action) {
+    this.viaIpc = true;
+    if (typeof action !== 'string') return;
+    if (action === 'start') this.start(webContents);
+    else if (action === 'ping') this.replay(webContents);
+    else if (action === 'stop') this.stop();
+    else this.send(action);
   }
 
   /** 把手上这份快照立刻重发给页面。 */
@@ -41,6 +59,13 @@ class NowPlayingBridge {
   handle(webContents, payload) {
     this.last = payload;
     if (!webContents || webContents.isDestroyed()) return;
+    // 只走一条路：页面用 preload 发过动作（accept）就走 IPC，否则用旧的全局量。
+    // 两条一起发会让页面把同一份快照处理两次——`listenNowPlaying` 的回调会
+    // 重新算一遍碟面配色，重复一次就是白掉一帧。
+    if (this.viaIpc) {
+      webContents.send('now:snapshot', payload);
+      return;
+    }
     webContents.executeJavaScript(`window.__ravenNowPlaying && window.__ravenNowPlaying(${JSON.stringify(payload)})`, true)
       .catch(() => undefined);
   }
@@ -110,9 +135,23 @@ class NowPlayingBridge {
 function attachNowPlaying() {
   const bridge = new NowPlayingBridge();
 
-  // 页面没有 preload，只能靠主进程主动去取它的 outbox。
+  /**
+   * 页面通过 preload 发进来的动作。
+   *
+   * 有这条通道之后，下面那个 400ms 轮询就完全可以不跑了；但探针建的窗口
+   * 没有 preload，仍然需要它。所以轮询留着，只是在页面明确用 IPC 说话之后
+   * 就没什么可轮的了（outbox 会一直是空数组）。
+   */
+  ipcMain.on('now:action', (event, action) => {
+    void bridge.accept(event.sender, action);
+  });
+
+  // 页面没有 preload 时，只能靠主进程主动去取它的 outbox。
   // 400ms 一次，空数组时几乎不花钱；拿到就清空，避免重复执行。
   setInterval(async () => {
+    // 已经走 IPC 的页面不必再轮询：它的 outbox 永远是空的，
+    // 每 400ms 白跑一次 executeJavaScript（每次都要过一遍沙箱边界）。
+    if (bridge.viaIpc) return;
     // 必须排除专注小窗：它也是 BrowserWindow，而且里面没有 outbox 这套变量。
     // 以前按 [0] 取，只有一个窗口时没事；有了小窗之后可能取到小窗，
     // 于是命令永远读不到，传输键看着像失灵。
