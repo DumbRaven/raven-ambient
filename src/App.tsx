@@ -257,7 +257,19 @@ export default function App() {
     const month = now.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
     return `${weekday} · ${month} ${String(now.getDate()).padStart(2, '0')}`;
   })();
-  const visible = cabinetRecords(cabinet, filter, query);
+  /**
+   * 当前真正生效的筛选。
+   *
+   * 外部音乐模式下唱片柜里只剩环境音（`cabinetRecords` 会把音乐整类过滤掉），
+   * 页签栏也不再有「音乐」这一格。`filter` 这个 state 还可能是 `'music'`：
+   * 关掉外部模式的瞬间、或者用户上次就停在那儿。直接用原始 state 会得到
+   * 「三个页签都不高亮、柜子空着、空态按钮还推你去导音乐」。
+   *
+   * 做成派生值而不是再写一处 `setFilter`：改 state 有先后顺序问题
+   * （这一帧渲染用的还是旧值），派生值当帧就对。
+   */
+  const activeFilter: CabinetFilter = cabinet.lineMode && filter === 'music' ? 'ambient' : filter;
+  const visible = cabinetRecords(cabinet, activeFilter, query);
   const pages = pageCount(visible.length);
   const currentPage = clampPage(page, visible.length);
   const shown = paginate(visible, currentPage);
@@ -389,7 +401,17 @@ export default function App() {
   function turnPage(direction: number) { goToPage(currentPage + direction); }
   // 导入后要翻到最后一页；这里重新算一遍过滤结果，避免用到本次渲染前的 visible。
   function jumpToLastPage() { setPage(pageCount(cabinetRecords(cabinetRef.current, importType, query).length) - 1); setFocusId(undefined); }
-  function editRecord(id: string, changes: Partial<RecordItem>) { change({ records: cabinetRef.current.records.map(r => r.id === id ? { ...r, ...changes } : r) }); }
+  /**
+   * 改一张唱片的元数据。
+   *
+   * 这里**必须用会抛的 commit**，不能走吞异常的 `change()`：编辑弹窗要根据
+   * 成败决定关不关窗。走 change 的话，配额满 / 快照过期时用户点「保存介绍」
+   * 只会闪一条 toast、窗立刻关、重开看到旧内容——他刚打的字全没了，
+   * 而且没有任何东西告诉他保存失败过。
+   */
+  function editRecord(id: string, changes: Partial<RecordItem>) {
+    commit({ ...cabinetRef.current, records: cabinetRef.current.records.map(r => r.id === id ? { ...r, ...changes } : r) });
+  }
   /**
    * 开关外部音乐模式。
    * 开：先抓虚拟声卡，抓不到就整体不生效（免得界面进了外部模式却没声音）；
@@ -407,6 +429,9 @@ export default function App() {
       const stream = await line.current.open();
       player.current?.attachLineIn(stream);
       change({ lineMode: true });
+      // 不用在这里 setFilter 把「音乐」改掉：渲染时 activeFilter 会把
+      // lineMode 下的 music 降级成 ambient（见那边的注释）。改 state 反而会
+      // 把用户原来的选择吃掉——他关掉外部模式后回不到音乐那一栏了。
       // 打开外部音乐模式就等于「要听了」：环境音必须同时起来。
       // 否则外部音乐在响、环境音静音，避让没有任何东西可以压，
       // 用户只会觉得「避让没生效」。
@@ -681,7 +706,18 @@ export default function App() {
     change({ media: keep });
   }
   function openEdit(record = focused) { if (!record) return; setFocusId(record.id); setDraft({ name: record.name, artist: record.artist, description: record.description }); setDraftError(''); setModal('edit'); }
-  function chooseCover(cover: AmbientCover) { if (!focused) return; editRecord(focused.id, { coverId: undefined, coverPreset: cover.id, color: cover.color }); }
+  /**
+   * 换封面：封面库和「按名称重新匹配」都走这里。
+   *
+   * 调的是会抛的 `editRecord`，而这几颗按钮是直接挂在弹窗里的（不像保存那样
+   * 有提交回调可以 catch），所以失败必须就地兜住：不兜的话异常会从 React 的
+   * 事件处理里逃出去，封面没换成、界面也没提示。
+   */
+  function chooseCover(cover: AmbientCover) {
+    if (!focused) return;
+    try { editRecord(focused.id, { coverId: undefined, coverPreset: cover.id, color: cover.color }); }
+    catch (error) { notify(message(error)); }
+  }
   function autoCover() {
     const cover = matchAmbientCover(draft.name);
     if (cover) { chooseCover(cover); notify(`已换成「${cover.name}」封面。`); }
@@ -755,6 +791,9 @@ export default function App() {
     try { commit(removeRecord(cabinetRef.current, record.id)); setFocusId(undefined); setModal(null); notify('已从唱片柜移除，源文件不受影响。'); } catch { /* notice already shown */ }
   }
   async function clearBackground() {
+    // 和 clearCoverCache 一样要挡住并发：这里会整份 commit，跑到一半和导入 /
+    // 封面写入交错，两边各写一次完整 cabinet，后来者把前者的改动盖掉。
+    if (busyRef.current) return;
     try {
       cabinetStorage.current.assertWritable();
       // 顺序反了会留下半截状态：先删资产、再存文本，如果存文本失败（配额满、
@@ -839,8 +878,8 @@ export default function App() {
             <span className="flip-marker" aria-hidden="true" />
             {(cabinet.lineMode ? (['selected', 'ambient'] as const) : (['selected', 'music', 'ambient'] as const)).map(type => <button
               key={type}
-              aria-pressed={filter === type}
-              className={filter === type ? 'active' : ''}
+              aria-pressed={activeFilter === type}
+              className={activeFilter === type ? 'active' : ''}
               onClick={event => selectFilter(type, event.currentTarget)}
             >{type === 'selected' ? '已选择' : type === 'music' ? '音乐' : '环境音'}</button>)}
           </div>
@@ -852,7 +891,7 @@ export default function App() {
         <div ref={shelfRef} className={`cabinet-layout ${!cabinet.records.length ? 'empty-cabinet-layout' : ''}`} data-motion={filterMotion.phase} style={{ '--wipe-x': `${shelfWipe.x}px`, '--wipe-y': `${shelfWipe.y}px`, '--wipe-r': `${shelfWipe.r}px` } as CSSProperties}>
           <section className="cabinet" aria-label="我的唱片柜"><div className="cabinet-corners"><i /><i /><i /><i /></div>
             {!cabinet.records.length ? <div className="empty-cabinet"><div className="empty-art"><Sleeve playing={false} preview /></div><span className="shelf-line" /><div className="empty-copy"><h2>唱片柜还是空的</h2><button className="primary-button" disabled={!ready || !!busy} onClick={() => openImport()}><Plus size={14} />放入第一张唱片</button></div></div> : <>
-              <div className="shelf-label"><span>{filter === 'ambient' ? '此刻的环境音' : '此刻的声音'}</span><span><RollNumber value={visible.length} minDigits={2} /></span></div>
+              <div className="shelf-label"><span>{activeFilter === 'ambient' ? '此刻的环境音' : '此刻的声音'}</span><span><RollNumber value={visible.length} minDigits={2} /></span></div>
 
               <ul className="record-grid">
                 {shown.map(record => <RecordCard
@@ -884,16 +923,16 @@ export default function App() {
               </nav>}
               {!visible.length && <div className="no-results">
                 <Disc3 size={28} />
-                <p>{query ? '还没有找到这张唱片。' : filter === 'selected' ? '把喜欢的声音，加入此刻。' : '这一格，等一个新的声音。'}</p>
-                {filter === 'selected' && !query ? <>
+                <p>{query ? '还没有找到这张唱片。' : activeFilter === 'selected' ? '把喜欢的声音，加入此刻。' : '这一格，等一个新的声音。'}</p>
+                {activeFilter === 'selected' && !query ? <>
                   <small>在音乐和环境音中点击 ＋，就会出现在这里。</small>
                   <div className="selection-links">
                     <button className="text-button" onClick={event => selectFilter('music', event.currentTarget)}>挑选音乐<ArrowRight size={12} /></button>
                     <button className="text-button" onClick={event => selectFilter('ambient', event.currentTarget)}>挑选环境音 <ArrowRight size={12} /></button>
                   </div>
-                </> : <button className="text-button" onClick={() => openImport(filter === 'ambient' ? 'ambient' : 'music')}>收藏本地音频 <Plus size={12} /></button>}
+                </> : <button className="text-button" onClick={() => openImport(activeFilter === 'ambient' ? 'ambient' : 'music')}>收藏本地音频 <Plus size={12} /></button>}
               </div>}
-              <button className="add-to-shelf" disabled={!!busy} onClick={() => openImport(filter === 'ambient' ? 'ambient' : 'music')}><Plus size={15} /><span>再收藏一个声音</span></button>
+              <button className="add-to-shelf" disabled={!ready || !!busy} onClick={() => openImport(activeFilter === 'ambient' ? 'ambient' : 'music')}><Plus size={15} /><span>再收藏一个声音</span></button>
             </>}
             <div className="cabinet-base"><span>R / A</span><span>HANDLE WITH FEELING.</span><i /></div>
           </section>
@@ -909,7 +948,7 @@ export default function App() {
               onPreview={() => void togglePreview(focused)}
               onRemove={() => removeFromCabinet(focused)}
               onSelect={() => choose(focused)}
-              onChange={changes => editRecord(focused.id, changes)}
+              onChange={changes => { try { editRecord(focused.id, changes); } catch (error) { notify(message(error)); } }}
             />
           </> : <div className="empty-notes"><Sparkles size={25} strokeWidth={1} /><p>点开一张唱片，<br />它的介绍会出现在这里。</p></div>}</aside>
         </div>
@@ -979,24 +1018,29 @@ export default function App() {
         onOrder={() => change({ order: nextOrder(cabinet.order) })}
         onMaster={value => change({ master: value })}
       />
-      <dialog ref={modalRef} className="modal" data-motion={dialogMotion.phase} aria-label="空间窗口" onClick={e => { if (e.target === modalRef.current && !busy) setModal(null); }}><div className="modal-content" inert={dialogMotion.phase === 'exit'}><button className="modal-close icon-button" aria-label="关闭窗口" disabled={!!busy} onClick={() => setModal(null)}><X size={18} /></button>
+      <dialog ref={modalRef} className="modal" data-motion={dialogMotion.phase} aria-labelledby="modal-title" onClick={e => { if (e.target === modalRef.current && !busy) setModal(null); }}><div className="modal-content" inert={dialogMotion.phase === 'exit'}><button className="modal-close icon-button" aria-label="关闭窗口" disabled={!!busy} onClick={() => setModal(null)}><X size={18} /></button>
       {shownModal === 'import' && <ImportModal importType={importType} busy={busy} ready={ready} report={report} onType={setImportType} onFiles={() => filesInput.current?.click()} onFolder={() => folderInput.current?.click()} />}
       {shownModal === 'edit' && focused && <EditModal
         record={focused}
         draft={draft}
         draftError={draftError}
         busy={busy}
+        confirming={confirmRemove === focused.id}
         nameInputRef={nameInputRef}
         onDraft={setDraft}
         onSubmit={() => {
           setDraftError('');
-          editRecord(focused.id, { ...draft, name: draft.name.trim() });
+          // 存不进去就别关窗：一关窗用户在弹窗里刚打的字就没了，重开看到的是
+          // 旧内容，而他只会看到一闪而过的 toast。失败原因写进 draftError，
+          // EditModal 会把名称框标红、把这句话放在框下面（那条支路本来就在）。
+          try { editRecord(focused.id, { ...draft, name: draft.name.trim() }); }
+          catch (error) { setDraftError(message(error)); return; }
           setModal(null);
         }}
         onChooseCover={chooseCover}
         onAutoCover={autoCover}
         onUploadCover={() => coverInput.current?.click()}
-        onRemove={() => takeOffShelf(focused)}
+        onRemove={() => removeFromCabinet(focused)}
       />}
       {shownModal === 'settings' && <SettingsModal
         cabinet={cabinet}

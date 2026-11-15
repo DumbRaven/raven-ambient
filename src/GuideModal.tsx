@@ -4,7 +4,7 @@ import { ArrowRight } from 'lucide-react';
 export default function GuideModal({ onClose }: { onClose: () => void }) {
   return (
     <>
-      <h2>使用说明</h2>
+      <h2 id="modal-title">使用说明</h2>
       <div className="guide-steps">
         <p>
           <span>01</span>

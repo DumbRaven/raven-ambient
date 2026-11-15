@@ -55,6 +55,16 @@ test('selected shelf contains only selections, follows queue order, and updates 
   assert.equal(cabinetRecords({ ...state, queue: [], ambience: [] }, 'selected').length, 0);
   assert.equal(cabinetRecords(state, 'ambient').length, 2);
 });
+test('外部音乐模式下要音乐那一栏，拿到的是空列表', () => {
+  const state = { ...emptyCabinet, records: [record('a', 'music'), record('rain', 'ambient')], queue: ['a'], ambience: ['rain'], lineMode: true };
+  // 这就是「停在音乐筛选上开了外部模式」时用户看到空柜的原因：不是数据丢了，
+  // 是这个筛选在这个模式下本来就没有东西。界面得把筛选降级，别让柜子空着。
+  assert.deepEqual(cabinetRecords(state, 'music').map(r => r.id), []);
+  assert.deepEqual(cabinetRecords(state, 'ambient').map(r => r.id), ['rain']);
+  assert.deepEqual(cabinetRecords(state, 'selected').map(r => r.id), ['rain'], '已选择里音乐那半也被过滤掉');
+  // 关掉之后音乐原样回来：queue 一直原封不动存着
+  assert.deepEqual(cabinetRecords({ ...state, lineMode: false }, 'music').map(r => r.id), ['a']);
+});
 test('limit simultaneous ambience to eight while allowing deselection', () => {
   const records = Array.from({ length: 9 }, (_, i) => record(String(i), 'ambient'));
   const state = { ...emptyCabinet, records, ambience: records.slice(0, 8).map(r => r.id) };

@@ -12,11 +12,13 @@ export type EditDraft = { name: string; artist: string; description: string };
  * 名称是唯一必填项：没有名字的唱片在柜子里就是一个色块，找不回来。
  * 校验失败时抖一下输入框而不是只显示一行红字，让眼睛知道该看哪里。
  */
-export default function EditModal({ record, draft, draftError, busy, nameInputRef, onDraft, onSubmit, onChooseCover, onAutoCover, onUploadCover, onRemove }: {
+export default function EditModal({ record, draft, draftError, busy, confirming, nameInputRef, onDraft, onSubmit, onChooseCover, onAutoCover, onUploadCover, onRemove }: {
   record: RecordItem;
   draft: EditDraft;
   draftError: string;
   busy: string;
+  /** 已经点过一次「从唱片柜移除」，这颗按钮现在是红色的确认态。 */
+  confirming: boolean;
   nameInputRef: RefObject<HTMLInputElement | null>;
   onDraft: (next: EditDraft) => void;
   onSubmit: () => void;
@@ -43,7 +45,7 @@ export default function EditModal({ record, draft, draftError, busy, nameInputRe
 
   return (
     <>
-      <h2>编辑唱片</h2>
+      <h2 id="modal-title">编辑唱片</h2>
       <form
         onSubmit={e => {
           e.preventDefault();
@@ -113,9 +115,17 @@ export default function EditModal({ record, draft, draftError, busy, nameInputRe
           保存介绍
         </button>
       </form>
-      <button className="text-button remove-record" onClick={onRemove}>
+      {/* 两段确认，和右侧介绍栏那颗删除按钮同一套：第一下变红，第二下才真删。
+          这里本来是一下直删——它紧贴着「保存介绍」，误触代价是一张唱片的名字、
+          作者、介绍、封面引用一起没了，而旁边同功能的入口都要点两下。 */}
+      <button
+        type="button"
+        className={`text-button remove-record ${confirming ? 'armed' : ''}`}
+        disabled={!!busy}
+        onClick={onRemove}
+      >
         <Trash2 size={12} />
-        从唱片柜移除
+        {confirming ? '再点一下，真的移出' : '从唱片柜移除'}
       </button>
     </>
   );

@@ -27,7 +27,7 @@ export default function SettingsModal({ cabinet, busy, background, lineError, st
 }) {
   return (
     <>
-      <h2>设置</h2>
+      <h2 id="modal-title">设置</h2>
 
       <div className="settings-group">
         <h3>空间的颜色</h3>
@@ -36,7 +36,7 @@ export default function SettingsModal({ cabinet, busy, background, lineError, st
           {busy || '选择背景照片'}
         </button>
         {background && (
-          <button className="text-button" onClick={onClearBackground}>
+          <button className="text-button" disabled={!!busy} onClick={onClearBackground}>
             <RotateCcw size={12} />
             恢复默认背景
           </button>

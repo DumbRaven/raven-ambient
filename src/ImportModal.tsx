@@ -18,7 +18,7 @@ export default function ImportModal({ importType, busy, ready, report, onType, o
 }) {
   return (
     <>
-      <h2>收藏声音</h2>
+      <h2 id="modal-title">收藏声音</h2>
       <div className="import-types">
         <button className={importType === 'music' ? 'selected' : ''} disabled={!!busy} onClick={() => onType('music')}>
           <Music2 size={22} />
