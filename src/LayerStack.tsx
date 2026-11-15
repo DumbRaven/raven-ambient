@@ -159,6 +159,11 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
     if ((event.target as HTMLElement).closest('.dw-kill')) return;
     if ((event.target as HTMLElement).closest('.layer-grip')) return;
     event.preventDefault();
+    /* 上面那句 preventDefault 同时挡掉了「按下就聚焦」这个默认行为，
+       于是鼠标点中一块图层之后焦点仍在别处，方向键挪不动它——键盘用户
+       得先 Tab 一圈才轮到刚点的那块。这里把聚焦补回来。
+       preventScroll 是必须的：拖动过程中聚焦若触发滚动，画面会跟着跳。 */
+    if (editable) event.currentTarget.focus({ preventScroll: true });
     // 指针捕获抓不到就别抓（合成事件、或指针已经抬起时会抛 NotFoundError）。
     // **不能让这一句把后面的 setDrag 一起打断**——曾经没包 try/catch，
     // 探针里量到「按下去之后整块一动不动」。
@@ -263,7 +268,9 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
     };
   }, [resize, onChange, value]);
 
-  // 时钟每分钟跳一次就够，秒针在这里没有意义。日期跟着它跨零点。
+  // 时钟看的是「分」，不是「秒」。20 秒一跳足够让分钟跟上（最坏晚 20 秒），
+  // 而日期跨零点也在这条链上——所以这里不能真的写成「每分钟」，那样用户
+  // 盯着表看时会发现分钟最多晚 60 秒才变。20 秒是刻意选的小一个量级。
   const [at, setAt] = useState(() => new Date());
   useEffect(() => {
     const timer = window.setInterval(() => setAt(new Date()), 20_000);

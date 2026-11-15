@@ -222,7 +222,7 @@ class Program {
         return best;
     }
 
-    static Snapshot Pick(GlobalSystemMediaTransportControlsSessionManager mgr) {
+    static Snapshot Pick(GlobalSystemMediaTransportControlsSessionManager mgr, Snapshot previous) {
         var sessions = mgr.GetSessions();
         GlobalSystemMediaTransportControlsSession best = null;
         int bestScore = int.MaxValue;
@@ -254,10 +254,26 @@ class Program {
             var info = best.GetPlaybackInfo();
             snap.status = info.PlaybackStatus.ToString();
             snap.playing = snap.status == "Playing";
-            string mime;
-            var bytes = ReadCover(best, out mime);
-            if (bytes != null && mime.Length > 0) {
-                snap.cover = "data:" + mime + ";base64," + Convert.ToBase64String(bytes);
+            // 上一份快照的封面能复用就复用。
+            //
+            // ReadCover 最多要读 4MB 再 base64 成五六兆字符，而主循环 700ms 一轮。
+            // 歌一直在放、封面却一直不变的时候，这段读盘就是纯浪费——而且它在
+            // 唯一一条输出线程上，慢一点就是整条链路的延迟。
+            // 只有「同一个播放器、同一个标题、同一个歌手」才复用；换歌必换封面。
+            // 标题歌手都一样而封面换了的极端情况（同名单曲换专辑图）会漏掉一次，
+            // 下一轮窗口切过去时自然补上，不值得为此每轮都读。
+            if (previous != null
+                && previous.app == snap.app
+                && previous.title == snap.title
+                && previous.artist == snap.artist
+                && previous.cover.Length > 0) {
+                snap.cover = previous.cover;
+            } else {
+                string mime;
+                var bytes = ReadCover(best, out mime);
+                if (bytes != null && mime.Length > 0) {
+                    snap.cover = "data:" + mime + ";base64," + Convert.ToBase64String(bytes);
+                }
             }
         } catch { }
         return snap;
@@ -288,7 +304,7 @@ class Program {
 
         if (mode == "--once") {
             Console.OutputEncoding = Encoding.UTF8;
-            Console.WriteLine(Pick(mgr).ToJson());
+            Console.WriteLine(Pick(mgr, null).ToJson());
             return 0;
         }
 
@@ -299,6 +315,8 @@ class Program {
         var stdout = new StreamWriter(Console.OpenStandardOutput(), enc);
         stdout.AutoFlush = true;
         string lastKey = null;
+        // 上一份快照，只为了复用封面（见 Pick 里的注释）。
+        Snapshot lastSnap = null;
 
         var reader = new Thread(() =>
         {
@@ -337,10 +355,11 @@ class Program {
             }
 
             try {
-                var snap = Pick(mgr);
+                var snap = Pick(mgr, lastSnap);
                 string key = snap.Key();
                 if (key != lastKey) {
                     lastKey = key;
+                    lastSnap = snap;
                     stdout.WriteLine(snap.ToJson());
                 }
             } catch { /* 播放器刚关掉这类瞬时错误，下一轮再说 */ }

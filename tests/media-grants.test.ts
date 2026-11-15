@@ -163,3 +163,62 @@ test('移出目录会真的撤销授权', () => {
     cleanup();
   }
 });
+
+test('末尾带点号或空格的系统目录也进不来', () => {
+  // Windows 的路径末尾点号与空格会被文件系统忽略，`C:\Windows.` 打开的就是
+  // `C:\Windows`。台账里若存下带点号的那一份，黑名单就比不上了。
+  assert.equal(looksLikeFolder('C:\\Windows.'), false);
+  assert.equal(looksLikeFolder('C:\\Windows '), false);
+  assert.equal(looksLikeFolder('C:\\Windows. . '), false);
+  assert.equal(looksLikeFolder('C:\\Program Files.'), false);
+});
+
+test('真的叫「..b」的子目录不算越界', () => {
+  // 判越界只认 `..` 本身或者 `..\<名字>`，不能整片 `startsWith('..')`——
+  // 那样一个合法叫 `..b` 的目录里所有文件都读不了。
+  const { root, cleanup } = tempTree();
+  try {
+    const odd = path.join(root, '..b');
+    fs.mkdirSync(odd, { recursive: true });
+    const file = path.join(odd, 'cover.png');
+    fs.writeFileSync(file, 'x');
+    assert.equal(isWithin(file, [root]), true, '「..b」是个正常目录名');
+  } finally {
+    cleanup();
+  }
+});
+
+test('目录里的目录链接指到外面，就走不出去', () => {
+  // 早先 isWithin 会拿「解析后的真实路径」与「原路径」各试一次，命中任一就放行。
+  // 链接本身就在用户选的目录里，于是原路径那条永远成立 —— 链接穿越成功。
+  // 现在只认真实路径。
+  const { root, cleanup } = tempTree();
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'raven-outside-'));
+  try {
+    const secret = path.join(outside, 'secret.png');
+    fs.writeFileSync(secret, 'top secret');
+    const link = path.join(root, 'escape');
+    let linked = false;
+    try {
+      fs.symlinkSync(outside, link, 'junction');
+      linked = true;
+    } catch { /* 没权限，见下面 */ }
+
+    if (!linked) {
+      assert.ok(true, '当前环境建不出目录链接，跳过');
+      return;
+    }
+
+    assert.equal(isWithin(path.join(link, 'secret.png'), [root]), false, '穿过链接就到了外面');
+  } finally {
+    fs.rmSync(outside, { recursive: true, force: true });
+    cleanup();
+  }
+});
+
+test('8.3 短名也绕过不了系统目录黑名单', () => {
+  // `C:\PROGRA~1` 就是 `C:\Program Files`。普通 realpathSync 原样返回短名，
+  // 黑名单里那串长名永远比不上；realpathSync.native 会展开它。
+  assert.equal(looksLikeFolder('C:\\PROGRA~1'), false);
+  assert.equal(looksLikeFolder('C:\\PROGRA~1\\Common Files'), false);
+});

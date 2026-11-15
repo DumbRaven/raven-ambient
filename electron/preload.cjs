@@ -36,7 +36,7 @@ const SEND = new Set([
   'media:request',
   /** 外部音乐：start / stop / ping / toggle / next / prev。 */
   'now:action',
-  /** 番茄钟小窗：toggle / skip / close / prev / next / reveal。 */
+  /** 番茄钟小窗：小窗发 toggle / skip / close / prev / next，主窗口发 reveal。 */
   'focus:action',
   /** 桌面放映窗上按下的动作（切歌、换石头、改雨量、回传图层）。 */
   'stage:command',
@@ -44,7 +44,17 @@ const SEND = new Set([
   'stage:snapshot',
 ]);
 
-/** 主进程 → 页面。与 SEND 分开列：一条通道两个方向都能用，页面就能伪造主进程的消息。 */
+/**
+ * 主进程 → 页面。与 SEND 分开列：一条通道两个方向都能用，页面就能伪造主进程的消息。
+ *
+ * ⚠ 这里和 SEND **逐条不相交**，两条转发通道也因此改过名：
+ *   `stage:command` / `focus:action` 是「页面发、主进程收」，主进程要把同一条动作
+ *   **再送到另一个渲染进程**时走的是 `stage:press` / `focus:press`。
+ *   原本两边共用同一个通道名，页面侧来 on() 时被白名单拒掉，
+ *   于是桌面窗点切歌、小窗点暂停全都是静默丢弃——而 `viaIpc` 已经被置 true，
+ *   连轮询那条旧路也一起关了。取名分开而不是加一个「双向白名单」，
+ *   是因为这份名单防的正是「页面自己伪造一条主进程推来的消息」，两个方向共用就白防了。
+ */
 const RECEIVE = new Set([
   /** 媒体库的扫描结果、放行目录、拒收原因。 */
   'media:message',
@@ -52,10 +62,14 @@ const RECEIVE = new Set([
   'now:snapshot',
   /** 番茄钟读数，推给桌面小窗。 */
   'focus:snapshot',
+  /** 小窗上按下的动作，主进程转给主窗口（见下面 SEND 里同名的那条）。 */
+  'focus:press',
   /** 放映快照，推给桌面放映窗。 */
   'stage:paint',
   /** 桌面放映窗被关掉了，主窗口需要知道。 */
   'stage:closed',
+  /** 桌面放映窗上按下的动作，主进程转给主窗口（见下面 SEND 里同名的那条）。 */
+  'stage:press',
 ]);
 
 contextBridge.exposeInMainWorld('raven', {

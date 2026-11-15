@@ -107,6 +107,9 @@ function TicketFace({ item, index }: { item: MediaItem; index: number }) {
   // 拿不到目录时退回一句兜底，不让票根上「FROM」后面空着。
   const folder = item.source ? folderOf(item.source) : folderOf(item.path);
   const venue = folder || 'LOCAL LIBRARY';
+  // 悬停提示用**原始文件名**（带扩展名），而票面正文用 titleOf（去扩展名）——
+  // 两处故意不一致：票面上要好看，悬停是用户想知道「这到底是哪个文件」的时候，
+  // `.mp4` 还是 `.webm` 正好是那一刻唯一有用的信息。同名一串时靠它才分得清。
   const name = <b className="ticket-name" title={item.name}>{titleOf(item)}</b>;
   const barcode = <Barcode id={item.id} />;
 
@@ -308,7 +311,15 @@ function TicketStage({
     event.preventDefault();
     const panel = (event.currentTarget as HTMLElement).getBoundingClientRect();
     drag.current = { id: event.pointerId, startY: event.clientY, height: panel.height };
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    // 指针捕获抓不到就别抓（合成事件、或指针已经抬起时会抛 NotFoundError）。
+    // 不能让这一句把后面的 setHolding 一起打断——断了 data-holding 就一直是
+    // 'false'，关过渡的那组规则不生效，表现是「按住没反应、纸不跟手」。
+    // 和 LayerStack 那两处是同一个坑，那边 2026-11 就因为没包它量到过同样现象。
+    try {
+      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    } catch {
+      /* 抓不到也没关系：move/up 的监听本来就挂在元素自己身上 */
+    }
     setHolding(true);
   }
 
@@ -487,11 +498,28 @@ export default function MediaTickets({ items, active, seen, currentId, listRef, 
   // 键盘用户得从头 Tab 一遍才能继续挑下一张。
   const opener = useRef<HTMLElement | null>(null);
 
-  const close = useCallback(() => {
-    setOpenId('');
-    opener.current?.focus();
+  const close = useCallback(() => { setOpenId(''); }, []);
+
+  /**
+   * 关掉浮层之后把焦点还给「打开它的那张票」。不还的话焦点落到 <body>，
+   * 键盘用户得从头 Tab 一遍才能继续挑下一张。
+   *
+   * 为什么必须放在 effect 里而不是 close() 里直接 focus()：close() 先
+   * setOpenId('')，那一刻 React 还没提交这次更新，<ul>/<nav> 上的 inert
+   * 仍然挂着，而 Chromium 对 inert 子树直接忽略 focus()——焦点会掉到
+   * <body>，opener 又被清成 null，连重试的机会都没有。
+   * 放进 effect 里就是等这次提交完成、inert 已经摘掉之后再聚焦。
+   *
+   * onDone（撕开之后换片放映）走的是另一条路：它把 opener 置 null 再关，
+   * 所以这个 effect 看到 null 会早退，不会把焦点抢回一张已经被撕掉的票。
+   */
+  useEffect(() => {
+    if (openId) return;
+    const target = opener.current;
+    if (!target) return;
     opener.current = null;
-  }, []);
+    target.focus();
+  }, [openId]);
 
   // 纸纹滤镜只需要一份，抹在整个列表与浮层的票根上（CSS 里 filter: url(#id)）。
   // 插在 <body> 上而不是某个票根里：被 mask 裁过的容器里引用滤镜，
@@ -518,7 +546,35 @@ export default function MediaTickets({ items, active, seen, currentId, listRef, 
 
   useEffect(() => {
     if (!openId) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') close(); };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { close(); return; }
+      if (event.key !== 'Tab') return;
+      // 焦点陷阱。`.ticket-stage` 是 position:fixed inset:0 的全屏遮罩，但页面
+      // 里别的东西（媒体来源那一排「重新扫描」「移出」、添加按钮、放映控制键）
+      // 并没有被 inert —— 浮层开着时按 Tab 走到底，焦点会跑进被遮罩盖住的按钮里，
+      // 画面上看不见焦点在哪，回车却会真的触发它（最坏是「移出壁纸库」）。
+      // 只把那一片整体 inert 是不行的：遮罩与它在同一层 DOM，动它就要重排。
+      // 所以在这里把 Tab 圈回浮层内部，代价最小。
+      const stage = document.querySelector('.ticket-stage');
+      if (!stage) return;
+      const focusable = Array.from(
+        stage.querySelectorAll<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])'),
+      ).filter(element => !element.hasAttribute('disabled'));
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const current = document.activeElement;
+      if (!stage.contains(current)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && current === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && current === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [openId, close]);

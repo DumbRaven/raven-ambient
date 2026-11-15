@@ -33,20 +33,36 @@ test('页面能发的通道：五个，一个不多', () => {
   ]);
 });
 
-test('主进程能推的通道：五个，一个不多', () => {
+test('主进程能推的通道：七个，一个不多', () => {
   assert.deepEqual(RECEIVE, [
+    'focus:press',
     'focus:snapshot',
     'media:message',
     'now:snapshot',
     'stage:closed',
     'stage:paint',
+    'stage:press',
   ]);
 });
 
 test('收和发是两份名单，互不通用', () => {
   // 一条通道两个方向都能用，意味着页面能自己伪造一条「主进程推来的消息」。
+  //
+  // 这条曾经把一个真 bug 固化下来：`stage:command` / `focus:action` 原本是
+  // 双向同名的，主进程往回推时被 RECEIVE 白名单拒掉，桌面窗上的切歌、小窗上的
+  // 暂停全都是静默丢弃。改法不是放宽这条断言，而是把回传方向改名为
+  // `stage:press` / `focus:press` —— 见 preload.cjs 里 RECEIVE 上方的 ⚠。
   for (const channel of SEND) {
     assert.equal(RECEIVE.includes(channel), false, `${channel} 同时出现在收发两侧`);
+  }
+});
+
+test('两条转发通道的收发名字必须成对存在，不许只剩一半', () => {
+  // 只改一侧就会退回「点一次跳两首」或者「点了没反应」，两种都很隐蔽。
+  const pairs = [['stage:command', 'stage:press'], ['focus:action', 'focus:press']];
+  for (const [out, back] of pairs) {
+    assert.ok(SEND.includes(out), `页面发不出去 ${out}`);
+    assert.ok(RECEIVE.includes(back), `页面收不到 ${back}`);
   }
 });
 
@@ -103,5 +119,36 @@ test('通道名里没有空串或纯空白，都带方向前缀', () => {
     assert.equal(channel, channel.trim());
     assert.equal(channel.includes(' '), false);
     assert.ok(channel.includes(':'), `${channel} 缺少方向前缀`);
+  }
+});
+
+test('主进程的转发监听在模块级只注册一次，不能跟着窗口重建再挂一遍', () => {
+  // createWindow() 每次都会调 attachFocusMini / attachDesktopStage，而主窗口
+  // 是可以销毁后重建的（second-instance 的 !mainWindow 分支、macOS 的 activate）。
+  // 监听器注册若留在那两个函数里，同一条通道会累积出两个监听器，
+  // 表现为一次切歌跳两首、一次暂停被 toggle 两下——而通道改名修好之后
+  // 这个缺陷就会立刻显形，所以两条必须一起守。
+  const dir = new URL('../electron/', import.meta.url);
+  for (const [file, handlers] of [
+    ['focus-mini.cjs', ['focus:action']],
+    ['desktop-stage.cjs', ['stage:command', 'stage:snapshot']],
+  ]) {
+    const text = readFileSync(new URL(file, dir), 'utf8');
+    const rows = text.split('\n');
+    for (const channel of handlers) {
+      const line = rows.findIndex(row => row.includes(`ipcMain.on('${channel}'`));
+      assert.ok(line >= 0, `${file} 里找不到 ${channel} 的监听`);
+      // 判据：注册行必须出现在 attach 函数定义**之前**（模块级），
+      // 出现在它之后就只有一种可能——被包进了那个每次 createWindow() 都会调的函数。
+      // 不直接用「必须顶格」是因为注册可以合理地包在 `if (ipcMain) {}` 里
+      // （纯 node 测试直接 require 这个模块时 ipcMain 是 undefined）。
+      const attach = rows.findIndex(row => row.startsWith('function attach'));
+      assert.ok(attach > 0, `${file} 里找不到 attach 函数`);
+      assert.equal(
+        line < attach,
+        true,
+        `${file} 的 ${channel} 监听被放进了 attach 函数，窗口重建会重复注册`,
+      );
+    }
   }
 });

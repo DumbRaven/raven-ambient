@@ -49,8 +49,6 @@ function DesktopStage() {
             template={snapshot.template}
             videoRef={screen}
             onPlayState={() => { /* 桌面窗没有播放按钮，播放状态由主窗口管 */ }}
-            index={snapshot.index}
-            total={snapshot.total}
             disc={snapshot.disc}
             focus={snapshot.focus}
             ambience={snapshot.ambience}

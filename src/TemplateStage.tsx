@@ -106,10 +106,6 @@ type Props = {
   /** 视频要用 video 元素而不是 img；由外面持有 ref，好让控制条能暂停/续播。 */
   videoRef: React.RefObject<HTMLVideoElement | null>;
   onPlayState: (playing: boolean) => void;
-  /** 这一件在队列里排第几。相集把 TITLE 那三项撤掉之后暂时没人读了，
-   *  留着是因为信息条那边还会用到「第几件」这类计数。 */
-  index: number;
-  total: number;
   /** 「正在听」的那张碟。拼贴版右下角画的就是它。 */
   disc?: StageDisc | null;
   /** 番茄钟读数。不传或为 null 时信息条第二格显示「未开始」。 */
@@ -161,10 +157,19 @@ type Props = {
 
 const BRAND = 'DumbRaven';
 
-/** 左上角那两行日期。AE 里是「2026 / 1020」，这里跟着当天走。 */
-const stampDate = new Date();
-const stampYear = String(stampDate.getFullYear());
-const stampDay = `${String(stampDate.getMonth() + 1).padStart(2, '0')}${String(stampDate.getDate()).padStart(2, '0')}`;
+/**
+ * 左上角那两行日期。AE 里是「2026 / 1020」，这里跟着当天走。
+ *
+ * 做成函数在渲染时现取，而不是模块级算一次常量：桌面放映窗与主界面都可能
+ * 开着过零点，模块级常量会一直停在启动那天。外层每 800ms 交一次番茄钟读数，
+ * 组件本来就在持续重渲染，跨过整点时下一拍就跟上了。
+ */
+function stampOf(date: Date) {
+  return {
+    year: String(date.getFullYear()),
+    day: `${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`,
+  };
+}
 
 /**
  * 竖排徽标。AE 源里它不是「DUMBRAVEN 十个字母顺序排」，而是把品牌拆成两个词根
@@ -201,6 +206,8 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, d
      不缓存：MediaRoom 每 800ms 会把番茄钟读数交上来，组件本来就在持续重渲染，
      时段跨过整点时下一拍就跟上了。 */
   const heading = timeOfDay();
+  /* 左上角那两行日期：每次渲染现取，跨过零点下一拍就换。理由见 stampOf。 */
+  const stamp = stampOf(new Date());
   /* PLAYLIST 的副行：本地是「01:12 / 03:48 · 列表循环」，外部是专辑。
      空串表示这一行没内容，JSX 那边就不渲染它，不留一根空线。 */
   const detail = nowDetail(now);
@@ -375,7 +382,7 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, d
           <div className="tpl-block tpl-block-media">{media}</div>
 
           {/* 左上角那两行小日期。AE 里这层叫「2026 1020」，字号 12、色 #C5AF83。 */}
-          <p className="tpl-corner-date">{stampYear}<br />{stampDay}</p>
+          <p className="tpl-corner-date">{stamp.year}<br />{stamp.day}</p>
 
           <div className="tpl-block tpl-block-panel">
             <span className="tpl-dot tpl-dot-tl" aria-hidden="true" />

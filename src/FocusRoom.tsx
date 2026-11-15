@@ -148,6 +148,14 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
   const [state, setState] = useState<FocusState>(() => initialFocusState(loadSettings()));
   const [now, setNow] = useState(() => Date.now());
   const finishing = useRef(false);
+  /**
+   * 「清空专注记录」要按两下。第一下只是把按钮变红（照 `src/App.tsx` 的
+   * `removeFromCabinet` 那套做，删唱片与删记录都是不可逆、且没别处能找回来：
+   * 这份历史只活在 localStorage 里，没有备份通道）。
+   */
+  const [confirming, setConfirming] = useState(false);
+  const confirmTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(confirmTimer.current), []);
 
   const total = focusDuration(state, settings);
   const remaining = remainingFocus(state, now);
@@ -198,12 +206,17 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
     finishing.current = false;
   }, [now, state, settings, records, onNotice]);
 
+  // 窗口标题只在「专注视图正在看着、并且计时真的在走」时接管。
+  // 这个组件是常驻挂载的（切到别的视图它也在），原来不看 active/running
+  // 就无条件写 BASE_TITLE —— 于是任何别处想改标题的地方都会被它顶掉，
+  // 而且清空 / 重置之后标题还停在 25:00 的样子。
   useEffect(() => {
-    document.title = state.running ? `${clock(remainingFocus(state, now))} · ${phaseNames[state.phase]} · Raven` : BASE_TITLE;
+    if (!active || !state.running) return;
+    document.title = `${clock(remainingFocus(state, now))} · ${phaseNames[state.phase]} · Raven`;
     return () => {
       document.title = BASE_TITLE;
     };
-  }, [state, now]);
+  }, [active, state, now]);
 
   const toggle = useCallback(() => {
     const at = Date.now();
@@ -410,14 +423,22 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
             </button>
           </label>
           <button
-            className="text-button focus-clear"
+            className={`text-button focus-clear${confirming ? ' armed' : ''}`}
             disabled={records.length === 0}
             onClick={() => {
+              if (!confirming) {
+                setConfirming(true);
+                window.clearTimeout(confirmTimer.current);
+                confirmTimer.current = window.setTimeout(() => setConfirming(false), 2000);
+                return;
+              }
+              window.clearTimeout(confirmTimer.current);
+              setConfirming(false);
               setRecords([]);
               writeStore(HISTORY_KEY, []);
             }}
           >
-            清空专注记录
+            {confirming ? '再点一下，真的清空' : '清空专注记录'}
           </button>
         </aside>
       </div>

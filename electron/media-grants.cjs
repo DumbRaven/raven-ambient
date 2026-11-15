@@ -24,12 +24,27 @@ function looksLikeFolder(dir) {
   // 而误选到盘根会把整个盘变成可读范围。
   if (/^[a-zA-Z]:$/.test(trimmed)) return false;
   // 系统目录不收。用户选中它们，几乎一定是选错了。
-  const lower = resolved.toLowerCase();
+  //
+  // 比对必须先把「用户可能写出来的等价形式」都摊平：
+  //   - 末尾的点号与空格会被文件系统忽略（`C:\Windows.` 打开的就是 `C:\Windows`）；
+  //   - `C:\PROGRA~1` 是 `C:\Program Files` 的 8.3 短名。
+  // 早先这里是拿 `path.resolve` 的结果直接比，两种写法都能绕过。
+  // `realpathOf` 走 `realpathSync.native`，短名与末尾点号都会展开成规范形式。
+  const forms = new Set([trimmed.toLowerCase()]);
+  // 末尾的点号与空格要自己剥：`realpathOf` 对它解不出来（路径字符串带点号时
+  // 系统不认，直接抛错返回空串），于是只剩「c:\windows.」这种比不上的形式。
+  // Windows 不允许建以点号或空格结尾的目录，所以剥掉不会误伤真实目录。
+  const stripped = trimmed.replace(/[. ]+$/, '');
+  if (stripped) forms.add(stripped.toLowerCase());
+  const real = realpathOf(resolved);
+  if (real) forms.add(real.replace(/[\\/]+$/, '').toLowerCase());
   const blocked = [
     'c:\\windows', 'c:\\program files', 'c:\\program files (x86)',
     'c:\\programdata', 'c:\\$recycle.bin', 'c:\\system volume information',
   ];
-  if (blocked.some(prefix => lower === prefix || lower.startsWith(prefix + '\\'))) return false;
+  for (const lower of forms) {
+    if (blocked.some(prefix => lower === prefix || lower.startsWith(prefix + '\\'))) return false;
+  }
   return true;
 }
 
@@ -148,6 +163,12 @@ class MediaGrants {
 
 /** 解析真实路径，失败（不存在、没权限）返回空串。 */
 function realpathOf(target) {
+  // 用 `realpathSync.native`：它会**展开 8.3 短名**，`C:\PROGRA~1` 得到
+  // `C:\Program Files`。普通版原样返回短名，于是黑名单里那串长名永远比不上。
+  // 实测 native 在 `C:\PROGRA~1` 上给 `C:\Program Files`，普通版给 `C:\PROGRA~1`。
+  try {
+    return fs.realpathSync.native(target);
+  } catch { /* 退到普通版，见下 */ }
   try {
     return fs.realpathSync(target);
   } catch {
@@ -164,26 +185,31 @@ function realpathOf(target) {
  * `path.relative` 会算出「还在目录里面」，系统实际打开的是链接指向的别处。
  * 一条用户目录里的链接，足以把 `media://` 变成整块盘可读。
  *
+ * **只认解析后的真实路径，不拿原路径兜底**：早先这里是「真实路径与原路径都试，
+ * 命中任一个就算通过」，于是链接恰好落回原路径时（链接本身在用户目录内）
+ * 那条链接穿越又成立了。单文件授权（用户直接点文件选的那种）由调用方
+ * `media.cjs` 的 `insideAllowed` 用 `g.files` 单独判，不需要这里再兜一次。
+ *
  * `target` 解析失败直接判否：文件不存在，调用方本来也会 404，
  * 在这里挡住能少一次 toctou 的机会。
  */
 function isWithin(target, dirs) {
   const real = realpathOf(target);
   if (!real) return false;
-  const raw = path.resolve(target);
-  // 原路径和真实路径都试：单文件授权可能记的是原路径（用户看到的就是那个）
-  const candidates = real === raw ? [real] : [real, raw];
   for (const dir of dirs) {
     if (!dir) continue;
     // 目录一侧也解析。目录不存在时退回原路径，让「目录被挪走」这类情况
     // 仍然按原样判否，而不是意外变成「全都不能读」。
     const base = path.resolve(realpathOf(dir) || path.resolve(dir));
-    for (const candidate of candidates) {
-      const rel = path.relative(base, candidate);
-      // rel 为空 = 就是这个目录本身（目录不是文件，调用方后续会挡掉）
-      // 以 `..` 开头或变成绝对路径 = 跳出去了
-      if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return true;
-    }
+    const rel = path.relative(base, real);
+    // rel 为空 = 就是这个目录本身（目录不是文件，调用方后续会挡掉）
+    // 以 `..` 开头或变成绝对路径 = 跳出去了
+    // 判 `..` 要连分隔符一起看：`..b\c.png` 是个叫「..b」的子目录，不是越界。
+    // 单看 `startsWith('..')` 会把它误判成越界，用户真有个这样的目录就读不了。
+    if (!rel) continue;
+    if (rel === '..' || rel.startsWith('..' + path.sep)) continue;
+    if (path.isAbsolute(rel)) continue;
+    return true;
   }
   return false;
 }

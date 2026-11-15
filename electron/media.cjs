@@ -70,9 +70,23 @@ function allowedDirs() {
   return [...grantsOf().dirs].filter(dir => !wallpaper.has(path.resolve(dir).toLowerCase()));
 }
 
+/**
+ * 这个渲染进程是不是子窗口（桌面放映窗 / 专注小窗）。
+ *
+ * 两者都用同一份 preload，白名单也共享，所以「能发」不等于「该处理」。
+ * 判据看 URL：子窗口各有自己的 html，主窗口是 index.html。
+ * URL 拿不到时按**是**处理——宁可让主窗口的一条请求被吃掉，
+ * 也不要让子窗口把 `target` 换走（那会让对话框开在一块看不见的窗口上）。
+ */
+function isSubWindow(webContents) {
+  if (!webContents || webContents.isDestroyed()) return true;
+  const url = webContents.getURL();
+  if (!url) return true;
+  return url.includes('mini.html') || url.includes('desktop.html');
+}
+
 /** 把目录加进白名单。**只给探针和主进程内部用**；页面来的路径走不到这里。 */
-function allowDir(dir) {
-  if (grantsOf().addDir(dir)) grantsOf().save();
+function allowDir(dir) {  if (grantsOf().addDir(dir)) grantsOf().save();
 }
 
 /** 把单个文件加进白名单。同上，只给探针和主进程内部用。 */
@@ -132,8 +146,14 @@ function kindOf(file) {
  *
  * 返回去重后的路径：注册表里那条和固定路径经常是同一个目录，
  * 不去重会把整个库扫两遍（本机 184 个作品会变成 368 件）。
+ *
+ * **结果缓存在模块级**：这条路径要 `execFileSync('reg', ...)` 起一个子进程，
+ * 而 `allowedDirs()` 被 `ping` / `forget` / `restore` 各调一次，启动时至少两次。
+ * Steam 装在哪个盘不会再变，缓存住即可。
  */
+let rootsCache = null;
 function wallpaperRoots() {
+  if (rootsCache) return rootsCache;
   const roots = [];
   // 用户把库装在别处时，Steam 会在注册表里登记
   try {
@@ -147,12 +167,13 @@ function wallpaperRoots() {
     roots.push(`${drive}:\\SteamLibrary\\steamapps\\workshop\\content\\431960`);
   }
   const seen = new Set();
-  return roots.filter(root => {
+  rootsCache = roots.filter(root => {
     const key = path.resolve(root).toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+  return rootsCache;
 }
 
 /**
@@ -226,6 +247,10 @@ function scanWallpaper(root) {
     const title = typeof project.title === 'string' && project.title.trim() ? project.title.trim().slice(0, 200) : entry.name;
     const file = typeof project.file === 'string' ? project.file : '';
     const playable = path.join(dir, file);
+    // `project.json` 是**第三方内容**（创意工坊里任何人发布的），`file` 字段
+    // 写 `..\..\..\Users\me\Pictures\x.png` 就能把一条根目录外的路径塞进媒体库。
+    // 读的时候会被白名单再挡一次，但列表里会先多出一条不存在的东西。
+    if (file && !isWithin(playable, [dir])) continue;
     const kind = file ? kindOf(playable) : '';
     let target = '';
     if (kind) {
@@ -262,6 +287,8 @@ class MediaBridge {
     this.target = null;
     /** 页面有没有用 preload 发过请求。详见 push() 的注释。 */
     this.viaIpc = false;
+    /** 上一轮 take 还在处理。定时器与 poke 可能撞在一起，见 take()。 */
+    this.busy = false;
   }
 
   /**
@@ -284,6 +311,20 @@ class MediaBridge {
   }
 
   async take(webContents) {
+    if (!webContents || webContents.isDestroyed()) return;
+    // 上一轮还没走完就跳过这一轮：`pick` 扫一个大目录可能超过 400ms，
+    // 定时器不管这些照样再进来一次，两次都读到同一批 outbox、各处理一遍。
+    // `poke()` 也可能和定时器撞在一起，所以守卫放在这里而不是定时器里。
+    if (this.busy) return;
+    this.busy = true;
+    try {
+      await this.drain(webContents);
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  async drain(webContents) {
     if (!webContents || webContents.isDestroyed()) return;
     let queued = [];
     try {
@@ -539,9 +580,19 @@ function attachMedia() {
    * 这条通道一旦有流量，说明页面装了 preload，轮询就没必要了——
    * `accept()` 会顺手把它停掉。探针建的窗口没有 preload，永远走不到这里，
    * 于是继续用轮询，两边互不干扰。
+   *
+   * **只认主窗口**：桌面放映窗和专注小窗的 preload 用的是同一份白名单，
+   * 它们也能发这条通道。让它们发进来后果不只是错，还会**改掉状态**——
+   * `accept()` 会把 `target` 换成一个全屏透明窗，之后用户在主窗口点
+   * 「添加文件夹」，对话框就挂在那块看不见的窗口上了。
+   *
+   * 判据用页面 URL 而不是 `bridge.target` 的等值：target 要等 `did-finish-load`
+   * 才设好，而 React 的首次 effect 可能跑在那一帧之前，用等值判会把第一条
+   * `ping` 吃掉。URL 在发消息这一刻已经是确定的。
    */
   ipcMain.on('media:request', (event, action) => {
     if (!action || typeof action !== 'object') return;
+    if (isSubWindow(event.sender)) return;
     void bridge.accept(event.sender, action);
   });
 
@@ -550,9 +601,17 @@ function attachMedia() {
     // 只挂主窗口：小组件和桌面放映窗都不需要媒体库，多挂一份只会白跑轮询，
     // 更糟的是 MediaBridge 只有一个 target——谁最后加载完谁抢走，
     // 主窗口的选文件、全屏这些动作就没人处理了。
-    const url = win.webContents.getURL();
-    if (url.includes('mini.html') || url.includes('desktop.html')) return;
-    win.webContents.once('did-finish-load', () => bridge.start(win.webContents));
+    //
+    // ⚠ 不能在这里读 `win.webContents.getURL()` 判断：`browser-window-created`
+    // 是在 `new BrowserWindow()` 内部**同步**触发的，那一刻还没 loadFile，
+    // URL 恒为空串——`includes('mini.html')` 永远为 false，等于没判。
+    // 判断必须挪到 `did-finish-load` 里，那时 URL 才成立。
+    win.webContents.once('did-finish-load', () => {
+      if (win.isDestroyed()) return;
+      const url = win.webContents.getURL();
+      if (url.includes('mini.html') || url.includes('desktop.html')) return;
+      bridge.start(win.webContents);
+    });
   });
 }
 

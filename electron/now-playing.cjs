@@ -141,8 +141,13 @@ function attachNowPlaying() {
    * 有这条通道之后，下面那个 400ms 轮询就完全可以不跑了；但探针建的窗口
    * 没有 preload，仍然需要它。所以轮询留着，只是在页面明确用 IPC 说话之后
    * 就没什么可轮的了（outbox 会一直是空数组）。
+   *
+   * **只认主窗口**：子窗口（桌面放映窗、专注小窗）共用同一份 preload，
+   * 也能发这条通道。让它们发进来会 `bridge.start()` 一个空窗口——外部播放器
+   * 的 outbox 挂在那块全屏透明窗上，主窗口按什么都没反应。
    */
   ipcMain.on('now:action', (event, action) => {
+    if (isSubWindow(event.sender)) return;
     void bridge.accept(event.sender, action);
   });
 
@@ -152,11 +157,11 @@ function attachNowPlaying() {
     // 已经走 IPC 的页面不必再轮询：它的 outbox 永远是空的，
     // 每 400ms 白跑一次 executeJavaScript（每次都要过一遍沙箱边界）。
     if (bridge.viaIpc) return;
-    // 必须排除专注小窗：它也是 BrowserWindow，而且里面没有 outbox 这套变量。
+    // 必须排除两个子窗口：它们也是 BrowserWindow，而且里面没有 outbox 这套变量。
     // 以前按 [0] 取，只有一个窗口时没事；有了小窗之后可能取到小窗，
-    // 于是命令永远读不到，传输键看着像失灵。
+    // 于是命令永远读不到，传输键看着像失灵。桌面放映窗是同一类，别漏第二个。
     const win = require('electron').BrowserWindow.getAllWindows()
-      .find((item) => !item.isDestroyed() && !String(item.webContents.getURL()).includes('mini.html'));
+      .find((item) => !item.isDestroyed() && !isSubWindow(item.webContents));
     if (!win || win.isDestroyed()) return;
     let actions;
     try {

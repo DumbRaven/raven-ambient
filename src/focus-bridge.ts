@@ -105,7 +105,9 @@ export function listenFocusCommand(onCommand: (action: string) => void) {
   // IPC 那头是 unknown（主进程可以发任何东西过来），在这里收窄一次。
   // 不把 onCommand 的签名放宽成 unknown：调用方要的是 string，放宽等于把
   // 类型检查推给每一个使用点。
-  if (ipc) return ipc.on('focus:action', payload => { if (typeof payload === 'string') onCommand(payload); });
+  // 收的是 `focus:press`，不是页面自己发出去的 `focus:action`：
+  // preload 的收发两份白名单互不相交，所以两个方向必须是两个名字。
+  if (ipc) return ipc.on('focus:press', payload => { if (typeof payload === 'string') onCommand(payload); });
   raven.__ravenFocusCommand = onCommand;
   return () => {
     if (raven.__ravenFocusCommand === onCommand) raven.__ravenFocusCommand = undefined;

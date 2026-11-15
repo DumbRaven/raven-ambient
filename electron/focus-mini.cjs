@@ -47,8 +47,16 @@ class FocusMini {
       this.create();
       return;
     }
-    if (!this.win.isVisible()) this.win.showInactive();
-    this.win.setAlwaysOnTop(true, 'screen-saver');
+    // 只在小窗真的从「藏起来」变成「露出来」时做这两件事。
+    //
+    // tick() 每 200ms 就会调一次 reveal()，而窗口一旦露出来它就一直是可见的；
+    // 每次都无条件 showInactive + setAlwaysOnTop 就是在反复做同一次原生调用，
+    // 用户看不出区别，机器一直在付费。'screen-saver' 这一档是持续生效的，
+    // 设一次就够了，不需要每轮刷新。
+    if (!this.win.isVisible()) {
+      this.win.showInactive();
+      this.win.setAlwaysOnTop(true, 'screen-saver');
+    }
   }
 
   hide() {
@@ -166,7 +174,9 @@ class FocusMini {
     const host = this.host;
     if (!host || host.isDestroyed()) return;
     if (this.viaIpc) {
-      host.webContents.send('focus:action', action);
+      // 用 `focus:press` 而不是小窗发来的 `focus:action`：preload 的收发两份
+      // 白名单互不相交，要让主窗口能收这条就得换个名字（见 preload.cjs 的 RECEIVE）。
+      host.webContents.send('focus:press', action);
       return;
     }
     try {
@@ -192,33 +202,39 @@ class FocusMini {
 
 const mini = new FocusMini();
 
+/**
+ * 页面通过 preload 发进来的动作。
+ *
+ * 同一个通道名两边都在用，所以要按**谁发的**分开处理：
+ *   - 小窗发来的（toggle / skip / prev / next / close）转给主窗口，由 FocusRoom 改状态；
+ *   - 主窗口发来的只有 'reveal'，意思是「把小窗找回来」。
+ * 不分开的话，主窗口发 reveal 会被当成小窗动作再转回去，形成一个自己转自己的圈。
+ *
+ * ⚠ 这个监听**必须在模块级只注册一次**，不能放进 attachFocusMini 里。
+ * 那个函数每次 createWindow() 都会调一遍，而主窗口可以销毁后重建
+ * （second-instance 的 !mainWindow 分支、macOS 的 activate）——放进去就会让
+ * 同一条通道挂上两个监听器，一次暂停被 toggle 两下、一次切歌跳两首。
+ * 它操作的是模块级单例 `mini`，本来也不依赖是哪个窗口触发的注册。
+ */
+ipcMain.on('focus:action', (event, action) => {
+  if (typeof action !== 'string') return;
+  const senderIsMini = !!mini.win && !mini.win.isDestroyed() && event.sender === mini.win.webContents;
+  if (senderIsMini) {
+    mini.viaIpc = true;
+    void mini.toHost(action);
+    return;
+  }
+  if (action === 'reveal') {
+    mini.viaIpc = true;
+    mini.dismissed = false;
+    mini.reveal();
+  }
+});
+
 function attachFocusMini(host) {
   mini.attach(host);
-
-  /**
-   * 页面通过 preload 发进来的动作。
-   *
-   * 同一个通道名两边都在用，所以要按**谁发的**分开处理：
-   *   - 小窗发来的（toggle / skip / prev / next / close）转给主窗口，由 FocusRoom 改状态；
-   *   - 主窗口发来的只有 'reveal'，意思是「把小窗找回来」。
-   * 不分开的话，主窗口发 reveal 会被当成小窗动作再转回去，形成一个自己转自己的圈。
-   */
-  ipcMain.on('focus:action', (event, action) => {
-    if (typeof action !== 'string') return;
-    const senderIsMini = !!mini.win && !mini.win.isDestroyed() && event.sender === mini.win.webContents;
-    if (senderIsMini) {
-      mini.viaIpc = true;
-      void mini.toHost(action);
-      return;
-    }
-    if (action === 'reveal') {
-      mini.viaIpc = true;
-      mini.dismissed = false;
-      mini.reveal();
-    }
-  });
-
   // 主窗口关掉就一起收掉，别留一个孤儿小窗在桌面上。
+  // 这个是窗口级监听（只对当前这个主窗口有意义），所以留在函数里。
   host.on('closed', () => mini.destroy());
   return mini;
 }

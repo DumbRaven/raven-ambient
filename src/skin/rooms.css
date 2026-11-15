@@ -233,6 +233,11 @@
 .focus-switch > span { font-size: 12px; font-weight: 500; color: var(--bold-ink); gap: 3px; }
 .focus-switch small { font-size: 10px; color: var(--bold-muted); }
 .focus-clear { font-size: 11px; }
+/* 「清空专注记录」按第一下之后：文字变红，告诉用户这一下是真的了。
+   `.text-button` 本身没有边框，所以这里只改颜色，不能套 `.notes-remove.armed`
+   那套 border/background。 */
+.focus-clear.armed { color: var(--bold-danger); }
+.focus-clear.armed:not(:disabled):hover { color: var(--bold-danger-deep); }
 
 /* ---------- 队列拖拽（原版是奶白玻璃质感，这里换成纯白卡片） ----------
    注意：原版「第十批」用 .music-queue.reorder-queue > .queue-item.dragging（0,3,0）

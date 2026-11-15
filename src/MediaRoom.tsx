@@ -8,25 +8,39 @@
 // 摆进 4:3 的格子里会被裁掉两边，而且分辨率低。所以直接挂 <video> 读自己的第一帧。
 // 一屏最多也就九件，配合视口懒加载不会同时开一百多个文件句柄。
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Droplets, FilePlus2, FolderOpen, ImageIcon, Maximize2, Minimize2, MonitorPlay, Pause, Play, RefreshCw, Sparkles, X, Palette
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, FilePlus2, FolderOpen, ImageIcon, Pause, Play, RefreshCw, Sparkles, X } from 'lucide-react';
 import { setDesktopStage, setWindowFullscreen } from './media';
 import { afterResize as afterResizeWait, canToggle } from './fullscreen-timing';
 import { listenStageClosed, listenStageCommand, publishStage, type StageSnapshot } from './desktop-bridge';
 import TemplateStage, { type StageAmbience, type StageDisc, type StageFocus, type StageNow } from './TemplateStage';
-import { defaultTone, normaliseHex, readTone, toneGroups, toneHint, toneKey, writeTone, type ToneSetting } from './tone-setting';
+import { readTone, toneHint, toneKey, writeTone, type ToneSetting } from './tone-setting';
 import { nextStoneStyle } from './marble.ts';
 import LayerStack from './LayerStack';
 import RainLayer from './RainLayer';
 import MediaTickets from './MediaTickets';
 import { titleOf } from './media-text';
-import TheaterLayers from './TheaterLayers';
 import { layersKey, legacyOverlaysKey, legacyWidgetsKey, readLayers, writeLayers, type LayerList } from './layers';
-import { rainKey, rainModes, readRain, writeRain, type RainSetting } from './rain';
+import { rainKey, readRain, writeRain, type RainSetting } from './rain';
 import { readFocus } from './focus-bridge';
 import { templates, type TemplateId } from './templates';
-import TheaterTemplates from './TheaterTemplates';
+import TheaterTools from './TheaterTools';
 import type { MediaItem } from './records';
+
+/**
+ * 读一条本地偏好，读不出来就当没有。
+ *
+ * 为什么不能直接 `localStorage.getItem`：隐私模式 / 存储被禁时，**读**也会抛
+ * （不是只有写才抛）。这些调用全在 `useState` 的初始化里，抛出去整块放映视图
+ * 直接白掉——全库没有 ErrorBoundary，白掉就只能强制关窗口。
+ * 同一个文件里 `template` 那一条早就因为这个原因包了 try，另外三条漏了。
+ *
+ * 走 `localStorage` 而不是 `store.ts` 的 getText：这里的键是「怎么看」的偏好，
+ * 从来不进收藏、也不跟着 driver 换平台，而 store 的 browserDriver 底层就是
+ * localStorage，绕一层只是多一次间接。
+ */
+function readRaw(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
 
 type Props = {
   items: MediaItem[];
@@ -123,7 +137,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   // 放映的排版。默认「拼贴」——那是用户自己视频里的样子。
   // 存本地而不是存进收藏：这是看的偏好，不该触发一次写盘。
   // 配色：默认跟画面走。用户可以在这三层里选，设置存 localStorage。
-  const [tone, setTone] = useState<ToneSetting>(() => readTone(localStorage.getItem(toneKey)));
+  const [tone, setTone] = useState<ToneSetting>(() => readTone(readRaw(toneKey)));
   const [toneMenu, setToneMenu] = useState(false);
   // 点胶囊换下一种石纹。顺序与文案都在 marble.ts 的 stoneStyles 里，
   // 这里只负责把「下一个」写回设置——组件不该知道一共有几种。
@@ -134,11 +148,9 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   const [palette, setPalette] = useState<string[]>([]);
   const [template, setTemplate] = useState<TemplateId>(() => {
     // 读也要兜住：隐私模式下 getItem 同样会抛，而这里是 useState 的初始化，
-    // 抛出去整块放映视图就白掉了。
-    try {
-      const saved = localStorage.getItem('raven-stage-template');
-      return templates.some(item => item.id === saved) ? (saved as TemplateId) : 'collage';
-    } catch { return 'collage'; }
+    // 抛出去整块放映视图就白掉了。（统一走 readRaw，同文件上面有说明。）
+    const saved = readRaw('raven-stage-template');
+    return templates.some(item => item.id === saved) ? (saved as TemplateId) : 'collage';
   });
   // 存不下也别让放映中断：版式只是偏好，下次回到默认那个而已。
   // 裸写会在存储被禁（隐私模式、配额满）时抛进 React 的渲染链，整个视图白掉。
@@ -166,16 +178,16 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   // 存档差别在两份旧键的搬家（readLayers 的第三、四个参数）。
   const [layers, setLayers] = useState<LayerList>(() =>
     readLayers(
-      localStorage.getItem(layersKey),
-      localStorage.getItem(legacyOverlaysKey),
-      localStorage.getItem(legacyWidgetsKey),
+      readRaw(layersKey),
+      readRaw(legacyOverlaysKey),
+      readRaw(legacyWidgetsKey),
     ),
   );
   // 「叠加元素」与「加组件」合并成一颗按钮：外观一样，菜单内容跟着版式走。
   // 为什么不再各留一个开关：合并之后只剩一个菜单，两个 state 一定会有一个忘了同步。
   const [layersMenu, setLayersMenu] = useState(false);
   // 雨层。和图层一样存 localStorage——这是「怎么看」的偏好，不该写盘。
-  const [rain, setRain] = useState<RainSetting>(() => readRain(localStorage.getItem(rainKey)));
+  const [rain, setRain] = useState<RainSetting>(() => readRain(readRaw(rainKey)));
   const [rainMenu, setRainMenu] = useState(false);
   useEffect(() => { writeRain(rain); }, [rain]);
   // 番茄钟读数：跟着专注页走，自己不另起计时器（两处各算各的，暂停一次就对不上）。
@@ -186,6 +198,10 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   const [focusStage, setFocusStage] = useState<StageFocus | null>(null);
   // 桌面放映窗开着没有。窗口真正的存亡在主进程，这里只跟它对齐一下按钮状态。
   const [onDesktop, setOnDesktop] = useState(false);
+  /* 与 onDesktop 同步的一份 ref：toggleDesktop 里要读「现在是不是开着」，
+     但那个值不能从 setState 的 updater 里取（见 toggleDesktop 的注释）。 */
+  const onDesktopRef = useRef(onDesktop);
+  useEffect(() => { onDesktopRef.current = onDesktop; }, [onDesktop]);
   useEffect(() => {
     const tick = () => {
       const snapshot = readFocus();
@@ -434,10 +450,13 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
    * 按钮亮着而画面没出来比慢半拍更难受。关窗时主进程会回一条通知。
    */
   const toggleDesktop = useCallback(() => {
-    setOnDesktop(value => {
-      setDesktopStage(!value);
-      return !value;
-    });
+    // 发 IPC 不能写在 setState 的 updater 里：React 严格模式会**重复调用**
+    // updater 来验证它是纯函数，那样一次点击会建两次窗口（第二次把第一次的
+    // 覆盖掉，或者按「已经开着」直接关掉）。用 ref 读当前值，副作用写在 updater 外面。
+    const next = !onDesktopRef.current;
+    onDesktopRef.current = next;
+    setOnDesktop(next);
+    setDesktopStage(next);
   }, []);
 
   /* 桌面窗关掉了（用户 Alt+F4 或系统带走）→ 按钮回到未按下。 */
@@ -467,8 +486,6 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   useEffect(() => {
     const snapshot: StageSnapshot = {
       item: current ?? null,
-      index: Math.max(0, usable.findIndex(item => item.id === current?.id)),
-      total: usable.length,
       template,
       stone: tone.stone,
       palette,
@@ -512,8 +529,6 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               template={template}
               videoRef={screen}
               onPlayState={setPlaying}
-              index={Math.max(0, usable.findIndex(item => item.id === current.id))}
-              total={usable.length}
               disc={disc}
               focus={focusStage}
               ambience={ambience}
@@ -568,196 +583,19 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                   : `${usable.findIndex(item => item.id === current.id) + 1} / ${usable.length}${screenKind === 'video' ? ' · 视频' : ' · 图片'}`}
               </small>
             </div>
-            {/* 版式切换。三个都做得不一样，所以给文字而不是图标——
-                图标认不出「相集」和「透明」的区别。滑块与量法见 TheaterTemplates。 */}
-            <TheaterTemplates value={template} onChange={setTemplate} />
-
-            {/* 雨层：模式和浓淡。位置固定在右下，和水滴图标同一簇。 */}
-            <div className="theater-rain">
-              <button
-                className={`icon-button theater-rain-toggle ${rain.on ? 'on' : ''}`}
-                aria-label="雨"
-                aria-expanded={rainMenu}
-                aria-pressed={rain.on}
-                title="雨"
-                onClick={() => setRainMenu(value => !value)}
-              >
-                <Droplets size={13} />
-              </button>
-              {rainMenu && (
-                <>
-                  <button className="theater-overlay-veil" aria-label="收起" onClick={() => setRainMenu(false)} />
-                  <div className="theater-rain-menu">
-                    <div className="rain-switch">
-                      <span>雨</span>
-                      <button
-                        className={`toggle ${rain.on ? 'on' : ''}`}
-                        role="switch"
-                        aria-checked={rain.on}
-                        aria-label="打开雨"
-                        onClick={() => setRain(prev => ({ ...prev, on: !prev.on }))}
-                      >
-                        <span />
-                      </button>
-                    </div>
-                    <div className="rain-modes" role="radiogroup" aria-label="雨的样子">
-                      {rainModes.map(mode => (
-                        <button
-                          key={mode.id}
-                          role="radio"
-                          aria-checked={rain.mode === mode.id}
-                          className={rain.mode === mode.id ? 'on' : ''}
-                          title={mode.hint}
-                          onClick={() => setRain(prev => ({ ...prev, mode: mode.id }))}
-                        >
-                          {mode.name}
-                        </button>
-                      ))}
-                    </div>
-                    <label className="rain-slider">
-                      <span>浓淡</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={rain.strength}
-                        aria-label="雨的浓淡"
-                        onChange={event => setRain(prev => ({ ...prev, strength: Number(event.target.value) }))}
-                      />
-                    </label>
-                    <label className="rain-slider">
-                      <span>透明度</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={rain.opacity}
-                        aria-label="雨的透明度"
-                        onChange={event => setRain(prev => ({ ...prev, opacity: Number(event.target.value) }))}
-                      />
-                    </label>
-                  </div>
-                </>
-              )}
-            </div>
-            {/* 配色：默认跟画面走，也可以指定主色或手填色值。 */}
-            <div className="theater-tone">
-              <button
-                className={`icon-button theater-tone-toggle ${toneMenu ? 'on' : ''}`}
-                aria-label="配色"
-                aria-expanded={toneMenu}
-                title="配色"
-                onClick={() => setToneMenu(value => !value)}
-              >
-                <Palette size={13} />
-              </button>
-              {toneMenu && (
-                <>
-                  <button className="theater-tone-veil" aria-label="收起配色" onClick={() => setToneMenu(false)} />
-                  <div className="theater-tone-menu" role="group" aria-label="配色">
-                    <div className="tone-modes" role="radiogroup" aria-label="取色方式">
-                      {([
-                        ['auto', '跟随画面'],
-                        ['pick', '挑一个'],
-                        ['custom', '自己填'],
-                      ] as const).map(([key, label]) => (
-                        <button
-                          key={key}
-                          role="radio"
-                          aria-checked={tone.mode === key}
-                          className={tone.mode === key ? 'on' : ''}
-                          onClick={() => setTone(prev => ({ ...prev, mode: key }))}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-
-                    {tone.mode === 'pick' && (
-                      <div className="tone-swatches" role="radiogroup" aria-label="从画面里挑一个主色">
-                        {(palette.length ? palette : ['#6f6f6f']).map((color, at) => (
-                          <button
-                            key={color + at}
-                            role="radio"
-                            aria-checked={tone.pick === at}
-                            aria-label={`画面主色 ${at + 1}`}
-                            className={tone.pick === at ? 'on' : ''}
-                            style={{ background: color }}
-                            onClick={() => setTone(prev => ({ ...prev, pick: at }))}
-                          />
-                        ))}
-                        <small>这张画面取出来的主色，点一个当主色相。</small>
-                      </div>
-                    )}
-
-                    {tone.mode === 'custom' && (
-                      <div className="tone-fields">
-                        {/* 三组：信息条 / 面板 / 胶囊·署名。分组表在 tone-setting.ts，
-                            这里只负责画——以后加一档颜色不用改这段 JSX。 */}
-                        {toneGroups.map(group => (
-                          <fieldset key={group.key} className="tone-group">
-                            <legend>{group.title}</legend>
-                            {group.fields.map(([key, label]) => (
-                              <label key={key} className="tone-field">
-                                <span>{label}</span>
-                                <input
-                                  type="color"
-                                  value={tone.custom[key] || '#6f6f6f'}
-                                  aria-label={`${group.title}${label}颜色`}
-                                  onChange={event => setTone(prev => ({ ...prev, custom: { ...prev.custom, [key]: event.target.value } }))}
-                                />
-                                <input
-                                  className="tone-hex"
-                                  type="text"
-                                  inputMode="text"
-                                  maxLength={7}
-                                  placeholder="自动"
-                                  value={tone.custom[key]}
-                                  aria-label={`${group.title}${label}色值`}
-                                  onChange={event => {
-                                    const raw = event.target.value;
-                                    // 边输边认：认得出就收敛成 #rrggbb，认不出先原样留着，
-                                    // 否则输到一半（"#1c2"）就被吞掉字符，根本没法打。
-                                    const next = normaliseHex(raw);
-                                    setTone(prev => ({ ...prev, custom: { ...prev.custom, [key]: next || raw } }));
-                                  }}
-                                />
-                              </label>
-                            ))}
-                          </fieldset>
-                        ))}
-                        <button className="tone-reset" onClick={() => setTone(prev => ({ ...prev, custom: { ...defaultTone.custom } }))}>
-                          全部回到自动
-                        </button>
-                      </div>
-                    )}
-
-                    <p className="tone-hint">留空表示这一档仍然按画面算。</p>
-                  </div>
-                </>
-              )}
-            </div>
-            {/* 图层：一颗按钮、一份菜单，六项在两个版式里都能用。
-                只有拼贴改不了大小（用户 m11244），提示跟着这个走。 */}
-            <TheaterLayers layers={layers} onLayers={setLayers} open={layersMenu} onOpen={setLayersMenu} scalabe={template !== 'collage'} />
-            {/* 全屏键在透明版式下变成「放到桌面」。
-                透明模式的意义就是把画面贴回桌面上看，这时候窗口全屏没有意义——
-                两个按钮并排反而要用户自己判断该点哪个。 */}
-            {desktopMode ? (
-              <button
-                className="icon-button theater-expand"
-                aria-label={onDesktop ? '收回桌面放映' : '放到桌面'}
-                aria-pressed={onDesktop}
-                title={onDesktop ? '收回桌面放映' : '放到桌面'}
-                onClick={toggleDesktop}
-              >
-                <MonitorPlay size={13} />
-              </button>
-            ) : (
-              <button className="icon-button theater-expand" aria-label={expanded ? '退出全屏' : '全屏'} aria-pressed={expanded} onClick={toggleFullscreen}>
-                {expanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-              </button>
-            )}
+            <TheaterTools
+              template={template}
+              onTemplate={setTemplate}
+              rain={{ value: rain, onChange: setRain, open: rainMenu, onOpen: setRainMenu }}
+              tone={{ value: tone, onChange: setTone, open: toneMenu, onOpen: setToneMenu, palette }}
+              layers={{ value: layers, onChange: setLayers, open: layersMenu, onOpen: setLayersMenu }}
+              expanded={expanded}
+              onFullscreen={toggleFullscreen}
+              desktopMode={desktopMode}
+              onDesktop={onDesktop}
+              onToggleDesktop={toggleDesktop}
+              scalabe={template !== 'collage'}
+            />
           </div>
         </div>
       ) : (
@@ -771,8 +609,6 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               template={template}
               videoRef={screen}
               onPlayState={setPlaying}
-              index={0}
-              total={0}
               hint={toneHint(tone, palette)}
               stone={tone.stone}
               onStone={cycleStone}
@@ -817,93 +653,19 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               <b>{template === 'desktop' ? '空白桌面' : '空台面'}</b>
               <small>{template === 'desktop' ? '图层里挑一块加上去看看' : '先放点东西进来'}</small>
             </div>
-            <TheaterTemplates value={template} onChange={setTemplate} />
-            {/* 雨层：模式和浓淡。位置固定在右下，和水滴图标同一簇。 */}
-            <div className="theater-rain">
-              <button
-                className={`icon-button theater-rain-toggle ${rain.on ? 'on' : ''}`}
-                aria-label="雨"
-                aria-expanded={rainMenu}
-                aria-pressed={rain.on}
-                title="雨"
-                onClick={() => setRainMenu(value => !value)}
-              >
-                <Droplets size={13} />
-              </button>
-              {rainMenu && (
-                <>
-                  <button className="theater-overlay-veil" aria-label="收起" onClick={() => setRainMenu(false)} />
-                  <div className="theater-rain-menu">
-                    <div className="rain-switch">
-                      <span>雨</span>
-                      <button
-                        className={`toggle ${rain.on ? 'on' : ''}`}
-                        role="switch"
-                        aria-checked={rain.on}
-                        aria-label="打开雨"
-                        onClick={() => setRain(prev => ({ ...prev, on: !prev.on }))}
-                      >
-                        <span />
-                      </button>
-                    </div>
-                    <div className="rain-modes" role="radiogroup" aria-label="雨的样子">
-                      {rainModes.map(mode => (
-                        <button
-                          key={mode.id}
-                          role="radio"
-                          aria-checked={rain.mode === mode.id}
-                          className={rain.mode === mode.id ? 'on' : ''}
-                          title={mode.hint}
-                          onClick={() => setRain(prev => ({ ...prev, mode: mode.id }))}
-                        >
-                          {mode.name}
-                        </button>
-                      ))}
-                    </div>
-                    <label className="rain-slider">
-                      <span>浓淡</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={rain.strength}
-                        aria-label="雨的浓淡"
-                        onChange={event => setRain(prev => ({ ...prev, strength: Number(event.target.value) }))}
-                      />
-                    </label>
-                    <label className="rain-slider">
-                      <span>透明度</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={rain.opacity}
-                        aria-label="雨的透明度"
-                        onChange={event => setRain(prev => ({ ...prev, opacity: Number(event.target.value) }))}
-                      />
-                    </label>
-                  </div>
-                </>
-              )}
-            </div>
-            <TheaterLayers layers={layers} onLayers={setLayers} open={layersMenu} onOpen={setLayersMenu} scalabe={template !== 'collage'} />
-            {/* 空台面也要有全屏 / 桌面键：上面那张画面已经是同一块舞台，
-                换到空库时忽然没得全屏会很怪。透明版式下这颗仍走桌面放映。 */}
-            {desktopMode ? (
-              <button
-                className="icon-button theater-expand"
-                aria-label={onDesktop ? '收回桌面放映' : '放到桌面'}
-                aria-pressed={onDesktop}
-                title={onDesktop ? '收回桌面放映' : '放到桌面'}
-                onClick={toggleDesktop}
-              >
-                <MonitorPlay size={13} />
-              </button>
-            ) : (
-              <button className="icon-button theater-expand" aria-label={expanded ? '退出全屏' : '全屏'} aria-pressed={expanded} onClick={toggleFullscreen}>
-                {expanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-              </button>
-            )}
+            <TheaterTools
+              template={template}
+              onTemplate={setTemplate}
+              rain={{ value: rain, onChange: setRain, open: rainMenu, onOpen: setRainMenu }}
+              tone={{ value: tone, onChange: setTone, open: toneMenu, onOpen: setToneMenu, palette }}
+              layers={{ value: layers, onChange: setLayers, open: layersMenu, onOpen: setLayersMenu }}
+              expanded={expanded}
+              onFullscreen={toggleFullscreen}
+              desktopMode={desktopMode}
+              onDesktop={onDesktop}
+              onToggleDesktop={toggleDesktop}
+              scalabe={template !== 'collage'}
+            />
           </div>
         </div>
       )}

@@ -342,9 +342,15 @@ export default function App() {
     // 最深的那一层决定「让出多少」：三层里有一层让 18 dB、两层让 6 dB，
     // 耳朵听到的是 18 dB 那一层，报平均值反而对不上听感。
     const depth = layers.reduce((most, record) => Math.max(most, record.duckDepth ?? 0), 0);
+    // 「几层」与「几层静音」必须同一个分母：都只数**唱片还在柜里**的那些。
+    // 原来静音数是 `cabinet.ambience.length - live.length`，按 id 数；而层数是
+    // 按「还找得到这张唱片」数——某张环境音唱片被删了、id 还留在 ambience 里时，
+    // 两个数各算各的，屏幕上就会出现「2 层 · 1 静音」而柜里其实只剩两张。
+    const present = cabinet.ambience.filter(id => cabinet.records.some(record => record.id === id));
+    const muted = present.filter(id => cabinet.muted.includes(id)).length;
     return {
       layers: layers.map(record => record.name),
-      muted: cabinet.ambience.length - live.length,
+      muted,
       ducked: status.ducked,
       depth,
     };

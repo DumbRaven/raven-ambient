@@ -30,8 +30,6 @@ import type { StageAmbience, StageDisc, StageFocus, StageNow } from './TemplateS
  */
 export type StageSnapshot = {
   item: MediaItem | null;
-  index: number;
-  total: number;
   template: TemplateId;
   stone: StoneStyle;
   /** 主窗口取到的原始色板。桌面窗用 collageTone(colors, hint) 算出同一套颜色。 */
@@ -143,7 +141,10 @@ export function publishStage(snapshot: StageSnapshot) {
  */
 export function listenStageCommand(onCommand: (command: StageCommand) => void) {
   const ipc = channel();
-  if (ipc) return ipc.on('stage:command', payload => { if (isStageCommand(payload)) onCommand(payload); });
+  // 收的是 `stage:press`，不是页面自己发出去的 `stage:command`：
+  // preload 的收发两份白名单互不相交（页面不能伪造主进程推来的消息），
+  // 所以「桌面窗发的」和「主进程转给主窗口的」必须是两个名字。
+  if (ipc) return ipc.on('stage:press', payload => { if (isStageCommand(payload)) onCommand(payload); });
   const host = raven();
   host.__ravenStageCommand = onCommand;
   return () => {

@@ -1,6 +1,7 @@
 import { type CSSProperties, type RefObject } from 'react';
 import { ImagePlus, LoaderCircle, RotateCcw } from 'lucide-react';
 import Slider from './Slider';
+import { radioKeyDown } from './radio-keys';
 import { formatTime } from './model';
 import { trackTransitions, transitionHints, transitionNames, type Cabinet, type TrackTransition } from './records';
 
@@ -101,7 +102,7 @@ export default function SettingsModal({ cabinet, busy, background, lineError, st
 
       <div className="settings-group">
         <h3>换唱片的方式</h3>
-        <div className="transition-options" role="radiogroup" aria-label="换唱片的方式">
+        <div className="transition-options" role="radiogroup" aria-label="换唱片的方式" onKeyDown={radioKeyDown}>
           {trackTransitions.map(value => (
             <button key={value} type="button" role="radio" aria-checked={cabinet.transition === value} className={cabinet.transition === value ? 'selected' : ''} onClick={() => onChange({ transition: value as TrackTransition })}>
               <strong>{transitionNames[value]}</strong>

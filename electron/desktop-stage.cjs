@@ -126,6 +126,10 @@ class DesktopStage {
     this.win.on('closed', () => {
       this.win = null;
       this.lastPushed = '';
+      // 窗口没了就把轮询停掉。tick 本身会早退，但那样定时器还会每 200ms
+      // 醒一次空转——用户关掉桌面画面之后，这台机器不该再为它费电。
+      // 下次 show() 会走 create()，那里的 start() 会把定时器重新装上。
+      this.stop();
       // 窗口关掉就告诉主窗口一声，让那个按钮回到「未按下」的状态。
       if (this.viaIpc) {
         const host = this.host;
@@ -222,7 +226,10 @@ class DesktopStage {
     this.viaIpc = true;
     const host = this.host;
     if (!host || host.isDestroyed()) return;
-    host.webContents.send('stage:command', command);
+    // 用 `stage:press` 而不是桌面窗发来的那个 `stage:command`：
+    // preload 的收发两份白名单互不相交，主窗口要收这条就必须换一个名字，
+    // 否则会被白名单拦掉（见 preload.cjs 里 RECEIVE 上方的 ⚠）。
+    host.webContents.send('stage:press', command);
   }
 
   destroy() {
@@ -236,15 +243,23 @@ class DesktopStage {
 
 const stage = new DesktopStage();
 
-function attachDesktopStage(host) {
-  stage.attach(host);
-
-  /**
-   * 桌面窗发来的动作。
-   *
-   * 只认桌面窗本人发的：主窗口也在同一个通道名上听（它收的是 stage:paint，
-   * 不在这条上发），但将来要是有第三处往这条通道说话，不该被当成桌面窗的点击。
-   */
+/**
+ * 桌面窗发来的动作。
+ *
+ * 只认桌面窗本人发的：主窗口也在同一个通道名上听（它收的是 stage:paint，
+ * 不在这条上发），但将来要是有第三处往这条通道说话，不该被当成桌面窗的点击。
+ *
+ * ⚠ 这个监听**必须在模块级只注册一次**，不能放进 attachDesktopStage 里。
+ * 那个函数每次 createWindow() 都会调一遍，而主窗口是可以销毁后重建的
+ * （second-instance 的 !mainWindow 分支、macOS 的 activate）——放进去就会让
+ * 同一条通道挂上两个监听器，一次切歌跳两首、一次暂停被 toggle 两下。
+ * 它操作的是模块级单例 `stage`，本来也不依赖是哪个窗口触发的注册。
+ */
+// 纯 node 下（tests/media-scan.test.ts 为了测扫描函数直接 require 了 media.cjs，
+// 而 media.cjs 又 require 了这里）`require('electron')` 拿到的是这个包的路径字符串，
+// ipcMain 是 undefined。真正的做法只有一种：注册留在模块级、在没有 electron 时跳过。
+// 绝不能为了绕过它把注册塞回 attachDesktopStage —— 那正是下面注释在防的重复注册。
+if (ipcMain) {
   ipcMain.on('stage:command', (event, command) => {
     const win = stage.win;
     if (!win || win.isDestroyed() || event.sender !== win.webContents) return;
@@ -252,18 +267,25 @@ function attachDesktopStage(host) {
     stage.acceptCommand(event, command);
   });
 
-  /**
-   * 主窗口通过 preload 推来的放映快照。
-   *
-   * 只认主窗口发的：桌面窗自己不会往这条通道写，但要是将来写了，
-   * 不该被当成「主窗口的新状态」再推回给自己。
-   */
   ipcMain.on('stage:snapshot', (event, snapshot) => {
     const host = stage.host;
     if (!host || host.isDestroyed() || event.sender !== host.webContents) return;
     stage.acceptSnapshot(snapshot);
   });
+}
 
+/**
+ * 主窗口通过 preload 推来的放映快照。
+ *
+ * 只认主窗口发的：桌面窗自己不会往这条通道写，但要是将来写了，
+ * 不该被当成「主窗口的新状态」再推回给自己。
+ *
+ * 同上，模块级注册一次（见上面那个 if 块里的 `stage:snapshot`）。
+ */
+
+function attachDesktopStage(host) {
+  stage.attach(host);
+  // 这个监听是窗口级的（只对当前这个主窗口有意义），所以留在函数里。
   host.on('closed', () => stage.destroy());
   return stage;
 }
