@@ -12,6 +12,31 @@
   padding: 0 28px 96px;
 }
 
+/* 收藏读坏时的恢复条。
+   平时不出现；出现时说明保存已经暂停、磁盘上那份还是原样。
+   没有这个条的话，用户看到的只是一个空唱片柜——而保存锁着，
+   他往里加歌也不会有任何反应，这正是上一版最糟的地方。 */
+.salvage-bar {
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  border: 1px solid var(--bold-line);
+  border-radius: 14px;
+  background: var(--bold-sunken);
+}
+
+.salvage-bar p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--bold-ink);
+}
+
+.salvage-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+}
+
 .masthead {
   height: 84px;
   border-bottom: 0;

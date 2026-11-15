@@ -36,8 +36,12 @@ export class RoomPlayer {
    * 这一轮里读不出文件的唱片。
    *
    * 只活在内存里，不进存档：用户可能只是暂时拔了移动硬盘，
-   * 下次启动该再试一次。手动切歌 / 重新点播放都会清空它，
-   * 否则「修好了文件还是要重启软件」。
+   * 下次启动该再试一次。
+   *
+   * 清空它的时机只有「用户明确要求再试一次」——playRecord / 切歌 / 重新按播放。
+   * 之前只有 playRecord 会清，于是拔掉硬盘再插回来时，点播放键和「下一首」
+   * 都没反应：wantsMusic() 里 queue.some(!broken) 为假，schedule() 直接返回，
+   * 连读文件那一步都走不到。用户唯一能自救的方式是恰好点到那张唱片。
    */
   private broken = new Set<string>();
 
@@ -106,6 +110,12 @@ export class RoomPlayer {
     // 外部音乐模式下本地音乐不参与，「有没有东西可放」只看环境音
     const musicReady = !this.cabinet.lineMode && this.cabinet.queue.length > 0;
     if (!musicReady && !this.cabinet.ambience.length) return;
+    // 按播放键就是「再来一次」：上一轮全部读不出来的唱片，现在都重新给机会。
+    // 不清的话，wantsMusic() 会一直返回假，schedule() 连门都不进。
+    this.broken.clear();
+    // 队列里还有歌，却因为「全坏」被 skipBroken 关掉了音乐开关——
+    // 这时候按播放键，用户要的是把音乐重新打开，而不是只响环境音。
+    if (musicReady && !this.musicOn) this.musicOn = true;
     // 两个开关都关着时，总播放按钮把它们一起打开，否则按用户上次的选择恢复
     if (!this.musicOn && !this.ambientOn) { this.musicOn = true; this.ambientOn = true; }
     this.running = true; this.emit(); this.schedule();
@@ -131,6 +141,8 @@ export class RoomPlayer {
   toggleMusic() {
     // 外部音乐模式下本地音乐这条路是关着的，按了也不该有任何反应
     if (this.cabinet.lineMode || !this.cabinet.queue.length) return;
+    // 要打开音乐，同样算「再试一次」：全部标坏时用户按的就是这个键。
+    if (!this.musicOn) this.broken.clear();
     if (!this.running) { this.musicOn = true; this.ambientOn = false; } else this.musicOn = !this.musicOn;
     if (!this.musicOn) { this.pendingTransition = undefined; this.engine.pauseMusic(); }
     this.syncRunning();
@@ -151,6 +163,9 @@ export class RoomPlayer {
     else { this.running = false; ++this.revision; this.engine.stopAll(); this.emit(); }
   }
   next(manual = true) {
+    // 用户主动切歌 = 「再试一次」的信号：硬盘可能刚插回来。
+    // 自动接下一首（manual=false）不清，否则一个坏文件会让整轮循环反复重试它。
+    if (manual) this.broken.clear();
     const from = this.currentId;
     this.currentId = nextInOrder(this.cabinet.queue, from, this.cabinet.order, Math.random, manual);
     this.armTransition(manual, from);
@@ -215,8 +230,16 @@ export class RoomPlayer {
       if (!valid()) return;
       const wantsMusic = this.wantsMusic(), wantsAmbient = this.wantsAmbient();
       if (!wantsMusic && !wantsAmbient) { this.running = false; this.engine.stopAll(); this.emit(); return; }
+      let ambientFailed = false;
       try {
-        if (wantsAmbient) await this.engine.start(this.applyMix()); else this.engine.stopAmbience();
+        if (wantsAmbient) {
+          try { await this.engine.start(this.applyMix()); }
+          // 环境音起不来和音乐读不出来是两件事，必须分开走。
+          // 以前它们共用一个 catch，结果环境音一失败就去 skipBroken()，
+          // 而那个函数第一行就把「当前正在播的那首歌」记进 broken——
+          // 一首完全正常的歌被冤枉成文件丢失，然后被跳过。
+          catch (error) { ambientFailed = true; if (valid()) this.onError(error); }
+        } else this.engine.stopAmbience();
         if (!valid()) return;
         if (!wantsMusic) {
           this.engine.pauseMusic();
@@ -267,6 +290,9 @@ export class RoomPlayer {
         // 一张都放不了才把音乐关掉。环境音全程不动。
         this.loadedId = undefined;
         this.engine.pauseMusic();
+        // 环境音已经在上面的分支里报过错了，这里再报一次就成了两条提示；
+        // 而且不能因此把一首好歌判成坏文件。
+        if (ambientFailed) { this.emit(); return; }
         const moved = this.skipBroken();
         this.onError(error);
         if (moved) {

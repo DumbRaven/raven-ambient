@@ -179,6 +179,16 @@
   padding: 0 2px;
 }
 
+/* 窄屏收紧间距。
+ *
+ * 这条原来写在 rooms.css 的 @media (max-width: 440px) 里，而 rooms.css 比
+ * modern.css 更早被 @import —— 于是它被上面那条基础规则整条压掉，从来没生效过。
+ * 结果是最窄的窗口反而用着最宽的间距（18/26px），比桌面还松。
+ * 放在基础规则后面，层叠顺序才对。 */
+@media (max-width: 440px) {
+  .record-grid { column-gap: 14px; row-gap: 24px; padding: 0; }
+}
+
 /* 封面网格里，唱片盒沿用原有的掀开动作，只是圆角和阴影换成明亮版的 */
 .record-card .record-case {
   border-radius: 20px;

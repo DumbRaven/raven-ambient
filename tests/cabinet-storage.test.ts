@@ -29,16 +29,73 @@ test('首次使用须先成功读取，随后可以正常连续保存', async ()
  * 用户只能开 DevTools 删 localStorage。反过来「不锁」也不行，那等于把坏掉的那几条抹了。
  * 所以判据变成：**原文进备份键，一个字符不差**，然后才允许覆盖。
  */
-test('读不出来的收藏：原文逐字备份，界面可用', async () => {
-  for (const raw of ['{"records":[', '', 'null', '{"version":3,"records":[]}', '{"version":2,"records":[{"id":"recoverable"}]}']) {
+test('读不出来的收藏：原文逐字备份，保存锁住等人决定', async () => {
+  // 前四种是整份读不出来（语法坏 / 空串 / null / 版本不认识），最后一种只是丢了一条记录。
+  const cases: [string, boolean][] = [
+    ['{"records":[', true],
+    ['', true],
+    ['null', true],
+    ['{"version":3,"records":[]}', true],
+    ['{"version":2,"records":[{"id":"recoverable"}]}', false],
+  ];
+  for (const [raw, broken] of cases) {
     const { text } = memory(), session = new CabinetStorage(); text.set(KEY, raw);
     const loaded = await session.load();
-    // 坏数据一个字符都不能动，且必须有备份
     assert.equal(text.get(SALVAGE), raw, `原文没备份：${raw}`);
-    assert.ok(loaded.broken || loaded.lost >= 0);
-    // 界面能继续用：不再抛「已暂停保存」
-    assert.doesNotThrow(() => session.save(emptyCabinet));
+    assert.equal(text.get(KEY), raw, '读坏时不该动主键');
+    assert.equal(loaded.broken, broken, `broken 判定不对：${raw}`);
+    if (broken) {
+      // 界面能开（load 不抛、cabinet 是空柜），但保存被锁住——
+      // 这是关键区别：以前这里断言 doesNotThrow(save)，等于允许用空柜盖掉原文。
+      assert.equal(loaded.cabinet.records.length, 0);
+      assert.throws(() => session.save(emptyCabinet), /尚未成功读取/);
+      assert.equal(text.get(KEY), raw, '锁住期间主键必须一字不变');
+    } else {
+      // 只是丢了坏的那条，照常放行
+      assert.equal(loaded.lost, 1);
+      assert.doesNotThrow(() => session.save(emptyCabinet));
+    }
   }
+});
+
+test('读坏之后，用户可以从备份恢复原文', async () => {
+  const { text } = memory(), session = new CabinetStorage();
+  // 真·整份读不出来（JSON 语法坏了），不是「丢了几条」
+  const broken = '{"version":2,"records":[{"id":"x"';
+  text.set(KEY, broken);
+  const loaded = await session.load();
+  assert.ok(loaded.broken);
+  assert.ok(loaded.salvage, '要报告备份成功了，UI 才敢给「恢复原文件」这个按钮');
+  assert.throws(() => session.save(emptyCabinet), /尚未成功读取/);
+  // 恢复：备份写回主键，落回去的必须是逐字原文
+  assert.ok(session.restore());
+  assert.equal(text.get(KEY), broken);
+});
+
+test('读坏之后，用户也可以选择放弃那份数据从空柜开始', async () => {
+  const { text } = memory(), session = new CabinetStorage();
+  text.set(KEY, '{"records":[');
+  const loaded = await session.load();
+  assert.ok(loaded.broken);
+  assert.throws(() => session.save(emptyCabinet));
+  // 显式选择之后才开锁，而且是「无条件覆盖第一次」
+  session.adoptEmpty();
+  assert.doesNotThrow(() => session.save({ ...emptyCabinet, master: 7 }));
+  assert.equal(JSON.parse(text.get(KEY)!).master, 7);
+});
+
+test('只是丢了几条记录时直接放行，但原文同样留一份', async () => {
+  const { text } = memory(), session = new CabinetStorage();
+  const good = { id: 'ok-1', assetId: 'a1', name: '好的', category: 'music', artist: '', description: '',
+    duration: 100, size: 1000, format: 'mp3', color: '#879a91', fingerprint: 'f1', volume: 80, pan: 0, warmth: 0, duckDepth: 9 };
+  const raw = JSON.stringify({ version: 2, records: [good, { id: 'bad-1', name: '缺 assetId' }] });
+  text.set(KEY, raw);
+  const loaded = await session.load();
+  assert.equal(loaded.lost, 1);
+  assert.equal(loaded.broken, false);
+  // 丢一两条不值得打断人：照常能保存，但原文仍然备份着
+  assert.doesNotThrow(() => session.save(emptyCabinet));
+  assert.equal(text.get(SALVAGE), raw);
 });
 
 test('备份都写不进去时，宁可锁住保存也不覆盖原文', async () => {
@@ -50,7 +107,8 @@ test('备份都写不进去时，宁可锁住保存也不覆盖原文', async ()
     if (key === SALVAGE) throw new Error('quota');
     write(key, value);
   };
-  await session.load();
+  const loaded = await session.load();
+  assert.equal(loaded.salvage, false, '备份失败要如实报告，UI 不能给「恢复原文件」');
   assert.throws(() => session.save(emptyCabinet));
   assert.equal(text.get(KEY), raw);
 });

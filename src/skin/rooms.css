@@ -334,7 +334,8 @@
   .view-tabs { width: 100%; justify-content: space-between; }
   .view-tabs > button { padding: 8px 10px; font-size: 10px; }
   .cabinet-layout { grid-template-columns: 1fr; gap: 26px; }
-  .record-grid { column-gap: 14px; row-gap: 24px; padding: 0; }
+  /* .record-grid 的窄屏间距搬到 modern.css 了：它在这条更早加载的文件里
+     会被 modern.css 的基础规则整条压掉，等于没写。 */
   .cabinet { padding: 18px 14px 0; }
   .cabinet-base { margin: 0 -14px; padding: 0 14px; }
   .cover-title { font-size: 17px; }

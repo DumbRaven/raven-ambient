@@ -21,18 +21,20 @@ export class CabinetWriteError extends Error {}
  * `lost` 是「读到了但没法用、被丢掉」的唱片条数。它不是致命错误：坏掉的那几条
  * 丢掉，剩下的照常能用——用户几百张唱片里有一条 ID3 标签异常，不该让整柜消失。
  *
- * `broken` 是整份都读不出来（JSON 语法坏了、结构完全对不上）。这时退回空柜，
- * 但**仍然允许写入**：读不出来是数据问题，不该变成软件不可用（以前就是这样，
- * 结果是空唱片柜 + 所有导入按钮全灰，用户只能开 DevTools 删 localStorage 才能自救）。
+ * `broken` 是整份都读不出来（JSON 语法坏了、结构完全对不上、或者版本不认识）。
+ * 这时退回空柜，但**不自动放行保存**：一旦放行，下一次随便什么操作都会拿空柜
+ * 盖掉主键，而用户可能根本不知道发生过什么。要不要用空柜重开，得由人决定。
  */
 export type CabinetLoad = {
   cabinet: Cabinet;
   /** 有几条记录读不出来被丢掉了。 */
   lost: number;
-  /** 整份都读不出来时为 true，此时 cabinet 是空柜。 */
+  /** 整份都读不出来时为 true，此时 cabinet 是空柜，且保存被锁住。 */
   broken: boolean;
   /** 给人看的原因，正常加载时是空串。 */
   reason: string;
+  /** 读坏时有没有留下备份（`restoreSalvage()` 能把原文拿回来）。 */
+  salvage: boolean;
 };
 
 /** 每个窗口持有自己的读取快照；读失败或快照已过期时，绝不覆盖原文。 */
@@ -72,26 +74,25 @@ export class CabinetStorage {
       const cabinet = sanitizeCabinet(parsed);
       const lost = broken ? 0 : Math.max(0, rawCount - cabinet.records.length);
 
-      if (broken || suspect || lost > 0) {
-        // 有东西读不出来：先原样留一份，再放行。
-        // 备份成功才敢放行覆盖；备份失败（存满了之类）就维持原来的锁，
-        // 宁可这次不能存，也不能把用户数据抹了。
-        try {
-          setText(SALVAGE_KEY, current);
-          this.writable = true;
-          this.snapshot = current;
-          this.overwriteOnce = true;
-          return { cabinet, lost, broken: broken || !!suspect, reason };
-        } catch {
-          this.writable = false;
-          return { cabinet: structuredClone(emptyCabinet), lost: 0, broken: true, reason: reason || '存储空间不足' };
-        }
+      if (broken || suspect) {
+        // 整份读不出来：留一份原文，但**不放行保存**。
+        //
+        // 这里原本是先备份、再 overwriteOnce = true 放行——以为「备份了就等于没丢」。
+        // 实际上 SALVAGE_KEY 全库零处读，备份是一句空头承诺；而放行之后用户随便
+        // 调一下音量，空柜就把主键盖掉了。所以改成：备份照旧做（用户想恢复时
+        // 有东西可恢复），但锁住保存，把「要不要拿空柜重开」交给人。
+        const salvaged = this.salvage(current);
+        return { cabinet: structuredClone(emptyCabinet), lost: 0, broken: true, reason, salvage: salvaged };
       }
+
+      // 只是个别唱片坏掉：直接放行。用户损失的是一两条，不值得为它弹窗，
+      // 但原文照样留一份——万一他后来发现「少的那条其实很重要」。
+      if (lost > 0) this.salvage(current);
 
       this.writable = true;
       this.snapshot = current;
       this.overwriteOnce = false;
-      return { cabinet, lost: 0, broken: false, reason: '' };
+      return { cabinet, lost, broken: false, reason: '', salvage: lost > 0 };
     }
 
     // 没有 v2 数据，试试 v0.1 的老结构。
@@ -100,24 +101,58 @@ export class CabinetStorage {
       this.writable = true;
       this.snapshot = current;
       this.overwriteOnce = false;
-      return { cabinet, lost: 0, broken: false, reason: '' };
+      return { cabinet, lost: 0, broken: false, reason: '', salvage: false };
     } catch (error) {
-      const legacyText = legacy ?? '';
-      try {
-        setText(SALVAGE_KEY, legacyText);
-        this.writable = true;
-        this.snapshot = current;
-        this.overwriteOnce = true;
-      } catch {
-        this.writable = false;
-      }
+      const salvaged = this.salvage(legacy ?? '');
       return {
         cabinet: structuredClone(emptyCabinet),
         lost: 0,
         broken: true,
         reason: error instanceof Error ? error.message : String(error),
+        salvage: salvaged,
       };
     }
+  }
+
+  /**
+   * 把原文逐字存进备份键，成功返回 true。
+   *
+   * 只做备份，不改变任何可写状态——「备份了」和「允许覆盖」是两件事，
+   * 之前把它们绑在一起，才出现「说备份了、其实没人能读回来」的情况。
+   */
+  private salvage(text: string): boolean {
+    try { setText(SALVAGE_KEY, text); return true; } catch { return false; }
+  }
+
+  /**
+   * 把备份的原文写回主键。
+   *
+   * 这是「已备份」这句承诺的兑现入口：只有用户明确点了「恢复原文件」才调用它。
+   * 写完把当前窗口置为不可写，避免这个窗口的快照跟主键对不上后把人锁在外面。
+   */
+  restore(): boolean {
+    const text = getText(SALVAGE_KEY);
+    if (text === null) return false;
+    try {
+      setText(KEY, text);
+    } catch {
+      return false;
+    }
+    this.writable = false;
+    this.overwriteOnce = false;
+    return true;
+  }
+
+  /**
+   * 用户决定「不要那份坏数据了，就从这个空柜开始」。
+   *
+   * 显式开锁而不是让 load 自动放行：读坏之后每一次静默保存都是拿空柜覆盖真实收藏，
+   * 这个决定必须有人按一下。
+   */
+  adoptEmpty() {
+    this.writable = true;
+    this.snapshot = getText(KEY);
+    this.overwriteOnce = true;
   }
 
   assertWritable() {
@@ -146,6 +181,11 @@ export class CabinetStorage {
 const storage = new CabinetStorage();
 export function saveCabinet(cabinet: Cabinet) { storage.save(cabinet); }
 export function loadCabinet() { return storage.load(); }
+/** 把读坏时留下的备份写回主键。只有用户明确要求时才该调用。 */
+export function restoreSalvage() { return storage.restore(); }
+/** 用户决定放弃那份读坏的数据，从这个空柜开始。 */
+export function adoptEmptyCabinet() { return storage.adoptEmpty(); }
+export const SALVAGE = SALVAGE_KEY;
 
 type LegacyShape = {
   mix?: { tracks?: { kind?: string; id?: string; name?: string; volume?: number; pan?: number; warmth?: number; duckAmount?: number; master?: number; musicVolume?: number; ducking?: boolean }[]; master?: number; musicVolume?: number; ducking?: boolean; duckAmount?: number };

@@ -3,7 +3,7 @@ import { ArrowRight, Bird, ChevronLeft, ChevronRight, Disc3, Info, Plus, Search,
 import FocusRoom from './FocusRoom';
 import { cabinetRecords, clampPage, emptyCabinet, fingerprint, isAudioFile, nextOrder, orderNames, pageCount, paginate, removeRecord, toggleRecord, type Cabinet, type CabinetFilter, type RecordItem, type RecordType } from './records';
 import { ambientCoverUrl, matchAmbientCover, type AmbientCover } from './ambient-covers';
-import { CabinetStorage, CabinetWriteError } from './cabinet-storage';
+import { CabinetStorage, CabinetWriteError, restoreSalvage, adoptEmptyCabinet } from './cabinet-storage';
 import { RoomPlayer, type RoomStatus } from './player';
 import { inspectAudio } from './importer';
 import { prepareImage, readAsset, storeAsset } from './storage';
@@ -45,6 +45,9 @@ export default function App() {
   const cabinetRef = useRef(cabinet); cabinetRef.current = cabinet;
   const cabinetStorage = useRef(new CabinetStorage());
   const [ready, setReady] = useState(false);
+  // 收藏整份读不出来时为 true：界面照常开，但保存是锁着的，
+  // 得先让用户决定「恢复原文件」还是「就从空柜开始」，见下面的恢复条。
+  const [salvage, setSalvage] = useState(false);
   const [status, setStatus] = useState<RoomStatus>(emptyStatus);
   const player = useRef<RoomPlayer | null>(null);
   const [view, setView] = useState<'cabinet' | 'listening' | 'focus' | 'media'>('cabinet');
@@ -466,8 +469,11 @@ export default function App() {
         // 这里曾经是死锁来源：只有 try 末尾才 setReady(true)，而读盘一抛错就
         // 直接进 catch，结果界面永远停在「空柜 + 所有导入按钮全灰」。
         setReady(true);
-        if (loaded.broken) notify(`收藏读不出来（${loaded.reason || '格式异常'}）。已备份原文，可以继续使用。`);
-        else if (loaded.lost > 0) notify(`有 ${loaded.lost} 张唱片的数据不完整，已跳过；其余照常。原文已备份。`);
+        // 读坏和「丢了一两条」是两种严重程度，处理也不该一样：
+        //   丢几条——自动跳过，一句话说清，然后照常用；
+        //   整份读不出来——空柜摆在这儿，但保存是锁着的，等用户决定。
+        if (loaded.broken) setSalvage(loaded.salvage);
+        else if (loaded.lost > 0) notify(`有 ${loaded.lost} 张唱片的数据不完整，已跳过；其余照常。`);
         player.current = new RoomPlayer(saved, state => { if (active) setStatus(state); }, error => { if (active) notify(message(error)); });
         const image = await readAsset('background'); if (!active) return;
         if (image) { const url = URL.createObjectURL(image); urls.current.set('background', url); setBackground(url); }
@@ -700,6 +706,21 @@ export default function App() {
     <input ref={coverInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" aria-label="选择唱片封面" onChange={e => void uploadPicture(e, true)} />
     <div className="background-wash" /><div className="paper-grain" />
     <div className="portrait-shell">
+      {salvage && (
+        <div className="salvage-bar" role="alert">
+          <p>收藏读不出来，保存已暂停——先别急着加东西，不然空柜会盖掉原来那份。</p>
+          <div className="salvage-actions">
+            <button type="button" className="text-button" onClick={() => {
+              // 备份写回主键，然后整页重载从它重新读——比在这里手工重建
+              // 播放器、封面、外部音乐那套状态安全得多。
+              if (restoreSalvage()) location.reload();
+            }}>恢复原文件</button>
+            <button type="button" className="text-button" onClick={() => {
+              adoptEmptyCabinet(); setSalvage(false);
+            }}>不要了，从空柜开始</button>
+          </div>
+        </div>
+      )}
       <header className="masthead">
         <a href="#" className="brand" onClick={e => { e.preventDefault(); setView('cabinet'); }}>
           <Bird size={18} strokeWidth={1.3} />

@@ -191,3 +191,58 @@ test('一张唱片的文件读不出来：只停音乐，环境音继续流动',
   assert.equal(status.currentId, 'b', '文件补回来后该能正常播这一张');
   assert.equal(status.musicPlaying, true, '补回来之后音乐要真的响');
 });
+test('文件补回来之后，按播放键或切下一首就能重新试一遍', async t => {
+  // 拔掉移动硬盘又插回来，是这类问题最常见的真实形态：
+  // 整条队列都被标成「读不出来」，用户按播放键想重试——必须真的重试。
+  // 以前只有「点那张唱片本身」能清标记，按播放键和下一首都无反应，
+  // 因为 wantsMusic() 先返回假，schedule() 连读文件那一步都走不到。
+  installAudio(t);
+  const missing = new Set(['a', 'b', 'c']);
+  useStore({
+    name: 'audio-tests', getText: () => null, setText() {}, removeText() {},
+    readBlob: async (key: string) => (missing.has(key) ? undefined : new Blob(['fixture'])),
+    writeBlob: async () => {},
+  });
+  let status: any; const errors: unknown[] = [];
+  const player = new RoomPlayer(cabinet(), s => { status = s; }, e => errors.push(e));
+  t.after(() => player.dispose());
+
+  // skipBroken 每失败一张就递归排下一次，pending 会被替换成新的 promise，
+  // 所以要多等几轮才拿到最终状态。
+  player.start(); for (let i = 0; i < 5; i++) await inspect(player).pending;
+  // 三首全坏：音乐停掉，环境音不受牵连
+  assert.equal(status.musicPlaying, false);
+  assert.equal(status.playing, true, '环境音不该被连累');
+  assert.equal(errors.length, 3, '每一张读不出来都该说一声');
+
+  // 硬盘插回来
+  for (const id of missing) missing.delete(id);
+  errors.length = 0;
+  player.start(); await inspect(player).pending;
+  assert.equal(status.musicPlaying, true, '按播放键必须能重新读到文件');
+  assert.deepEqual(errors, []);
+});
+
+test('环境音起不来不能把正在正常播放的歌记成坏文件', async t => {
+  // 以前环境音和音乐共用一个 catch：engine.start() 抛错也走 skipBroken()，
+  // 而它第一行就把当前正在播的歌记进 broken —— 一首好歌被冤枉成文件丢失。
+  installAudio(t); memory();
+  let status: any; const errors: unknown[] = [];
+  const player = new RoomPlayer(cabinet(), s => { status = s; }, e => errors.push(e));
+  t.after(() => player.dispose());
+  const engine = inspect(player).engine as { start: (mix: unknown) => Promise<void> };
+
+  player.start(); await inspect(player).pending;
+  assert.equal(status.musicPlaying, true);
+
+  // 让环境音这一路单独失败，模拟某个环境音文件解码不了
+  const original = engine.start.bind(engine);
+  engine.start = async () => { throw new Error('decode failed'); };
+  player.toggleAmbient(); player.toggleAmbient();
+  await inspect(player).pending;
+  engine.start = original;
+
+  assert.equal(status.musicPlaying, true, '环境音失败不该停掉音乐');
+  assert.equal(status.currentId, 'a', '正在播的那首不能被换掉');
+  assert.ok(errors.length >= 1, '环境音失败也要说出来');
+});
