@@ -397,7 +397,13 @@
   column-gap: 0.6cqw;
   row-gap: 0;
   font-family: "Playfair Display", Georgia, "Times New Roman", serif;
-  font-style: italic;
+  /* 正体，不是斜体。AE 源里这层是 PlayfairDisplayRoman-Bold，Roman 指正体
+     （斜体是另一个 face，叫 Italic）。曾经写的是 italic，而 Playfair 的
+     italic 是**真斜体字形**不是合成的——58px/700 下 Canvas measureText 量
+     「DUMBRAVEN」：normal 369.10px、italic 375.55px，差 6.45px，
+     R 的腿和 A 的横都会换形状。所以这里不是「反正看不出来」的小事，
+     改错就是换了一款字。 */
+  font-style: normal;
   /* 描边原来是金色（等于给同一颜色描边，纯装饰）。改成深棕之后它变成
      可读性的底线：金色压在胶囊那层半透明大理石上只有 1.80:1，
      而金色与这圈描边是 6.58:1 —— 无论胶囊被取成什么颜色，字都立得住。 */
@@ -509,7 +515,27 @@
 .template-collage .tpl-list > span {
   font-size: 2.2cqw;
   line-height: 1.35;
-  font-style: italic;
+  /* 这里原来有一条 font-style: italic，已删。注意它的失败方式很隐蔽：
+     computed style 里**它是 italic**（声明被解析了，没被忽略），但它
+     产生不了任何字形变化——因为字体栈里没有 italic face，而 :root 写了
+     font-synthesis: none（src/styles.css:1），浏览器不许合成斜体。
+
+     证据是两条独立的实测：
+       1. 同字号下 Canvas measureText 量「DUMBRAVEN」，normal 与 italic
+          都是 87.998px，差值为 0。字体栈来自 src/skin/atmosphere.css:799
+          那串 Noto Serif SC 衬线族，中文字体不带 italic face。
+       2. 放大截图里「Ocean」「雨声·本地收藏」都是正体，没有倾斜。
+
+     对照组说明这不是测量方法的问题：换成 Playfair Display 字体栈
+     （src/skin/collage.css:399 的 badge 用那套），同字重同字号下
+     normal 293.07 → italic 293.15；换 Georgia 是 128.34 → 130.51。
+     那是真有 italic face 参与排版的样子。
+
+     留着这条的坏处是它会撒谎，而且是那种「看起来在工作」的撒谎：
+     后面接手的人查 computed style 会得到 italic，以为这里渲染成斜体。
+     哪天有人把 font-family 换成带斜体的西文族，它还会突然活过来——
+     而中文无论如何不会倾斜，结果是中英混排一半歪一半正。真要斜体，
+     就显式重设成带 italic face 的字体族。 */
 }
 
 .template-collage .tpl-note-icon {

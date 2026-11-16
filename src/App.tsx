@@ -875,7 +875,7 @@ export default function App() {
           </div>
         </div>
       </section>
-      <ViewTabs view={view} selectedCount={selectedCount} playing={playingNow} cardOpen={cardOpen} discCover={discCover} sleepUntil={sleepUntil} remaining={remaining} navigationRef={viewLayout.navigationRef} onSelect={selectView} onCard={openCard} />
+      <ViewTabs view={view} playing={playingNow} cardOpen={cardOpen} discCover={discCover} sleepUntil={sleepUntil} remaining={remaining} navigationRef={viewLayout.navigationRef} onSelect={selectView} onCard={openCard} />
       <div ref={viewLayout.stageRef} className="view-stage" data-motion={pageMotion.phase} data-view={pageMotion.value} inert={pageMotion.phase === 'exit'} style={{ '--page-direction': pageMotion.direction, '--wipe-x': `${wipe.x}px`, '--wipe-y': `${wipe.y}px`, '--wipe-r': `${wipe.r}px` } as CSSProperties}>
       <div ref={viewLayout.contentRef} className="view-content">
       {pageMotion.value === 'cabinet' ? <>

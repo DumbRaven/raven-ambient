@@ -22,9 +22,8 @@ const TABS: { id: ViewId; label: string; Icon: typeof Disc3 }[] = [
  * useViewLayout 在尺寸变化时重算（用 offset* 而不是 getBoundingClientRect，
  * 因为外层 .view-stage 带着 transform: scale()）。
  */
-export default function ViewTabs({ view, selectedCount, playing, cardOpen, discCover, sleepUntil, remaining, navigationRef, onSelect, onCard }: {
+export default function ViewTabs({ view, playing, cardOpen, discCover, sleepUntil, remaining, navigationRef, onSelect, onCard }: {
   view: ViewId;
-  selectedCount: number;
   playing: boolean;
   cardOpen: boolean;
   discCover?: string;
@@ -41,7 +40,6 @@ export default function ViewTabs({ view, selectedCount, playing, cardOpen, discC
         <button key={id} className={view === id ? 'active' : ''} onClick={event => onSelect(id, event.currentTarget)} aria-label={label}>
           <Icon size={15} />
           <span className="tab-label">{label}</span>
-          {id === 'listening' && selectedCount > 0 && <span className="tab-dot" />}
         </button>
       ))}
       <span className="dock-disc-slot">

@@ -277,17 +277,42 @@ export class RoomPlayer {
       const wantsMusic = this.wantsMusic(), wantsAmbient = this.wantsAmbient();
       if (!wantsMusic && !wantsAmbient) { this.running = false; this.engine.stopAll(); this.emit(); return; }
       let ambientFailed = false;
+      /*
+       * 环境音解码与音乐装载**并行**跑，不串成一条链。
+       *
+       * 原来这里是 `await this.engine.start(...)` 挡在音乐前面：冷启动时环境音
+       * 全部要解码（`audio.ts:321` 的并发上限是 3 条），音乐的 readAsset +
+       * loadMusic 只能排在最后一条解码完成之后才开始。实测（`tools/probe/play-latency.cjs`，
+       * 资产按真实库的 8–16MB 规模造）：
+       *
+       *   4 条环境音 + 9.4MB 音乐 → 点播放到出声 1136ms，其中 1075ms 在等环境音
+       *   8 条环境音 + 同上        → 1622ms
+       *
+       * 用户库里资产合计 163MB / 27 个文件，感受到的就是「延迟几秒」。
+       *
+       * 两者本来互不依赖：环境音只要 mix，音乐只要自己的 blob。分开跑之后，
+       * 出声时机从「环境音解码完」提前到「音乐文件读完」。
+       *
+       * 音量提前算：`applyMix()` 是同步的，这里调一次就 setMix 生效，
+       * 两条路都拿得到正确音量，不会出现音乐先用旧音量响一下再被改掉。
+       * （首帧 ctx 还没 init 时 setMix 会空转，靠下面音乐路径末尾那次再补。）
+       */
+      if (wantsMusic) {
+        if (!this.currentId || !this.cabinet.queue.includes(this.currentId)) this.currentId = this.cabinet.queue[0];
+      }
+      const mix = this.applyMix();
+      const ambientWork = wantsAmbient
+        // 环境音起不来和音乐读不出来是两件事，必须分开走。
+        // 以前它们共用一个 catch，结果环境音一失败就去 skipBroken()，
+        // 而那个函数第一行就把「当前正在播的那首歌」记进 broken——
+        // 一首完全正常的歌被冤枉成文件丢失，然后被跳过。
+        ? this.engine.start(mix).catch((error: unknown) => { ambientFailed = true; if (valid()) this.onError(error); })
+        : (this.engine.stopAmbience(), Promise.resolve());
       try {
-        if (wantsAmbient) {
-          try { await this.engine.start(this.applyMix()); }
-          // 环境音起不来和音乐读不出来是两件事，必须分开走。
-          // 以前它们共用一个 catch，结果环境音一失败就去 skipBroken()，
-          // 而那个函数第一行就把「当前正在播的那首歌」记进 broken——
-          // 一首完全正常的歌被冤枉成文件丢失，然后被跳过。
-          catch (error) { ambientFailed = true; if (valid()) this.onError(error); }
-        } else this.engine.stopAmbience();
         if (!valid()) return;
         if (!wantsMusic) {
+          await ambientWork;
+          if (!valid()) return;
           this.engine.pauseMusic();
           if (this.musicOn) this.currentId = undefined;
           // 环境音整体失败、又没有音乐可放：屏幕上写着「正在播放」，实际一点声音都没有。
@@ -297,7 +322,6 @@ export class RoomPlayer {
           this.emit();
           return;
         }
-        if (!this.currentId || !this.cabinet.queue.includes(this.currentId)) this.currentId = this.cabinet.queue[0];
         const record = this.cabinet.records.find(r => r.id === this.currentId)!;
         // 手动切歌时取走待用的过渡方式；自动接下一首或冷启动都走直接切换
         const transition = this.pendingTransition; this.pendingTransition = undefined;
@@ -329,6 +353,11 @@ export class RoomPlayer {
         if (!this.audio.musicPlaying) await this.engine.playMusic();
         if (valid()) this.emit();
       } catch (error) {
+        // 音乐先于环境音失败时，ambientFailed 可能还没被置上——
+        // 那样会误判成「只有音乐这一路坏了」去 skipBroken()，把一首好歌记进
+        // broken；而真正的情形是环境音和音乐两边都没起来（最典型：拔了移动硬盘）。
+        // 等环境音这一路落地再判断，结论才和改动前一致。
+        await ambientWork;
         if (!valid()) return;
         // 一首歌的文件没了，不该把整间屋子关掉。
         //
@@ -361,6 +390,19 @@ export class RoomPlayer {
           return;
         }
         this.emit();
+      } finally {
+        /*
+         * 这次 schedule 要等两路都落地才算完。
+         *
+         * `this.pending` 是外部观察「这一轮排完了没有」的唯一把手
+         * （测试 await 它、`App` 里也靠它串行化）。并行之后如果只等音乐，
+         * pending 会先于环境音 resolve：那时候 `status.playing` 还是旧值，
+         * 测试和界面都会看到「点完了却还没响」。
+         *
+         * 并行省的是**用户听到声音的时间**，不是这次排程的结束时刻——
+         * 这两件事在代码里本来就是两个量，别混成一个。
+         */
+        await ambientWork;
       }
     });
   }

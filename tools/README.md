@@ -20,6 +20,15 @@ env -u ELECTRON_RUN_AS_NODE node_modules/electron/dist/electron.exe tools/probe/
 | `geo.cjs` | **总几何**：各块画布百分比 + 截图。改版式后必跑的回归项。 |
 | `badge.cjs` | 竖排 DUMBRAVEN 徽标：每字母矩形、字号、行距、描边、四颗星位置 |
 | `produced.cjs` | 右下署名：矩形、字号、内边距、圆角、z-index、两行 Range 矩形 |
+| `styles.cjs` | **门禁第 1 步**。导出 12 份计算样式快照（约 274 万个属性），配 `style-diff.mjs` 比对 |
+| `style-diff.mjs` | 比对两份样式快照。终端只列前 40 条（`MAX_PRINT`），判断「差异是否收敛在一个属性上」用下面的 tally |
+| `style-diff-tally.mjs` | 全量聚合快照差异，**不截断**，按属性名计数 |
+| `baseline.cjs` | **门禁第 2 步**。导出 28 张像素基线（wide 680×980 / narrow 440×860 / short 680×680） |
+| `baseline-diff.py` | 比对像素基线。PSNR 判「有差异 / 噪声」，并给出差异区块坐标 |
+| `italic-audit.cjs` | 读某处规则的**计算样式**与字体栈，判断一条 `font-style` 后面到底解析到了什么 |
+| `italic-width.cjs` | 用 Canvas `measureText` 在 normal/italic 下量同字串宽度，差值为 0 即「死声明」。**必须带对照组**，否则测量方法出错也看不出来 |
+
+> 上表只列高频与门禁相关项。`probe/` 下共 140+ 个脚本，其余按文件名搜（命名都带领域：`ticket-*` / `tag-*` / `stone-*` / `desktop-*` / `template-*`）。
 
 ### `measure/` —— 只读像素，不用起 Electron
 拿参考图或探针截图的 PNG 逐像素扫。

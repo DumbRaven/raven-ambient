@@ -90,15 +90,9 @@
   border: 0;
 }
 
-@keyframes tab-dot-in {
-  from { opacity: 0; transform: scale(.2); }
-  to   { opacity: 1; transform: scale(1); }
-}
-
 @media (prefers-reduced-motion: reduce) {
   /* 全局已经 animation:none / transition:none，这里只是把时序也归零 */
   .roll-number .roll-col { transition: none !important; }
-  .tab-dot { animation: none !important; opacity: 1; transform: none; }
 }
 
 /* ============================================================

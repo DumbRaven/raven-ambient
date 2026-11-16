@@ -160,14 +160,6 @@
   opacity: .5;
   margin-left: 1px;
 }
-.tab-dot {
-  background: var(--bold-coral);
-  width: 6px;
-  height: 6px;
-  margin-left: 2px;
-  transform-origin: 50% 50%;
-  animation: tab-dot-in 180ms cubic-bezier(.2, .7, .3, 1) both;
-}
 
 /* ---------- 工具条 ---------- */
 .collection-toolbar { margin: 0 0 20px; }
