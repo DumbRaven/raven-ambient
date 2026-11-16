@@ -1106,10 +1106,9 @@
 }
 
 .ticket-lift {
-  --bend: 0;
-  --seg-count: 6;
-  --hinge: 12deg;
-  --curl-tilt: 18deg;
+  /* 整条票根往下平移了多少像素。由 MediaTickets 每帧写进来，
+     取值是手的位移本身，纯函数在 ticket-tear.ts 的 tearDrop() 里。 */
+  --drop: 0px;
   position: relative;
   display: flex;
   gap: 0;
@@ -1153,38 +1152,43 @@
   margin: 0;
 }
 
-/* 撕开时右半沿一条**斜折痕**翻起来，不是整块平移、不是绕轴平转、也不是切碎成条。
+/* 撕开时整条票根**直着往下**分离，不是掀角、不是斜折痕、不是烧成灰。
+
+   这条是用户 m01142 拍的板：「我感觉票根是右侧都撕掉吧」——撕掉的不是
+   一个角、也不是一层灰，是右边那条印着片名与条码的**整条**。所以这里既没有
+   折痕也没有背影纸：撕口就是封面与票根之间那条竖缝，手往下拉多少，
+   缝就从顶往下裂多少，裂开的那段跟着手走。
 
    ——为什么不是整块平移（第一版就是那么做的）：
    两张纸各自在接缝那条边上有一列半圆孔，拼起来才是完整的圆。整块平移意味着
-   右半的孔相对左半错开，错开的距离是「位移 × 0.76」，拖到阈值时约 159px，
+   右边那条的孔相对左边错开，错开的距离是「位移 × 0.76」，拖到阈值时约 159px，
    而孔的间距只有 20.8px —— 整列孔全部错位，每个孔里一半透出浮层后面的暗、
    一半是邻居的米色纸，混起来就是用户看到的那圈灰（m02721「锯齿部分还有
-   不合适的阴影」）。孔错位只在两半**沿接缝相对平移**时发生。
+   不合适的阴影」）。
+
+   现在这条读起来不假的原因：撕口那一刀只切在**票根自己身上**，封面那边
+   一个孔都没动，所以不存在「两半的孔相对错位」这件事。
 
    ——为什么不是整块绕轴转、也不是 skew（第二、三版）：
    那都是把右半当成一块硬板在动。绕接缝转是平面翻转、没有曲率；skew 更糟，
    实测手拖 210px 时右上角被抬了 94.6px，整块像纸片飞起来。用户 m04023 说
-   「这是一个柔软的东西明白吗，这是一种折叠」——软纸的形变是局部的。
+   「这是一个柔软的东西明白吗，这是一种折叠」——那条路走到头就是下面的狗耳。
 
    ——为什么不是切成 8 条横带各自转（第四版）：
    相邻两条的边不再共线，接缝裂成阶梯（探针 maxSeam 从 1.04 涨到 6.21），
    看着像把票切成八片错开。用户 m03567 说的「分段的也太生硬了」就是它。
 
-   ——为什么不是一条横贯整块面板的斜折痕（第五版）：
-   那样折起来的是面板下沿 60% 的面积，翻过去必然戳出票根之外——探针四档图里
-   那块纸整个飞到了票面上方，露出一大块米色纸背。用户 m04240 说「我感觉这是
-   很简单的一件事情啊，就是让你拟真的做一下撕票根的动画而已」。
+   ——为什么不是斜折痕翻角（第五版，也是最后一版折法）：
+   折痕从右下角斜切过去，切下来的三角翻过 180 度露纸背。它确实落在了纸面之内、
+   也确实「像个折起来的角」，但那是**折**不是**撕**，而且折出来只是一小块，
+   跟「右侧都撕掉」差得远。用户 m04030 要的「从右下角掀起来然后折叠着往上撕」
+   在物理上就不成立——折叠与撕开是两种形变。
 
-   ——现在这样，右下角一个三角狗耳：
-   折痕是从右下角斜切过去的一条 45° 线，切下来的三角形沿折痕翻过去，折满时
-   压在折痕另一侧——三角的直角边长是纸宽的一小段，翻过去正好落在纸面之内，
-   永远不会飞出去。折痕的落点由 ticket-tear.ts 的 foldShape() 算，以
-   --fold-x1（下边缘）与 --fold-y1（右边缘）传进来，两个值都从 1 往 0 退：
-   1 的时候折痕缩在右下角、纸是平的。
-
-   只有一条边要拼（折痕本身），一次旋转作用在整个三角上，接缝不可能裂开——
-   这也是用户 m04075 要的「简单办法」。 */
+   现在的做法是**整条平移**：票根从上沿起整体跟着手往下走，一路滑出浮层。
+   不裁开、不分两段。用户 m01988 打断过一版「裂口 + 上段跟手、下段不动」的设计：
+   「这个撕票根有这么复杂吗，是不是你想错了，我要的就是直上直下就行了」——
+   那句是对的，票被撕走这件事本身没有两段，把一个整体拆成两套坐标系之后，
+   屏幕上剩下的是「票根上半截凭空消失」，不是撕。 */
 .ticket-lift-panel {
   position: relative;
   display: block;
@@ -1192,128 +1196,32 @@
   min-width: 0;
   /* 与列表里同一套形状：只有外缘（右）两角圆。 */
   border-radius: 0;
-  /* 透视：1300px 是「一张纸距离眼睛一臂远」的观感。再远纸就发平，
-     再近翻起来那块会被放大得失真。 */
-  perspective: 1300px;
-  /* 翻起来那块要能转到纸面之外，不被父级压平。 */
-  transform-style: preserve-3d;
-  /* 折痕是斜的这件事交给两块纸自己（见 .ticket-fold），这里不加任何形变。 */
-  transform-origin: 0 0;
-  /* 这里一条位移都不写：上沿必须钉死在桌面那条线上。
-     早先这里有一条 translate: 0 calc(var(--grip-dy) * -0.18)，是从铰链版
-     带过来的「跟手上移」；手拖 210px 时它把整个右半抬上去 37.8px，于是
-     撕的同时上沿也在动（m03762 说的就是它）。
-     手往上的位移只通过 --bend 变成折痕的形状，纸本身不整体平移。 */
-  /* 这里刻意不写 opacity。opacity 不到 1 会让元素成为「分组元素」，
-     浏览器随即忽略 preserve-3d 把子树压平——翻起来那块会瞬间贴回纸面。
-     淡出改挂到两块 .ticket-fold 上（见下）。 */
+  /* 整条票根的位移就这一条：--drop 由 MediaTickets 每帧写进来，
+     等于手的位移像素数。 */
+  translate: 0 var(--drop, 0px);
+  /* 这里刻意不写 opacity：opacity 不到 1 会让元素成为「分组元素」，
+     淡出效果会连同它下面所有子元素一起被合成一次，拖动时边缘会糊。
+     淡出挂在 .ticket-stage[data-phase='flying'] 那条规则上（见下）。 */
 }
 
-/* 两块纸，各持一份**完整**票面，靠 clip-path 只留自己那半边，拼起来还是原来那张。
-   用裁切而不是真把票切开：纸色、纸纹、撕线孔、文字、条码全都不用重做，
-   bend=0 时两句 clip-path 恰好拼满整块面板，静止态不需要另一套 DOM。
-
-   为什么两份票面都留整个、而不是各裁一半渲染：裁一半要重排文字，票面版式
-   （arc / stack / editorial / classic）四种都要各写一遍裁法。整份渲染再裁，
-   四种版式一行代码都不用改。 */
-.ticket-fold {
-  position: absolute;
-  inset: 0;
-  /* 裁切窗口之外的票面不参与命中，否则下半张会挡住左半画面的点击。 */
-  pointer-events: none;
-}
-
-/* 折痕**上方**那块：原样躺在桌上，只把右下角那个三角切掉。
-   polygon 的五个点：左上、右上、折痕在右边缘的落点、折痕在下边缘的落点、左下。
-   --fold-y1 = --fold-x1 = 1 时右下角那个点塌成直角，整块等于没有裁。 */
-.ticket-fold[data-side='under'] {
-  clip-path: polygon(
-    0% 0%,
-    100% 0%,
-    100% calc(var(--fold-y1, 1) * 100%),
-    calc(var(--fold-x1, 1) * 100%) 100%,
-    0% 100%
-  );
-}
-
-/* 折痕**右下**那个三角：沿折痕线整体翻过去。
-   三个几何量缺一不可——
-   - clip-path 只留折痕右下（三个点：折痕右端、右下角、折痕下端）；
-   - transform-origin 落在折痕上：取折痕下端那个点，旋转轴从这里出发；
-   - rotate3d 轴 = 折痕方向（--fold-ax / --fold-ay），角度 = --fold-deg。
-   轴与折痕平行且过折痕上一点时，折痕这条边在旋转中保持不动，所以两块
-   永远贴着、不裂。 */
-.ticket-fold[data-side='over'] {
-  clip-path: polygon(
-    100% calc(var(--fold-y1, 1) * 100%),
-    100% 100%,
-    calc(var(--fold-x1, 1) * 100%) 100%
-  );
-  transform-origin: calc(var(--fold-x1, 1) * 100%) 100%;
-  transform: rotate3d(var(--fold-ax, 1), var(--fold-ay, 0), 0, var(--fold-deg, 0deg));
-  /* 纸背：翻过 90 度之后看见的是它。
-     必须比正面明显暗一档，否则折起来那块几乎隐形，整个效果读起来只剩
-     「票根右下角被啃掉一块」——两块纸都是米白时人眼只看得出缺口。
-     真实的折角背面是背光的，天然比正面暗。 */
-  background: linear-gradient(160deg, #ded2b8, #d3c6a9);
-  /* 折起来那块是离开纸面的，必须在底下那张纸上投一道影，否则它和纸面
-     贴在同一个平面里，读起来只是「一块颜色不同的区域」而不是「掀起来的纸」。
-     阴影方向斜向左下（-3px 4px）：光从右上打过来，掀起的角朝左下投影。
-     放在这块而不是缺口的父级：只有它知道自己的轮廓。 */
-  filter: drop-shadow(-3px 4px 5px rgb(42 35 24 / 0.3));
-  /* 抬手回弹挂在这里，不是父级：上沿那条已经钉死、父级没有任何位移可过渡，
-     能弹回去的只有这一块的折叠角。只有松手不撕时才真的用上
-     （拖拽期间 holding 把过渡关掉）；320ms 配 1.28 的过冲，
-     纸摊回平面时略微弹过一点再落定。 */
-  transition: transform 320ms cubic-bezier(0.3, 1.28, 0.48, 1);
-}
-
-/* 两块的票面都要在转过 90 度之后藏起来，露出的才是纸背，
-   而不是正面内容的镜像（倒着的片名与条码）。 */
-.ticket-fold > .ticket-panel {
-  /* 票面必须撑满这个裁切窗口。`.ticket-panel` 自己是 `display:flex`、高度按内容走
-     （只有几行字那么高），不给定位的话它只盖住面板上半截，下半截露出底下模糊的
-     背景——看起来就像票根被啃掉一块（这个坑踩过一次，四档图里下半张凭空消失）。 */
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  /* 拖到后面稍微淡一点点，像纸被拉薄。0.08 是上限，再多会以为要消失了。
-     淡出挂在这一层而不是 .ticket-lift-panel：opacity 会把 preserve-3d
-     压平，挂在这里只淡薄薄一片平面，不动 3D 结构。 */
-  opacity: calc(1 - var(--bend) * 0.08);
-  transition: opacity 320ms ease;
-  backface-visibility: hidden;
-}
-
-/* 折痕上刻意**不画**一条固定的暗带：折痕随进度整条移动，固定暗带会错位。
-   改成在翻起来那块纸自己身上画一圈贴着折痕的暗（见下面的 ::after）——
-   半径由 --fold-x1 推出来，折痕挪到哪儿，暗就跟着到哪儿。 */
-
-/* 翻起来那块纸的折痕侧压暗：折起来的纸，靠近折痕的地方是背光的，
-   一道贴着斜边的暗把「这是一块翻起来的纸」说清楚。
-   - 圆心放在右下角（这块三角的直角顶点），半径按折痕到它的距离算；
-   - (1 - x1) 是折痕吃掉的直角边长（占面板宽），×142% 换成到直角顶点的距离
-     （等腰直角三角形的斜边 ≈ 1.414×直角边）；
-   - 只在最外圈（72%~100%）加深，中间那片纸背保持干净。 */
-.ticket-fold[data-side='over']::after {
-  content: "";
+/* 票面：一份完整的票面，跟着面板整体位移。
+   为什么不把票裁成两段：裁开之后必须有「谁压谁」「裁完再挪会不会错位」
+   「键盘路径没有位移怎么办」这些配套问题，而它们全都只是为了一种用户没有
+   要求的形变。整条平移把这些问题一次性消掉。 */
+.ticket-face {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(
-    circle calc((1 - var(--fold-x1, 1)) * 142%) at 100% 100%,
-    rgb(42 35 24 / 0) 72%,
-    rgb(42 35 24 / 0.28) 100%
-  );
 }
 
-/* 按住期间零过渡：纸必须死死跟着手指，迟一帧都会觉得发飘。
-   父级的形变也要算进去——它同样是每帧跟着 --bend 变的，留着 320ms 过渡
-   会让整块纸在拖动时慢半拍才翻过来（m03830 说的「很呆板」有一半来自这里）。 */
-.ticket-lift[data-holding='true'] .ticket-lift-panel,
-.ticket-lift[data-holding='true'] .ticket-fold,
-.ticket-lift[data-holding='true'] .ticket-fold > .ticket-panel {
+/* 松手没撕成时，票根要滑回原位。按住期间不能有过渡，
+   否则纸会追在手指后面漂（下一条把它关掉）。 */
+.ticket-lift[data-holding='false'] .ticket-lift-panel {
+  transition: translate 260ms cubic-bezier(0.3, 0.9, 0.4, 1);
+}
+
+/* 按住期间零过渡：纸必须死死跟着手指，迟一帧都会觉得发飘。 */
+.ticket-lift[data-holding='true'] .ticket-lift-panel {
   transition: none;
 }
 
@@ -1326,8 +1234,8 @@
 }
 
 /* 票面现在也是键盘的一个停靠点（role=button + tabIndex），得看得见焦点。
-   用内缩的描边而不是外描边：外描边会被 .ticket-lift 的 preserve-3d +
-   drop-shadow 裁掉一圈，看起来像漏了一个角。
+   用内缩的描边而不是外描边：外描边会被 .ticket-lift 的 drop-shadow 裁掉一圈，
+   看起来像漏了一个角。
 
    颜色必须用纸面上的深墨（--ticket-ink），不能用浅色。
    原来写的是 #efeada——那是暗幕上的提示色（.ticket-tip 在 #0b0f14 上有 15.97:1），
@@ -1339,8 +1247,8 @@
   border-radius: 2px;
 }
 
-/* 提示挂在浮层上、不挂在会动的票根上：票根跟着手走（--bend 驱动
-   translate/rotate），提示跟着一起转就会「晃」，而且它压在条码上读不出来。 */
+/* 提示挂在浮层上、不挂在会动的票根上：票根跟着手往下走（--drop 驱动
+   translate），提示跟着一起走就会「晃」，而且它压在条码上读不出来。 */
 .ticket-tip {
   position: absolute;
   left: 50%;
@@ -1359,71 +1267,22 @@
   50% { opacity: 0.9; translate: -50% -3px; }
 }
 
-/* ── 灰烬 ───────────────────────────────────────────────────────
-   票根碎成一把灰往上飘。粒子位置与轨迹由 ashParticles 算好（纯函数，
-   有测试），这里只把 --ash-x / --ash-y / --ash-rot 三个数接上关键帧。 */
-.ticket-ash {
-  position: absolute;
-  inset: 0 0 0 70.9%;
-  overflow: visible;
-  pointer-events: none;
+/* ── 撕下来的票根滑出浮层 ────────────────────────────────────────
+   手一松，剩下的路自己走完：从当前位置继续往下滑出浮层，带一点加速，
+   像一张纸被抽走。滑完再让画面飞——两条轨迹方向相反，同时开跑眼睛不知道跟哪条。
+
+   为什么用关键帧而不是继续改 --drop：--drop 是每帧由 React 写进来的手部位移，
+   松手之后它就不再变化了。要「自己走完剩下的路」，得让这一段位移由 CSS
+   关键帧接管，起点是手松开的位置（当前 --drop），终点是整条票根滑出浮层。 */
+.ticket-stage[data-phase='cutting'] .ticket-lift-panel {
+  animation: ticket-slide 260ms cubic-bezier(0.4, 0, 0.9, 0.6) forwards;
 }
 
-.ticket-ash i {
-  position: absolute;
-  border-radius: 1px;
-  background: #4a443a;
-  opacity: 0;
-  animation: ticket-ash 900ms cubic-bezier(0.3, 0.1, 0.5, 1) forwards;
-}
-
-@keyframes ticket-ash {
-  0% {
-    opacity: 0;
-    translate: 0 0;
-    rotate: 0deg;
-    background: #4a443a;
-  }
-
-  12% {
-    opacity: 0.95;
-    background: #6a6153;
-  }
-
-  55% {
-    opacity: 0.7;
-    background: #8d8478;
-  }
-
-  100% {
-    opacity: 0;
-    translate: var(--ash-x) var(--ash-y);
-    rotate: var(--ash-rot);
-    background: #b6ad9d;
-  }
-}
-
-/* 撕开的票根本体在灰烬起来的同时淡出去，两件事叠着看才像烧掉，
-   而不是「纸先消失、灰再出现」。
-
-   烧的是两块 .ticket-fold，不是整个 .ticket-lift、也不是 .ticket-lift-panel：
-   - 烧 .ticket-lift 会把它的孩子（包括要飞走的左半画面）一起淡成透明，
-     画面还没飞就看不见了；
-   - 烧 .ticket-lift-panel 不行，它是折叠的 3D 根（perspective +
-     preserve-3d），filter 会让它变成分组元素、把那块翻起来的纸压回平面，
-     松手那一瞬间纸会「啪」地摊平。
-   挂在两块纸上就没有这两个问题：它们是末端的平面。 */
-.ticket-stage:not([data-phase='idle']) .ticket-fold {
-  animation: ticket-burn 520ms ease forwards;
-}
-
-/* 纸跟着字一起没。纸长在票根块上，所以把那一块整体淡出就够了——不然
-   看到的是「字烧掉了、白纸还在」，像把文字层删掉而不像把票烧掉。
-   投影在外层 .ticket-lift 上，这里不用管。 */
-@keyframes ticket-burn {
-  0% { filter: brightness(1) saturate(1); }
-  40% { filter: brightness(0.62) saturate(0.6); }
-  100% { opacity: 0; filter: brightness(0.3) saturate(0); }
+@keyframes ticket-slide {
+  from { translate: 0 var(--drop, 0px); opacity: 1; }
+  /* 尾段同步淡出：票根滑到浮层边缘时直接消失会读成「被裁掉」，
+     淡掉才像滑出了画面。110% 保证整条（含内边距）走干净。 */
+  to { translate: 0 calc(var(--drop, 0px) + 110%); opacity: 0; }
 }
 
 /* 剩下左半边画面往放映台飞。落点由 flightOf 算（浮层里这一块的矩形 →
@@ -1434,14 +1293,13 @@
   transition: transform 520ms cubic-bezier(0.3, 0.72, 0.28, 1);
 }
 
-/* 飞的时候纸已经烧完了，这里不再写 background / box-shadow——
+/* 飞的时候纸已经撕完了，这里不再写 background / box-shadow——
    那会盖回一层纸，把「只剩画面在飞」变成「整张票在飞」。 */
 .ticket-stage[data-phase='flying'] .ticket-lift {
   background: transparent;
 }
 
-.ticket-stage[data-phase='flying'] .ticket-lift-panel,
-.ticket-stage[data-phase='flying'] .ticket-ash {
+.ticket-stage[data-phase='flying'] .ticket-lift-panel {
   display: none;
 }
 
@@ -1453,45 +1311,19 @@
     transition: none;
   }
 
-  /* 降级态：不做 3D 折叠，整块右半绕接缝底端掀开 --hinge（TEAR_HINGE_DEG）。
-     撕的手感还在，只是纸不翻起来。两块纸的 clip-path 本来就是「折痕上下
-     各留半张」，bend=0 时正好拼满；这里把它们一起抬起来即可，不必按开关
-     渲染两套 DOM。 */
-  .ticket-lift-panel {
-    display: block;
-    perspective: none;
-    transform-style: flat;
-    transform-origin: 0 100%;
-    rotate: calc(var(--bend) * var(--hinge, 12deg));
-    transition: none;
+  /* 降级态：不做滑落，撕开就直接跳到「已经没了」。
+     位移仍然是同一套 --drop，只是不走 260ms 的关键帧，一帧之内换成结果。 */
+  .ticket-stage[data-phase='cutting'] .ticket-lift-panel {
+    animation-duration: 1ms;
   }
 
-  /* 不做折叠：纸不该缺一个角，所以下面的那块直接不画，上面的那块恢复成
-     完整矩形——整张票就靠父级那条 rotate 掀开。 */
-  .ticket-fold[data-side='under'] {
-    clip-path: none;
-  }
-
-  .ticket-fold[data-side='over'] {
-    display: none;
-  }
-
-  .ticket-fold > .ticket-panel {
-    opacity: 1;
+  .ticket-lift[data-holding='false'] .ticket-lift-panel {
     transition: none;
   }
 
   .ticket-tip {
     animation: none;
     opacity: 0.6;
-  }
-
-  .ticket-ash i {
-    animation-duration: 1ms;
-  }
-
-  .ticket-stage:not([data-phase='idle']) .ticket-fold {
-    animation-duration: 1ms;
   }
 
   .ticket-stage[data-phase='flying'] .ticket-lift-shot {

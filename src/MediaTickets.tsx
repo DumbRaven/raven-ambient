@@ -19,14 +19,13 @@ import {
   ticketShape, ticketShowtime, ticketStamp,
 } from './ticket.ts';
 import {
-  ashParticles, flightOf, flightSelectors, foldShape, pickFlightRect,
-  shouldTear, TEAR_HINGE_DEG, tearEase, tearProgress,
+  flightOf, flightSelectors, pickFlightRect, shouldTear, tearDrop,
 } from './ticket-tear.ts';
 import { PAPER_FILTER_ID, paperFilterMarkup } from './paper.ts';
 import type { MediaItem } from './records';
 
-/** 灰烬全部飘散要多久。和 CSS 里 ticket-ash 的关键帧长度一致，改一处要改两处。 */
-export const ASH_MS = 900;
+/** 撕下来的票根滑出浮层要多久。和 CSS 里 ticket-slide 的关键帧长度一致，改一处要改两处。 */
+export const SLIDE_MS = 260;
 /** 画面从浮层飞进放映台要多久。 */
 export const FLY_MS = 520;
 
@@ -234,12 +233,12 @@ function Ticket({
   );
 }
 
-type Phase = 'idle' | 'burning' | 'flying';
+type Phase = 'idle' | 'cutting' | 'flying';
 
 /**
  * 浮起来的那一张。
  *
- * 三个阶段各自占一个状态，不用一堆布尔：撕的时候不烧、烧完才飞，
+ * 三个阶段各自占一个状态，不用一堆布尔：撕的时候不飞、撕完才飞，
  * 用布尔表达这三种互斥关系会写出八个组合，其中有几个不可能出现。
  */
 function TicketStage({
@@ -253,8 +252,11 @@ function TicketStage({
   onDone: (id: string) => void;
 }) {
   const [phase, setPhase] = useState<Phase>('idle');
-  const [pull, setPull] = useState(0); // 0~1 的撕开进度
-  // 按住期间不能有过渡，否则纸会追在手指后面漂；松手才放开回弹。
+  // 手往下拖了多少像素。整条票根跟着这个数往下平移，就这么多。
+  // 用像素而不是 0~1 的比例：票根要**跟手走一样的距离**，换算成比例再乘回去
+  // 会丢掉 px 精度，还会在手停下时因为四舍五入抖。
+  const [drop, setDrop] = useState(0);
+  // 按住期间不能有过渡，否则纸会追在手指后面漂；松手才放开。
   const [holding, setHolding] = useState(false);
   // 已经拖过阈值：松手就断。只用来换视觉提示，不参与判定。
   const [tearable, setTearable] = useState(false);
@@ -264,7 +266,6 @@ function TicketStage({
   const shotRef = useRef<HTMLSpanElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLSpanElement>(null);
-  const flakes = useRef(ashParticles(item.id));
 
   useEffect(() => () => { timers.current.forEach(window.clearTimeout); }, []);
 
@@ -278,8 +279,14 @@ function TicketStage({
     timers.current.push(window.setTimeout(() => onDone(item.id), FLY_MS));
   };
 
-  function burn() {
-    setPhase('burning');
+  /**
+   * 票根已经撕下来了：等它滑出浮层，再让画面飞向放映台。
+   *
+   * 顺序不能反。画面飞走的落点是放映台，票根滑走的落点是屏幕下方，
+   * 两条轨迹方向相反；同时开跑的话，眼睛不知道该跟哪一条。
+   */
+  function detach() {
+    setPhase('cutting');
     timers.current.push(window.setTimeout(() => {
       // 画面飞向放映台。落点按版式分别取：拼贴的画面块只占屏幕左上 63%×65%，
       // 拿 `.theater-screen` 的话会飞偏、还飞大一圈（用户 m14515 报的就是这个）。
@@ -300,7 +307,7 @@ function TicketStage({
       }
       setPhase('flying');
       finish();
-    }, ASH_MS));
+    }, SLIDE_MS));
   }
 
   function down(event: React.PointerEvent) {
@@ -323,11 +330,15 @@ function TicketStage({
     setHolding(true);
   }
 
+  /**
+   * 往下拖 = 整条票根往下走。**只认正数**：往上推不倒退
+   * （已经滑走的票根不会自己长回来），从别处移进来也一样。
+   */
   function move(event: React.PointerEvent) {
     const state = drag.current;
     if (!state || state.id !== event.pointerId) return;
-    const dy = state.startY - event.clientY;
-    setPull(tearProgress(dy, state.height));
+    const dy = event.clientY - state.startY;
+    setDrop(tearDrop(dy));
     setTearable(shouldTear(dy, state.height));
   }
 
@@ -336,15 +347,15 @@ function TicketStage({
     if (!state || state.id !== event.pointerId) return;
     drag.current = null;
     setHolding(false);
-    const dy = state.startY - event.clientY;
+    const dy = event.clientY - state.startY;
     if (shouldTear(dy, state.height)) {
-      // 撕开了：进度钉在满值，卷曲就此停住，交给燃烧与飞行。
-      setPull(1);
+      // 撕开了：位移钉在松手那一刻，剩下的路交给 ticket-slide。
+      setDrop(tearDrop(dy));
       setTearable(false);
-      burn();
+      detach();
     } else {
-      // 没拖够：进度归零，由 CSS 的过渡带一点过冲把纸摊回平面。
-      setPull(0);
+      // 没拖够：归零，由 CSS 的过渡把票根推回原处。
+      setDrop(0);
       setTearable(false);
     }
   }
@@ -353,40 +364,22 @@ function TicketStage({
    * 键盘撕开：与「拖动越过阈值」走同一条后续链路。
    *
    * 不模拟一次假的拖拽（那要伪造 pointerId、clientY 与 getBoundingClientRect），
-   * 直接把「越过阈值之后该发生的事」重放一遍：进度钉满 → burn()。
-   * 后续的燃烧、飞行、onDone 完全复用，两条路径不会各改各的。
+   * 直接把「越过阈值之后该发生的事」重放一遍：进度钉满 → detach()。
+   * 后续的滑落、飞行、onDone 完全复用，两条路径不会各改各的。
+   *
+   * 键盘路径没有「拖了多远」这个量，所以 --drop 保持 0：撕口直接裂到满，
+   * 滑落的那段路全靠 ticket-slide 关键帧自己走完。
    */
   function tear() {
     if (phase !== 'idle') return;
-    setPull(1);
     setTearable(false);
-    burn();
+    detach();
   }
 
-  // 形变进度只算一次：折痕的形状与票面淡化都读它。
-  const bend = tearEase(pull);
-  // 一只从右下角翻起来的狗耳该怎么摆、绕哪个轴转多少度，全部由纯函数算好，
-  // CSS 只负责把这几个数贴到 clip-path 与 transform 上——折多少只改
-  // ticket-tear.ts 一处。
-  const fold = foldShape(bend);
-
+  // 整条票根往下挪多少，只由这一个数决定。CSS 把它贴到 translate 上。
   const style = {
-    // --bend 0~1：撕开已经被过成「前段绷住、后段加速」的形变进度，
-    // 折叠角与票面淡化都读它，两处同源才不会各走各的。
-    '--bend': bend.toFixed(3),
-    // 折痕在下边缘的落点（0~1 比值）。1 = 就在右下角，即什么都没折；
-    // 越折越小，折满时到 0（折痕横到左边缘）。
-    '--fold-x1': fold.x1.toFixed(5),
-    // 折痕在右边缘的落点（0~1 比值）。同样从 1 往 0 退。
-    '--fold-y1': fold.y1.toFixed(5),
-    // 折痕的方向向量与折叠角：CSS 用 rotate3d 绕这条**真实的折痕线**转，
-    // 一整块纸一次旋转，所以接缝不可能裂开。
-    '--fold-ax': fold.ax.toFixed(5),
-    '--fold-ay': fold.ay.toFixed(5),
-    '--fold-deg': `${fold.deg.toFixed(3)}deg`,
-    // --hinge：只有 prefers-reduced-motion 的降级态读它（那时不做 3D 折叠，
-    // 退回整块绕底端掀开）。
-    '--hinge': `${TEAR_HINGE_DEG}deg`,
+    // --drop：整条票根往下平移了多少像素，就等于手的位移。
+    '--drop': `${drop.toFixed(1)}px`,
     ...(flying
       ? {
         '--fly-x': `${flying.dx.toFixed(1)}px`,
@@ -395,6 +388,7 @@ function TicketStage({
       }
       : {}),
   } as React.CSSProperties;
+
 
   return (
     <div
@@ -435,35 +429,14 @@ function TicketStage({
           onPointerUp={up}
           onPointerCancel={up}
         >
-          {/* 两份票面：折痕上面那份原样留着，下面那份沿折痕翻过来。
-              都是同一张票面、同一套纸色纸纹撕线孔，不用真去把票切开。 */}
-          <span className="ticket-fold" data-side="under" aria-hidden="true">
-            <TicketFace item={item} index={index} />
-          </span>
-          <span className="ticket-fold" data-side="over" aria-hidden="true">
+          {/* 一份票面，整体往下走。不再裁成两段：拆开之后就必然要处理
+              「两段谁压谁」「裁完再挪会不会错位」这些问题，而用户要的只是
+              一条票根直上直下地滑走（m01988）。同一张票、同一套纸色纸纹。 */}
+          <span className="ticket-face" aria-hidden="true">
             <TicketFace item={item} index={index} />
           </span>
         </span>
-        {phase === 'idle' && <span className="ticket-tip">按住票根往上撕，或按回车</span>}
-        {phase !== 'idle' && (
-          <span className="ticket-ash" aria-hidden="true">
-            {flakes.current.map((flake, i) => (
-              <i
-                key={i}
-                style={{
-                  left: `${(flake.x * 100).toFixed(2)}%`,
-                  top: `${(flake.y * 100).toFixed(2)}%`,
-                  width: `${flake.size}px`,
-                  height: `${flake.size}px`,
-                  animationDelay: `${flake.delay}ms`,
-                  '--ash-x': `${(flake.dx * 100).toFixed(1)}%`,
-                  '--ash-y': `${(flake.dy * 100).toFixed(1)}%`,
-                  '--ash-rot': `${flake.rot.toFixed(0)}deg`,
-                } as React.CSSProperties}
-              />
-            ))}
-          </span>
-        )}
+        {phase === 'idle' && <span className="ticket-tip">按住票根往下撕，或按回车</span>}
       </div>
     </div>
   );
