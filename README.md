@@ -272,7 +272,7 @@ Node 24；`npm install`（Electron 下载慢时可设 `electron_config_cache` �
 
 外部音乐那条链路分布在四个文件里：`src/line-in.ts` 只负责找设备、抓流、把错误翻译成中文；`src/now-playing.ts` 是纯数据层（快照解析、播放器中文名、副标题拼接），可以脱离 Electron 测；`src/now-playing-bridge.ts` 是页面与外壳的唯一通道；`electron/now-playing.cjs` 管辅助进程的生命周期和 stdin 命令队列。
 
-辅助进程和页面之间没有 IPC 通道——渲染器是 `sandbox: true` 且没有 preload，拿不到 `ipcRenderer`。方向反过来：主进程用 `executeJavaScript` 调页面里的 `window.__ravenNowPlaying(snapshot)` 推送快照，页面把动作写进 `window.__ravenNowPlayingOutbox`，主进程每 400ms 轮询取走。控制命令不另起进程，走常驻那个的 stdin：每次新建 SMTC 连接要几百毫秒，连按两下会明显迟滞。
+辅助进程和页面之间**两条路并存**：有 preload 时页面用 `window.raven.on('now:snapshot')` 收快照、`window.raven.send('now:action', ...)` 回动作；没有 preload 的页面（探针用的旧路）则由主进程 `executeJavaScript` 调 `window.__ravenNowPlaying(snapshot)` 推、页面把动作写进 `window.__ravenNowPlayingOutbox` 让主进程轮询取走。`electron/now-playing.cjs` 用 `viaIpc` 标记按页面能力自动选路，**旧路不能删**。控制命令不另起进程，走常驻那个的 stdin：每次新建 SMTC 连接要几百毫秒，连按两下会明显迟滞。
 
 `src/loudness.ts` 是响度归一化的纯函数（RMS 测量、增益换算、上下限）。`src/vinyl.ts` 的 `liftForVinyl()` 会把太暗的封面色抬到看得见层次，但不改色相——纯黑被抬成 `#6b6b6b` 而不是染成别的颜色。
 
@@ -286,12 +286,14 @@ Node 24；`npm install`（Electron 下载慢时可设 `electron_config_cache` �
 
 界面样式分两层：
 
-- `src/styles.css`：基础样式，负责布局、唱片盒、唱盘、队列等结构。
-- `src/skin-bold.css`：视觉覆盖层，选择器优先级略高于基础样式，负责颜色、圆角、字体、唱机、专注盘、播放卡、弹窗等。由 `src/main.tsx` 在 `import './styles.css';` 之后追加 `import './skin-bold.css';` 挂上去。
+- `src/styles.css`：基础样式，负责布局、唱片盒、唱盘、队列等结构。**这一份一字不改。**
+- `src/skin/` 下的 14 个文件：视觉覆盖层，负责颜色、圆角、字体、唱机、专注盘、播放卡、弹窗等。`src/skin-bold.css` 现在只剩 14 条 `@import`，**它的 import 顺序就是层叠顺序**——改顺序等于改渲染结果。`src/main.tsx` 在 `import './styles.css';` 之后挂 `import './skin-bold.css';`。
 
-改视觉时优先调 `skin-bold.css` 里的设计令牌（文件开头的 `--bold-*` 变量），而不是逐个组件改颜色。
+改视觉时优先调令牌，而不是逐个组件改颜色：原地板那套 `--accent` 在 `styles.css`，明亮版那套 `--bold-*` 在 `src/skin/base.css`（票根另有 `--ticket-*` 在 `src/skin/gallery.css`）。
 
-**例外：桌面计时小窗不走这两层。** 它是 `electron/mini.html` 里一套自带的样式——那是个独立的透明无边框窗口，加载的也不是主页面，所以拿不到 `skin-bold.css`。颜色和形状直接写在 `mini.html` 的 `<style>` 里，改它要单独改。
+**例外：桌面计时小窗不走这两层。** `electron/mini.html` 是个独立的透明无边框窗口，加载的不是主页面，拿不到皮肤层。颜色和形状直接写在它的 `<style>` 里，改它要单独改。
+
+**不算例外：桌面放映窗。** `desktop.html` → `src/desktop.tsx` 会把三层都挂上（`styles.css` + `skin-bold.css` + `desktop.css`，最后一份是放映窗专有的少数规则），所以放映窗的观感跟着皮肤层一起变。
 
 ## 动效层
 
@@ -302,15 +304,15 @@ Node 24；`npm install`（Electron 下载慢时可设 `electron_config_cache` �
   - `src/splash.ts` 的 `dismissSplash()` **不自己算时间**，而是等 `document.getAnimations()` 里所有 `splash-*` 动画的 `finished`。CSS 动画跑在自己的 document timeline 上，窗口隐藏时不推进、显示后追赶；用 `performance.now()` 另算一套钟必然错位，会把动画截断（实测第一版离场时进度线只走到 0.88）。
   - `prefers-reduced-motion` 里只把五个可见元素压到 1ms，**不能包含 `.splash-clock`**，否则计时器被瞬间跳过。
 - `src/roll-number.tsx`：滚动数字。一列 0–9 竖排、`overflow:hidden` 只露一个窗口，靠 `translateY(calc(var(--roll) * -1.2em))` 滚到目标位。
-  - **`--roll` 必须注册成 `<number>`**（`skin-bold.css` 开头的 `@property`）。换成 `<integer>` 会退化成逐档跳变：实测 5 个取值、156ms 就跳完，剩下 164ms 静止，观感是「咔咔咔」。
+  - **`--roll` 必须注册成 `<number>`**（`src/skin/widgets.css:14` 的 `@property`）。换成 `<integer>` 会退化成逐档跳变：实测 5 个取值、156ms 就跳完，剩下 164ms 静止，观感是「咔咔咔」。
   - 首帧不滚：挂载后第一帧才给 `data-roll-ready="true"`，在那之前不给过渡。
   - 视觉隐藏的真实文本 `.roll-text` **必须在 `.roll-number` 内部**。放到外面时它的 `position:absolute` 会一路找到更外层的定位祖先，撑出滚动条。
-- 拖拽落位画线：`src/MusicQueue.tsx` 落位后给该行加 `settled` 类 460ms，`skin-bold.css` 的 `.queue-item.settled::after` 从中心向两端展开再淡出。
+- 拖拽落位画线：`src/MusicQueue.tsx` 落位后给该行加 `settled` 类 460ms，`src/skin/widgets.css:109` 的 `.queue-item.settled::after` 从中心向两端展开再淡出。
 - 表单错误反馈：`src/App.tsx` 的 `draftError` 状态 → `.text-field[data-invalid]` 变红 + 抖动 + `.field-error` 文案；打字即清除。
   - **表单必须带 `noValidate`**。`<input required>` 会让浏览器原生校验在 `onSubmit` 之前拦下提交，JS 校验分支永远走不到。
 - 播放键：`.main-play-icon` 换图标时重挂载播 `play-icon-in 200ms`；`.main-play:not(:disabled):active` 压到 `scale(.9)`。`:not(:disabled)` 不能省——`:active` 在 disabled 的 `<button>` 上照样命中。
 - 播放卡波形：`src/PlayCard.tsx` 用 32 个 `<span>` 的 ref 数组直接改 DOM 的 `--h`，**不走 setState**（每帧重渲染整棵树会掉帧）。电平来自 `player.level`（引擎每 80ms 的原始 RMS），开卡时用 60ms 定时器推。波形公式 `Math.min(1, Math.sqrt(rms) * 2.1)`——开方是为了让安静段也有可见起伏。
-- 换页圆形扩散：`src/App.tsx` 的 `selectView(next, trigger)` / `selectFilter(next, trigger)` 用 `circleFrom()` 算出「圆心到四角最远距离」写进 `--wipe-x/y/r`，`skin-bold.css` 的 `page-wipe-in` 用 `clip-path: circle(...)` 铺开。触发元素的中心可能在内容区上方，圆心要夹进内容区边界，否则扩散会先空转一段。
+- 换页圆形扩散：`src/App.tsx` 的 `selectView(next, trigger)` / `selectFilter(next, trigger)` 用 `circleFrom()` 算出「圆心到四角最远距离」写进 `--wipe-x/y/r`，`src/skin/modern.css:244` 的 `page-wipe-in` 用 `clip-path: circle(...)` 铺开。触发元素的中心可能在内容区上方，圆心要夹进内容区边界，否则扩散会先空转一段。
   - **CSS 动画时长必须和 `src/motion-state.ts` 的 `wipeDuration`（520）一致**。`pageTiming` 是 `data-motion` 翻 idle 的时限，写小了动画会被提前摘掉，扩散变成硬切。
   - 高度动画不能跟着共用一个时长，所以单独有 `heightTiming = { enter: 110 }`，由 `use-view-layout.ts` 使用。
 - 页签与筛选的黑色滑块：两处都是 JS 量出 active 按钮的 `left/width` 写进 CSS 变量（`--nav-marker-x/width`、`--flip-x/width`），`transition` 用 `cubic-bezier(.3, 1.32, .48, 1)` 制造回弹。首帧用 `data-marker-ready` / `data-ready` 关掉 transition，否则会从 0 宽度滑入。
@@ -325,7 +327,7 @@ Node 24；`npm install`（Electron 下载慢时可设 `electron_config_cache` �
   - **用 WAAPI（`node.animate()`）而不是切 class**。同名 CSS animation 在同一元素上重加一次不会重播，而用户连着点同一张是完全可能的。
   - 扩散环是运行时 `document.createElement('span')` 插进去的，动画 `finished` 后自己 `remove()`，不留残留节点。
   - 只有「从未选中变成选中」才触发，取消选择不放——撤销不需要庆祝。`justAdded` 带 `token` 递增，保证同一张连点两次也能重播。
-- 连续曲率圆角：`skin-bold.css` 末尾「第十七批」用 `corner-shape: superellipse(1.2)` 统一 21 处胶囊，外层 `@supports` 包着。
+- 连续曲率圆角：`src/skin/modern.css:299` 的 `@supports` 块用 `corner-shape: superellipse(1.2)` 统一 21 处胶囊，外层 `@supports` 包着。
   - 标准 `border-radius: 999px` 在 638×97 的胶囊上会被钳到高度一半，两端是标准半圆、中间直线，曲率从 1/r 突降到 0，看起来有折点。`squircle` 约等于超椭圆 n=4（苹果图标那档），但在这条长胶囊上端点收得太快、偏方；n=1.2 落在两者正中间。
   - **圆形元素要排除**（`border-radius: 50%` 的播放键、通道按钮、顺序按钮）——超椭圆会把圆变成圆角方形。
 
