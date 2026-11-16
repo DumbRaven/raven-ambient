@@ -434,7 +434,9 @@
   inset: 0;
   z-index: 7;
   overflow: hidden;
-  opacity: var(--rain-opacity, 0.7);
+  /* 刻意不写 opacity：opacity < 1 会创建 backdrop root，珠子里的折射就采不到
+     背后的画面了（实测从 43% 像素有变化掉到 0.00%）。
+     用户调的透明度改挂在每颗珠子上，见 .rain-drops > i 的 --drop-opacity。 */
   pointer-events: none;
 }
 
@@ -457,35 +459,197 @@
   position: absolute;
   display: block;
   border-radius: 50% 50% 47% 47%;
-  /* 凸透镜的观感靠三样叠出来，缺一样就像贴纸：
-     ① backdrop-filter 把背后的画面放大提亮——这是「透过水珠看」；
-     ② 一层极淡的白色渐变给中心高光；
-     ③ 内外两道阴影压出厚度（上沿亮、下沿暗），让它不是平的。 */
-  backdrop-filter: blur(0.4px) brightness(1.12) saturate(1.15) contrast(1.05);
-  -webkit-backdrop-filter: blur(0.4px) brightness(1.12) saturate(1.15) contrast(1.05);
+  /* 一滴水趴在玻璃上只有三件事能看见，按重要性排：
+     ① 背后的画面被**掰弯**（backdrop-filter 的位移，不是模糊——模糊只让线条变虚，
+        位移才会让它弯。纯色背景上看不出来是正常的，那不是没生效）；
+     ② 一圈**暗**边（菲涅尔：视线在水珠边缘与表面近乎相切，透过的光最少，
+        所以边缘比中心暗；反过来给一圈亮边就变成肥皂泡了）；
+     ③ 左上一小块**硬**高光，占不到十分之一面积。
+
+     第三条踩了很久：模糊要几乎为零。水是清的，一糊就是磨砂玻璃球；
+     真正让它像水的只有位移——背景在珠子内部明显错位、粗细不匀，
+     那个不均匀本身就是透镜的味道，糊是糊不出来的。 */
+  backdrop-filter: url(#rain-refract-soft);
+  -webkit-backdrop-filter: url(#rain-refract-soft);
   background:
-    radial-gradient(58% 52% at 36% 26%, #ffffffc4 0%, #ffffff3d 38%, #ffffff00 72%),
-    radial-gradient(120% 120% at 50% 50%, #ffffff00 62%, #ffffff1f 100%);
+    /* 高光：**不是一点，是一小片**。
+       给成一个锐利的圆点会立刻读作气泡反光——真实水珠的镜面是一小块被玻璃
+       曲率拉长的亮区，边界软、位置偏左上，且下面还跟着一条更弱的次级反光。 */
+    radial-gradient(20% 15% at 30% 21%, #ffffffe0 0%, #ffffff5c 38%, #ffffff00 100%),
+    radial-gradient(9% 7% at 44% 37%, #ffffff40 0%, #ffffff00 100%),
+    /* 边缘暗环，**圆心偏上**（at 50% 38%）。
+       圆心在正中时四圈一样深，看着是个空心圆环；真实水珠的球面下缘与视线更
+       接近相切，所以下缘的暗边更宽更实、上缘几乎不暗。把圆心往上挪就把这份
+       不对称做出来了。
+       最深只有 #0000005c：再深就会在纯色背景上读成一道铅笔画的圆圈轮廓，
+       而纯色背景本来就没什么可折射的——那种场景下珠子应该几乎融进背景，
+       把注意力留给有细节的地方。
+        必须用百分比（等比随珠子缩放），不能用 vh：vh 在小珠上只有 1px 的环，
+        等于没有边界，整颗就成了一个淡圆斑。 */
+    radial-gradient(
+      100% 100% at 50% 38%,
+      #00000000 50%,
+      #00000012 68%,
+      #00000033 84%,
+      #0000005c 96%,
+      #00000000 100%
+    ),
+    /* 底部透射带：光从上面进来、在水珠下缘聚成一钩更亮的弧。
+       这条是「实心玻璃球」与「一圈空壳」的分界线。 */
+    radial-gradient(70% 34% at 50% 88%, #ffffff2e 0%, #ffffff00 100%),
+    /* 透镜本体：中心几乎完全透明（透出被掰弯的背景），只留一点点提亮 */
+    radial-gradient(120% 120% at 50% 42%, #ffffff0a 0%, #ffffff00 70%);
+  /* 底部再压一道实心的内暗弧：球面下缘透光最少，这是「有体积」的来源 */
   box-shadow:
-    inset 0 -0.12vh 0.18vh #ffffff4d,
-    inset 0 0.10vh 0.14vh #ffffff59,
-    0 0.10vh 0.22vh #00000033;
+    inset 0 -0.20vh 0.26vh #0000002b,
+    inset 0 0.05vh 0.09vh #ffffff24,
+    /* 贴着玻璃的水珠几乎不投影，只留一点点让它不完全是平的 */
+    0 0.05vh 0.14vh #0000001f;
   opacity: 0;
   animation-name: drop-fall;
   animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1);
   animation-iteration-count: infinite;
   will-change: transform, opacity;
   /* AE 里那颗珠子会拖出一条竖直的变形痕。用竖向压扁的投影近似。 */
-  filter: drop-shadow(0 0.25vh 0.2vh #0000001f);
+  filter: drop-shadow(0 0.20vh 0.16vh #00000012);
 }
 
+/* 小水气：只有一个亮点加一圈暗边，不做折射。
+   五个像素的珠子上折射看不出来，而这类占六成，每颗都挂 backdrop-filter
+   等于白付一整屏的滤镜开销（帧率实测：60 颗折射 61fps，120 颗掉到 58）。
+   有质感的观感由少数大珠负责，密度感由它们负责。 */
+.rain-drops > i[data-size='tiny'] {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background:
+    radial-gradient(20% 17% at 32% 24%, #ffffffc4 0%, #ffffff00 100%),
+    radial-gradient(
+      100% 100% at 50% 50%,
+      #00000000 56%,
+      #0000001a 76%,
+      #0000004d 94%,
+      #00000000 100%
+    );
+  box-shadow: none;
+  filter: none;
+}
+
+/* 大珠：能看清「背后被掰弯」的那种。位移更大，暗环也更重——
+   珠子越大，边缘那圈透光越少，看起来才有体积。 */
+.rain-drops > i[data-size='big'] {
+  backdrop-filter: url(#rain-refract);
+  -webkit-backdrop-filter: url(#rain-refract);
+  background:
+    radial-gradient(18% 13% at 29% 20%, #ffffffec 0%, #ffffff66 40%, #ffffff00 100%),
+    radial-gradient(8% 6% at 43% 35%, #ffffff45 0%, #ffffff00 100%),
+    /* 大珠的暗环再宽一点、再深一点：大球面上「边缘变暗」占据的比例更大 */
+    radial-gradient(
+      100% 100% at 50% 38%,
+      #00000000 44%,
+      #00000014 63%,
+      #0000003d 80%,
+      #00000070 94%,
+      #00000000 100%
+    ),
+    radial-gradient(76% 38% at 50% 88%, #ffffff38 0%, #ffffff00 100%),
+    radial-gradient(120% 120% at 50% 42%, #ffffff0d 0%, #ffffff00 68%);
+  box-shadow:
+    inset 0 -0.30vh 0.36vh #00000030,
+    inset 0 0.07vh 0.12vh #ffffff30,
+    0 0.06vh 0.16vh #00000022;
+}
+
+/* 挂住的珠子：不往下走，只在原地极缓慢地渗一点。
+   真实雨窗上大多数珠子从头到尾是不动的，全都往下滑就成了下雨动画。 */
+.rain-drops > i[data-kind='hang'] {
+  animation-name: drop-hang;
+  animation-timing-function: ease-in-out;
+}
+
+/* 滑落的水痕。
+   这是「雨窗」最强的视觉信号，比珠子本身还强：一道竖直的细痕从珠子后面拖上去，
+   说明这颗刚走过这段路。完全没有水痕的雨窗看起来只是「贴了很多圆点」。
+
+   水痕画在珠子的**上方**（bottom: 100%），因为珠子是往下走的，走过的路在身后上方。
+   宽度跟着珠子走（百分比），大珠拖粗痕、小珠拖细痕——这符合表面张力：
+   珠子越大残留的水越多。
+
+   注意：伪元素会继承父元素的 opacity 动画，所以不需要单独处理透明度；
+   但它的背景要足够淡，否则会变成一条白线而不是水。 */
+.rain-drops > i[data-kind='slide']::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: 26%;
+  height: 9vh;
+  transform: translateX(-50%);
+  /* 两道渐变拼出水痕：
+     纵向是「贴着珠子最浓，往上散开」；
+     横向用 mask 让左右边缘发虚——固体矩形边缘一眼就假，
+     水痕的边界本来就是模糊的（水膜在玻璃上有一个逐渐变薄的过渡）。 */
+  background: linear-gradient(
+    to top,
+    rgb(255 255 255 / 0.5) 0%,
+    rgb(255 255 255 / 0.26) 20%,
+    rgb(255 255 255 / 0.09) 56%,
+    rgb(255 255 255 / 0) 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    #000 32%,
+    #000 68%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    #000 32%,
+    #000 68%,
+    transparent 100%
+  );
+  /* 顶端收窄：水痕越往上越细，最后融进画面 */
+  clip-path: polygon(22% 100%, 78% 100%, 62% 0%, 38% 0%);
+  pointer-events: none;
+}
+
+/* 大珠的水痕更粗更长——它走过去留下的水多。 */
+.rain-drops > i[data-size='big'][data-kind='slide']::after {
+  width: 32%;
+  height: 15vh;
+  background: linear-gradient(
+    to top,
+    rgb(255 255 255 / 0.54) 0%,
+    rgb(255 255 255 / 0.3) 22%,
+    rgb(255 255 255 / 0.1) 58%,
+    rgb(255 255 255 / 0) 100%
+  );
+}
+
+/* 细密水气不拖痕：它们本来就轻，走过去几乎不留水。 */
+.rain-drops > i[data-size='tiny']::after {
+  display: none;
+}
+
+/* 挂住：位移只有一点点，靠 opacity 的呼吸让它看起来「活着」而不是死图钉。 */
+@keyframes drop-hang {
+  0% { transform: translateY(0) scale(0.94); opacity: 0; }
+  8% { opacity: calc(var(--drop-opacity, 0.7) * 1); }
+  50% { transform: translateY(0.9vh) scale(1); opacity: calc(var(--drop-opacity, 0.7) * 0.92); }
+  92% { transform: translateY(1.6vh) scale(0.97); opacity: calc(var(--drop-opacity, 0.7) * 0.9); }
+  100% { transform: translateY(1.8vh) scale(0.9); opacity: 0; }
+}
+
+/* 滑落：一段一段挪。先挂住（0~40% 几乎不动），然后突然放开冲下去，
+   这正是真实水珠的样子——表面张力拉住，攒够了就一路到底。 */
 @keyframes drop-fall {
   0% { transform: translateY(0) scale(0.9); opacity: 0; }
-  6% { opacity: 0.95; }
+  6% { opacity: calc(var(--drop-opacity, 0.7) * 1); }
   /* 挂住的那一下：只走一点点，然后突然放开 */
-  42% { transform: translateY(14vh) scale(1); opacity: 0.95; }
-  46% { transform: translateY(15vh) scale(1.02); opacity: 0.95; }
-  88% { transform: translateY(78vh) scale(0.92); opacity: 0.7; }
+  42% { transform: translateY(14vh) scale(1); opacity: calc(var(--drop-opacity, 0.7) * 1); }
+  46% { transform: translateY(15vh) scale(1.02); opacity: calc(var(--drop-opacity, 0.7) * 1); }
+  88% { transform: translateY(78vh) scale(0.92); opacity: calc(var(--drop-opacity, 0.7) * 0.74); }
   100% { transform: translateY(96vh) scale(0.8); opacity: 0; }
 }
 
@@ -575,10 +739,15 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* 降级态下透明度不再由每颗珠子的 --drop-opacity 提供（动画停了），
+     这里补回去，否则珠子会变成一团实心白。 */
   .rain-streak,
   .rain-drops > i {
     animation: none;
-    opacity: 0.5;
+  }
+
+  .rain-drops > i {
+    opacity: calc(var(--drop-opacity, 0.7) * 0.5);
   }
 }
 
@@ -731,7 +900,8 @@
    亮度：原来最亮 #ffffff52 再乘 opacity 就没了，提到 #ffffffa6。 */
 .rain-streak {
   /* 折射：feTurbulence 当置换图把斜纹推成不规则的雨脚（见 RainLayer 里的 filter）。
-     注意：filter 引用的是同文档里的 SVG 元素，RainLayer 把它挂在 .rain-layer 内。 */
+     注意：filter 引用的是同文档里的 SVG 元素，RainLayer 把它挂在 <body> 上
+     （挂 .rain-layer 里会被 overflow:hidden 判为失效）。 */
   filter: url(#rain-streak-warp);
   -webkit-filter: url(#rain-streak-warp);
   position: absolute;
@@ -759,7 +929,12 @@
       #ffffff00 10px
     );
   animation: rain-fall 0.46s linear infinite, rain-fall 0.83s linear infinite;
-  opacity: calc(0.6 + var(--rain-strength, 0.55) * 0.4);
+  /* 用户调的透明度以前乘在 .rain-layer 上；层不能再挂了（会把珠子的折射废掉），
+     所以雨丝这里自己乘一次，不然透明度滑块对它失效。
+     基数从 0.6 降到 0.34，再降到 0.16：满屏均匀斜纹看着像贴了一层纱窗，
+     真实雨窗上远处的雨只是「背景在隐约流动」，不该读成可见的纹理。
+     这一层的职责已经让给水珠了——珠子才是主角，雨丝只负责氛围。 */
+  opacity: calc((0.16 + var(--rain-strength, 0.55) * 0.2) * var(--rain-opacity, 0.7));
 }
 
 @keyframes rain-fall {
