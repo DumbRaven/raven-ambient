@@ -252,10 +252,16 @@ function TicketStage({
   onDone: (id: string) => void;
 }) {
   const [phase, setPhase] = useState<Phase>('idle');
-  // 手往下拖了多少像素。整条票根跟着这个数往下平移，就这么多。
-  // 用像素而不是 0~1 的比例：票根要**跟手走一样的距离**，换算成比例再乘回去
-  // 会丢掉 px 精度，还会在手停下时因为四舍五入抖。
-  const [drop, setDrop] = useState(0);
+  /* 手往下拖了多少像素。整条票根跟着这个数往下平移，就这么多。
+     用像素而不是 0~1 的比例：票根要**跟手走一样的距离**，换算成比例再乘回去
+     会丢掉 px 精度，还会在手停下时因为四舍五入抖。
+
+     **但它不放在 state 里。** 拖拽时每一帧都变，setState 会把整个 TicketStage
+     子树（含四版式票面的 TicketFace）重渲染一次，60 次/秒——用户 m02848 说的
+     「有点卡，不太跟手」就是这个。位移只是给 CSS 一个数，React 不需要知道它变了，
+     所以直接写元素上的 `--drop`，只有「够不够撕开」这种真正要换 DOM 的东西才走 state。 */
+  const painted = useRef(0);
+  const liftRef = useRef<HTMLDivElement>(null);
   // 按住期间不能有过渡，否则纸会追在手指后面漂；松手才放开。
   const [holding, setHolding] = useState(false);
   // 已经拖过阈值：松手就断。只用来换视觉提示，不参与判定。
@@ -310,6 +316,20 @@ function TicketStage({
     }, SLIDE_MS));
   }
 
+  /**
+   * 把手的位移写进 `--drop`。
+   *
+   * 直接操作 DOM，不经过 state —— 理由见上面 `painted` 那段。
+   * 用一个 ref 记住上次写进去的数，值没变就不碰 DOM：
+   * pointermove 一次拖拽能来几百条，多数是同一像素反复触发。
+   */
+  function paint(dy: number) {
+    const next = tearDrop(dy);
+    if (painted.current === next) return;
+    painted.current = next;
+    liftRef.current?.style.setProperty('--drop', `${next.toFixed(1)}px`);
+  }
+
   function down(event: React.PointerEvent) {
     if (phase !== 'idle' || event.button !== 0) return;
     // 开始撕之前先掐掉浏览器的默认手势：默认会拖选文字、把图片拖成幽灵图。
@@ -338,7 +358,8 @@ function TicketStage({
     const state = drag.current;
     if (!state || state.id !== event.pointerId) return;
     const dy = event.clientY - state.startY;
-    setDrop(tearDrop(dy));
+    paint(dy);
+    // 阈值只跨一次，跨过去那一下才需要重渲染（换 data-tearable 的视觉提示）。
     setTearable(shouldTear(dy, state.height));
   }
 
@@ -346,17 +367,20 @@ function TicketStage({
     const state = drag.current;
     if (!state || state.id !== event.pointerId) return;
     drag.current = null;
-    setHolding(false);
+    setTearable(false);
     const dy = event.clientY - state.startY;
     if (shouldTear(dy, state.height)) {
       // 撕开了：位移钉在松手那一刻，剩下的路交给 ticket-slide。
-      setDrop(tearDrop(dy));
-      setTearable(false);
+      paint(dy);
+      setHolding(false);
       detach();
     } else {
       // 没拖够：归零，由 CSS 的过渡把票根推回原处。
-      setDrop(0);
-      setTearable(false);
+      // **先松 holding 再归零**：holding 期间那条 transition: none 还在，
+      // 同一帧里归零就是硬跳回原位，纸会瞬移。等这次渲染落地（下一帧）
+      // 过渡才重新生效，那时再改值才是滑回去。
+      setHolding(false);
+      requestAnimationFrame(() => paint(0));
     }
   }
 
@@ -377,9 +401,9 @@ function TicketStage({
   }
 
   // 整条票根往下挪多少，只由这一个数决定。CSS 把它贴到 translate 上。
+  // --drop 不在这里：它在拖拽期间由 paint() 直接写到元素上（见上面的说明），
+  // React 不持有它，也就不会每帧重渲染。
   const style = {
-    // --drop：整条票根往下平移了多少像素，就等于手的位移。
-    '--drop': `${drop.toFixed(1)}px`,
     ...(flying
       ? {
         '--fly-x': `${flying.dx.toFixed(1)}px`,
@@ -400,6 +424,7 @@ function TicketStage({
     >
       <div
         className="ticket-lift"
+        ref={liftRef}
         style={style}
         data-shape={ticketShape(item.id)}
         data-holding={holding ? 'true' : 'false'}

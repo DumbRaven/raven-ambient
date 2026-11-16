@@ -16,11 +16,9 @@ import TemplateStage, { type StageAmbience, type StageDisc, type StageFocus, typ
 import { readTone, toneHint, toneKey, writeTone, type ToneSetting } from './tone-setting';
 import { nextStoneStyle } from './marble.ts';
 import LayerStack from './LayerStack';
-import RainLayer from './RainLayer';
 import MediaTickets from './MediaTickets';
 import { titleOf } from './media-text';
 import { layersKey, legacyOverlaysKey, legacyWidgetsKey, readLayers, writeLayers, type LayerList } from './layers';
-import { rainKey, readRain, writeRain, type RainSetting } from './rain';
 import { readFocus } from './focus-bridge';
 import { templates, type TemplateId } from './templates';
 import TheaterTools from './TheaterTools';
@@ -186,10 +184,6 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   // 「叠加元素」与「加组件」合并成一颗按钮：外观一样，菜单内容跟着版式走。
   // 为什么不再各留一个开关：合并之后只剩一个菜单，两个 state 一定会有一个忘了同步。
   const [layersMenu, setLayersMenu] = useState(false);
-  // 雨层。和图层一样存 localStorage——这是「怎么看」的偏好，不该写盘。
-  const [rain, setRain] = useState<RainSetting>(() => readRain(readRaw(rainKey)));
-  const [rainMenu, setRainMenu] = useState(false);
-  useEffect(() => { writeRain(rain); }, [rain]);
   // 番茄钟读数：跟着专注页走，自己不另起计时器（两处各算各的，暂停一次就对不上）。
   // 800ms 一刷就够——叠加上只显示到分:秒。
   // 除了剩余毫秒，还留一份完整快照：拼贴版信息条那一格要显示阶段和轮次，
@@ -473,7 +467,6 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
     else if (command.type === 'prev') onPrevTrack?.();
     else if (command.type === 'next') onNextTrack?.();
     else if (command.type === 'layers') setLayers(command.value);
-    else if (command.type === 'rain') setRain(command.value);
   }), [onPrevTrack, onNextTrack]);
 
   /**
@@ -494,7 +487,6 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
       focus: focusStage,
       ambience,
       now,
-      rain,
       layers,
       focusLeft,
       title: current ? titleOf(current) : '',
@@ -502,7 +494,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
       canNext: !!onNextTrack,
     };
     publishStage(snapshot);
-  }, [current, usable, template, tone, palette, disc, focusStage, ambience, now, rain, layers, focusLeft, onPrevTrack, onNextTrack]);
+  }, [current, usable, template, tone, palette, disc, focusStage, ambience, now, layers, focusLeft, onPrevTrack, onNextTrack]);
 
   return (
     <section className={`media-room ${expanded ? 'is-expanded' : ''}`} data-chrome={chrome ? 'visible' : 'hidden'} aria-label="放映">
@@ -556,7 +548,6 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                 />
               }
             />
-            <RainLayer value={rain} />
           </div>
           <div className="theater-bar">
             <div className="theater-controls">
@@ -586,7 +577,6 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
             <TheaterTools
               template={template}
               onTemplate={setTemplate}
-              rain={{ value: rain, onChange: setRain, open: rainMenu, onOpen: setRainMenu }}
               tone={{ value: tone, onChange: setTone, open: toneMenu, onOpen: setToneMenu, palette }}
               layers={{ value: layers, onChange: setLayers, open: layersMenu, onOpen: setLayersMenu }}
               expanded={expanded}
@@ -600,7 +590,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
         </div>
       ) : (
         /* 库空着的时候台面也照常出现，只是画面换成一块渐变占位。
-           这样版式、叠加元素、雨滴都能先看着调——不然用户第一次打开
+           这样版式、配色、叠加元素都能先看着调——不然用户第一次打开
            什么都看不见，也就无从知道这些东西长什么样。 */
         <div className="media-theater" data-kind="image" data-template={template}>
           <div className="theater-screen">
@@ -629,7 +619,6 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
                 />
               }
             />
-            <RainLayer value={rain} />
             <div className="theater-blank-hint">
               <ImageIcon size={16} strokeWidth={1.2} />
               {/* 透明版式从头到尾不用媒体：底就是桌面壁纸，画面这块本来
@@ -656,7 +645,6 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
             <TheaterTools
               template={template}
               onTemplate={setTemplate}
-              rain={{ value: rain, onChange: setRain, open: rainMenu, onOpen: setRainMenu }}
               tone={{ value: tone, onChange: setTone, open: toneMenu, onOpen: setToneMenu, palette }}
               layers={{ value: layers, onChange: setLayers, open: layersMenu, onOpen: setLayersMenu }}
               expanded={expanded}

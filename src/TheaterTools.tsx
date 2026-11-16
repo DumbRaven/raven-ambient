@@ -1,19 +1,18 @@
-// 播放台右侧那簇工具：版式、雨、配色、图层、全屏。
+// 播放台右侧那簇工具：版式、配色、图层、全屏。
 //
 // 为什么单独一个文件：块「有画面」和「空台面」是两支 JSX，而这簇工具
 // 两支都要有——原先整簇在两个分支里各抄了一遍，约两百行逐字相同。
-// 抄两遍的代价不是体积，是**改一处忘一处**：往雨菜单里加一档，
+// 抄两遍的代价不是体积，是**改一处忘一处**：往配色菜单里加一档，
 // 空台面里那份不会有。
 //
-// 三个菜单（雨 / 配色 / 图层）的开关状态仍留在 MediaRoom：
+// 三个菜单（配色 / 图层 / 版式）的开关状态仍留在 MediaRoom：
 // 它们是「这次打开到哪了」，跟播放台的其它状态同生命周期，
 // 搬进这里反而要往上传。这里只接收值与回调。
 import type { Dispatch, SetStateAction } from 'react';
-import { Droplets, Maximize2, Minimize2, MonitorPlay, Palette } from 'lucide-react';
+import { Maximize2, Minimize2, MonitorPlay, Palette } from 'lucide-react';
 import TheaterLayers from './TheaterLayers';
 import TheaterTemplates from './TheaterTemplates';
 import { radioKeyDown } from './radio-keys';
-import { rainModes, type RainSetting } from './rain';
 import { defaultTone, normaliseHex, toneGroups, type ToneSetting } from './tone-setting';
 import type { LayerList } from './layers';
 import type { TemplateId } from './templates';
@@ -29,7 +28,6 @@ type Menu<T> = {
 type Props = {
   template: TemplateId;
   onTemplate: (id: TemplateId) => void;
-  rain: Menu<RainSetting>;
   /** 配色多一个「从这张画面里取出来的颜色」，见 MediaRoom 里的 palette。 */
   tone: Menu<ToneSetting> & { palette: string[] };
   layers: Menu<LayerList>;
@@ -45,7 +43,6 @@ type Props = {
 export default function TheaterTools({
   template,
   onTemplate,
-  rain: rainMenu,
   tone: toneMenu,
   layers: layersMenu,
   expanded,
@@ -55,7 +52,6 @@ export default function TheaterTools({
   onToggleDesktop,
   scalabe,
 }: Props) {
-  const rain = rainMenu.value;
   const tone = toneMenu.value;
   const palette = toneMenu.palette;
 
@@ -64,78 +60,6 @@ export default function TheaterTools({
       {/* 版式切换。三个都做得不一样，所以给文字而不是图标——
           图标认不出「相集」和「透明」的区别。滑块与量法见 TheaterTemplates。 */}
       <TheaterTemplates value={template} onChange={onTemplate} />
-
-      {/* 雨层：模式和浓淡。位置固定在右下，和水滴图标同一簇。 */}
-      <div className="theater-rain">
-        <button
-          className={`icon-button theater-rain-toggle ${rain.on ? 'on' : ''}`}
-          aria-label="雨"
-          aria-expanded={rainMenu.open}
-          aria-pressed={rain.on}
-          title="雨"
-          onClick={() => rainMenu.onOpen(value => !value)}
-        >
-          <Droplets size={13} />
-        </button>
-        {rainMenu.open && (
-          <>
-            <button className="theater-overlay-veil" aria-label="收起" onClick={() => rainMenu.onOpen(false)} />
-            <div className="theater-rain-menu">
-              <div className="rain-switch">
-                <span>雨</span>
-                <button
-                  className={`toggle ${rain.on ? 'on' : ''}`}
-                  role="switch"
-                  aria-checked={rain.on}
-                  aria-label={rain.on ? '关掉雨' : '打开雨'}
-                  onClick={() => rainMenu.onChange(prev => ({ ...prev, on: !prev.on }))}
-                >
-                  {/* 这个空 span 是开关的滑块本体，样式在 `src/skin/controls.css:103`
-                      的 `.toggle span`（20×20 的圆点，`.on` 时右移 18px）。
-                      少了它开关就只剩一片没有把手的底色。 */}
-                  <span />
-                </button>
-              </div>
-              <div className="rain-modes" role="radiogroup" aria-label="雨的样子" onKeyDown={radioKeyDown}>
-                {rainModes.map(mode => (
-                  <button
-                    key={mode.id}
-                    role="radio"
-                    aria-checked={rain.mode === mode.id}
-                    className={rain.mode === mode.id ? 'on' : ''}
-                    title={mode.hint}
-                    onClick={() => rainMenu.onChange(prev => ({ ...prev, mode: mode.id }))}
-                  >
-                    {mode.name}
-                  </button>
-                ))}
-              </div>
-              <label className="rain-slider">
-                <span>浓淡</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={rain.strength}
-                  aria-label="雨的浓淡"
-                  onChange={event => rainMenu.onChange(prev => ({ ...prev, strength: Number(event.target.value) }))}
-                />
-              </label>
-              <label className="rain-slider">
-                <span>透明度</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={rain.opacity}
-                  aria-label="雨的透明度"
-                  onChange={event => rainMenu.onChange(prev => ({ ...prev, opacity: Number(event.target.value) }))}
-                />
-              </label>
-            </div>
-          </>
-        )}
-      </div>
 
       {/* 配色：默认跟画面走，也可以指定主色或手填色值。 */}
       <div className="theater-tone">

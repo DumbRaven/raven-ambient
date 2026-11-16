@@ -17,7 +17,6 @@ import './skin-bold.css';
 import './desktop.css';
 import TemplateStage from './TemplateStage';
 import LayerStack from './LayerStack';
-import RainLayer from './RainLayer';
 import { installStageDrain, installStagePaint, sendStageCommand, type StageSnapshot } from './desktop-bridge';
 
 function DesktopStage() {
@@ -80,7 +79,6 @@ function DesktopStage() {
               />
             }
           />
-          <RainLayer value={snapshot.rain} />
         </div>
       </div>
     </section>

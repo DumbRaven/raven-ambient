@@ -7,7 +7,7 @@
 /* 令牌定义在 :root 而不是 .app。
  *
  * 原因是采样范围：`body` 与几个挂在 `document.body` 上的隐藏宿主节点
- * （rain / marble / paper 三套 SVG filter，见 RainLayer.tsx、TemplateStage.tsx、
+ * （marble / paper 两套 SVG filter，见 TemplateStage.tsx、
  * MediaTickets.tsx）都不在 `.app` 里面，拿不到定义在 `.app` 上的自定义属性。
  * 此前它们靠 `var(--bold-page, #f6f5f2)` 里那个**碰巧同值**的兜底才没出错——
  * 一旦改配色而忘了同步兜底值，这部分就会静默变回旧色。

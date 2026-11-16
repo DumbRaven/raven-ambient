@@ -15,7 +15,6 @@
 
 import type { MediaItem } from './records';
 import type { LayerList } from './layers';
-import type { RainSetting } from './rain';
 import type { StoneStyle } from './marble.ts';
 import type { TemplateId } from './templates';
 import type { ToneHint } from './templates';
@@ -39,7 +38,6 @@ export type StageSnapshot = {
   focus: StageFocus | null;
   ambience: StageAmbience | null;
   now: StageNow;
-  rain: RainSetting;
   /**
    * 图层表（时间/日期/标题/番茄钟/唱片/曲目）。
    *
@@ -68,7 +66,6 @@ export type StageCommand =
   | { type: 'stone' }
   | { type: 'prev' }
   | { type: 'next' }
-  | { type: 'rain'; value: RainSetting }
   /**
    * 桌面窗里拖了 / 删了一块图层，整份表回传。
    *
@@ -162,7 +159,7 @@ export function listenStageCommand(onCommand: (command: StageCommand) => void) {
 function isStageCommand(value: unknown): value is StageCommand {
   if (!value || typeof value !== 'object') return false;
   const type = (value as { type?: unknown }).type;
-  return type === 'stone' || type === 'prev' || type === 'next' || type === 'rain' || type === 'layers';
+  return type === 'stone' || type === 'prev' || type === 'next' || type === 'layers';
 }
 
 /**
