@@ -45,22 +45,28 @@ function useStreakFilter(on: boolean) {
       '<feDisplacementMap in="SourceGraphic" in2="noise" scale="26" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>' +
       // 水珠的折射。和雨丝那条分开，是因为参数要的是「一大块平滑的形变」：
-      // 频率低（0.010）、幅度按珠子直径给 → 透过珠子看，背后的线条被掰成弧形。
+      // 频率低、幅度按珠子直径给 → 透过珠子看，背后的线条被掰成弧形。
       // 频率再高就会变成磨砂玻璃，纹理碎了但看不出水。
-      // scale 不能大：它是位移的像素数。大珠直径约 90px，位移给到 40px 就等于
+      // scale 是位移的像素数。大珠直径约 90px，位移给到 40px 就等于
       // 把半颗珠子的画面搬到另一边，读出来是「皱褶」不是「透镜」。
-      // 真实的水滴在边缘处最多把背景错开约半径的 15%，所以这里给 24。
-      // 试过 42（太大，画面在珠子里皱成一团，读作皱褶不是透镜）与 14
-      // （太小，与背景的错位看不出来，珠子退化成一圈淡环）。
+      //
+      // 这组数经过对面材实的 A/B（tools/probe/rain-material-ab3.cjs）：
+      // 把珠子放在高频条纹背景上、四种尺寸并排比，0.006 / 52 是唯一
+      // 在小尺寸（30px、12px）上仍能看出「条纹被掰弯」的一档。
+      // 之前的 0.010 / 24 在 210px 的大珠上还算像水，落到真实的
+      // 60~90px 就只剩一圈淡环——因为位移量不随珠子缩小，而背景的
+      // 细节密度不变，珠子越小能覆盖的条纹越少，形变就看不出走向。
+      // 试过的其它数：0.012/42（皱成一团）、0.010/24（太小，淡环）、
+      // 0.016/18（更小，等于没有）。
       // seed 固定：每颗珠子用同一个形变场，才不会滑动时画面在里面乱跳。
-      '<filter id="rain-refract" x="-25%" y="-25%" width="150%" height="150%">' +
-      '<feTurbulence type="fractalNoise" baseFrequency="0.010" numOctaves="2" seed="11" result="warp"/>' +
-      '<feDisplacementMap in="SourceGraphic" in2="warp" scale="24" xChannelSelector="R" yChannelSelector="G"/>' +
+      '<filter id="rain-refract" x="-30%" y="-30%" width="160%" height="160%">' +
+      '<feTurbulence type="fractalNoise" baseFrequency="0.006" numOctaves="2" seed="7" result="warp"/>' +
+      '<feDisplacementMap in="SourceGraphic" in2="warp" scale="52" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>' +
       // 小水气用弱一档的位移：同样的 scale 在小面积上会显得抽搐。
-      '<filter id="rain-refract-soft" x="-25%" y="-25%" width="150%" height="150%">' +
-      '<feTurbulence type="fractalNoise" baseFrequency="0.016" numOctaves="2" seed="11" result="warp"/>' +
-      '<feDisplacementMap in="SourceGraphic" in2="warp" scale="10" xChannelSelector="R" yChannelSelector="G"/>' +
+      '<filter id="rain-refract-soft" x="-30%" y="-30%" width="160%" height="160%">' +
+      '<feTurbulence type="fractalNoise" baseFrequency="0.009" numOctaves="2" seed="7" result="warp"/>' +
+      '<feDisplacementMap in="SourceGraphic" in2="warp" scale="30" xChannelSelector="R" yChannelSelector="G"/>' +
       '</filter>' +
       '</svg>';
     document.body.appendChild(host);
@@ -98,11 +104,11 @@ export default function RainLayer({ value }: Props) {
         <div className="rain-drops">
           {all.slice(0, count).map((drop, at) => {
             // 三档材质，分界线就是 rain.ts 里 radiusOf 的两道台阶：
-            //   tiny（< 0.0105）：细密水气，只画边缘和暗环，不给折射——
+            //   tiny（< 0.0105）：细密水气，只画亮点和下缘亮弧，不给折射——
             //     五个像素的珠子上折射看不出来，白付一层滤镜开销；
-            //   small（< 0.021）：中珠，弱折射；
+            //   small（< 0.023）：中珠，弱折射；
             //   big：大珠，强折射，能看清背后画面被掰弯的只有它们。
-            const size = drop.radius < 0.0105 ? 'tiny' : drop.radius < 0.021 ? 'small' : 'big';
+            const size = drop.radius < 0.0105 ? 'tiny' : drop.radius < 0.023 ? 'small' : 'big';
             return (
               <i
                 key={at}

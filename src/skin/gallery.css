@@ -1207,10 +1207,22 @@
 /* 票面：一份完整的票面，跟着面板整体位移。
    为什么不把票裁成两段：裁开之后必须有「谁压谁」「裁完再挪会不会错位」
    「键盘路径没有位移怎么办」这些配套问题，而它们全都只是为了一种用户没有
-   要求的形变。整条平移把这些问题一次性消掉。 */
+   要求的形变。整条平移把这些问题一次性消掉。
+
+   **display: flex 不能省**。这层是 .ticket-panel 的定位父级，而 .ticket-panel
+   靠 `flex: 1` 撑满高度——那个 flex 只在 flex 容器里生效。写成 display:block
+   时父级高度是对的（inset:0 撑着），子级却塌成内容高度：实测 1724×846 画幅下
+   .ticket-face 497.6px、里面的 .ticket-panel 只剩 204.8px，票面短了一大截，
+   屏幕上就是用户 m02164 报的「点开之后怎么票根只剩一半了」。
+
+   上一版能正常显示，是因为当时 .ticket-panel 单独有一条
+   `position: absolute; inset: 0; width: 100%; height: 100%`；换成这一层壳的
+   时候把那条一起删了，`height: 100%` 也跟着没了。留一个 flex 容器比给子级
+   补一条 height 更稳：以后再有别的东西想塞进票面，不用记得补高度。 */
 .ticket-face {
   position: absolute;
   inset: 0;
+  display: flex;
   pointer-events: none;
 }
 

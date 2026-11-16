@@ -27,6 +27,12 @@ env -u ELECTRON_RUN_AS_NODE node_modules/electron/dist/electron.exe tools/probe/
 | `baseline-diff.py` | 比对像素基线。PSNR 判「有差异 / 噪声」，并给出差异区块坐标 |
 | `italic-audit.cjs` | 读某处规则的**计算样式**与字体栈，判断一条 `font-style` 后面到底解析到了什么 |
 | `italic-width.cjs` | 用 Canvas `measureText` 在 normal/italic 下量同字串宽度，差值为 0 即「死声明」。**必须带对照组**，否则测量方法出错也看不出来 |
+| `rain-material-ab3.cjs` | 雨滴材质的 A/B。**背景必须是高频图案**——纯色被 `feDisplacementMap` 位移之后还是纯色，看起来「什么都没发生」，那是测法无效 |
+| `rain-style.cjs` | 读一颗中珠的实际计算样式（`backgroundImage` / `boxShadow` / `backdropFilter` / 尺寸）。截图看着没变化时先跑这个，确认 CSS 到底生效没有 |
+| `rain-on-photo.cjs` | 把一张有细节的照片塞进 `.theater-screen`（z-index 6）再开雨 |
+| `rain-audit.cjs` | 汇总当前水珠的档位分布与几何 |
+| `ticket-fit.cjs` | 票根浮层在五种画幅下是否溢出。**离屏窗口改不了尺寸**，必须用 CDP `Emulation.setDeviceMetricsOverride` |
+| `ticket-face-height.cjs` | 量 `.ticket-lift` / `-shot` / `-panel` / `.ticket-face` / `.ticket-panel` 五层高度。票根「只剩一半」就是靠它查出来的：face 497.6px 而 panel 只有 204.8px |
 
 > 上表只列高频与门禁相关项。`probe/` 下共 140+ 个脚本，其余按文件名搜（命名都带领域：`ticket-*` / `tag-*` / `stone-*` / `desktop-*` / `template-*`）。
 
