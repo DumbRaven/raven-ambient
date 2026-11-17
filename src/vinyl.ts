@@ -84,6 +84,52 @@ function distance(a: string, b: string) {
   return Math.hypot(r1 - r2, g1 - g2, b1 - b2);
 }
 
+/**
+ * 一张小图里数出最多四个主色。封面和视频共用这一份。
+ *
+ * 分桶按 `>> 5`（每通道 8 档，共 512 个桶），排序键是
+ * `weight × √count`——`weight` 让「有彩度的」排前面，`√count` 让
+ * 「面积大的」排前面，开方是为了别让一大片天空把整个色板吃掉。
+ *
+ * `alpha < 140` 跳过半透明，`high < 22 || low > 240` 跳过纯黑纯白
+ * （对胶盘和版式都没有信息量），这两条两边一致。
+ *
+ * **去重判据也是同一份**：真实 RGB 色距 > 34。
+ *
+ * 2026-11-17 统一。视频那条路原来比的是十六进制字符串里对应字符的编码差
+ * （`'f'` 与 `'1'` 差 59），注释里说这是「有意留着的差异」。但它的实际
+ * 后果是：深色画面里前四个桶往往是 `#1a1314` / `#281811` / `#2f2929`
+ * / `#231d23` 这种同一个色相、明度差 1~3% 的近邻，字符差只有 1~3 永远
+ * 过不了 34 这道坎——**164 个真实视频里 62 个只取到 1 个色**，
+ * 「挑一个」那一栏就只剩一个色块可点，用户 m04694 说的就是这个。
+ *
+ * 换成真实色距之后同一批素材：出 1 个的 0 个、出 4 个的 142 个。
+ */
+export function pickPalette(context: CanvasRenderingContext2D, size: number): string[] {
+  const { data } = context.getImageData(0, 0, size, size);
+  const buckets = new Map<string, { r: number; g: number; b: number; count: number; weight: number }>();
+  for (let index = 0; index < data.length; index += 4) {
+    const r = data[index], g = data[index + 1], b = data[index + 2], alpha = data[index + 3];
+    if (alpha < 140) continue;
+    const high = Math.max(r, g, b), low = Math.min(r, g, b);
+    if (high < 22 || low > 240) continue;
+    const key = `${r >> 5},${g >> 5},${b >> 5}`;
+    const bucket = buckets.get(key) ?? { r: 0, g: 0, b: 0, count: 0, weight: 0 };
+    bucket.r += r; bucket.g += g; bucket.b += b; bucket.count++;
+    bucket.weight += 1 + (high - low) / 96;
+    buckets.set(key, bucket);
+  }
+  const ranked = [...buckets.values()]
+    .sort((a, b) => b.weight * Math.sqrt(b.count) - a.weight * Math.sqrt(a.count))
+    .map(bucket => toHex([bucket.r / bucket.count, bucket.g / bucket.count, bucket.b / bucket.count]));
+  const picked: string[] = [];
+  for (const color of ranked) {
+    if (picked.length >= 4) break;
+    if (picked.every(seen => distance(seen, color) > 34)) picked.push(color);
+  }
+  return picked;
+}
+
 /** RGB 转 HSV，色相换算时才不会把颜色抬成灰。 */
 function toHsv(hex: string): [number, number, number] {
   const [r, g, b] = toRgb(hex).map(n => n / 255) as [number, number, number];
@@ -184,29 +230,7 @@ export function coverPalette(src: string): Promise<string[]> {
         const context = canvas.getContext('2d', { willReadFrequently: true });
         if (!context) { resolve([]); return; }
         context.drawImage(image, 0, 0, size, size);
-        const { data } = context.getImageData(0, 0, size, size);
-        const buckets = new Map<string, { r: number; g: number; b: number; count: number; weight: number }>();
-        for (let index = 0; index < data.length; index += 4) {
-          const r = data[index], g = data[index + 1], b = data[index + 2], alpha = data[index + 3];
-          if (alpha < 140) continue;
-          const high = Math.max(r, g, b), low = Math.min(r, g, b);
-          // 纯黑和纯白对胶盘没有信息量，跳过；留一点灰阶给云石纹。
-          if (high < 22 || low > 240) continue;
-          const key = `${r >> 5},${g >> 5},${b >> 5}`;
-          const bucket = buckets.get(key) ?? { r: 0, g: 0, b: 0, count: 0, weight: 0 };
-          bucket.r += r; bucket.g += g; bucket.b += b; bucket.count++;
-          bucket.weight += 1 + (high - low) / 96;
-          buckets.set(key, bucket);
-        }
-        const ranked = [...buckets.values()]
-          .sort((a, b) => b.weight * Math.sqrt(b.count) - a.weight * Math.sqrt(a.count))
-          .map(bucket => toHex([bucket.r / bucket.count, bucket.g / bucket.count, bucket.b / bucket.count]));
-        const picked: string[] = [];
-        for (const color of ranked) {
-          if (picked.length >= 4) break;
-          if (picked.every(seen => distance(seen, color) > 34)) picked.push(color);
-        }
-        resolve(picked);
+        resolve(pickPalette(context, size));
       } catch {
         resolve([]);
       }

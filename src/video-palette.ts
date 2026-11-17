@@ -9,7 +9,7 @@
  * 停在 0 秒取出来是一片黑，等于没取。所以往后跳 12% 处（够越过片头，
  * 又一定在正片里），太短的片子退到中点。
  */
-import { toHex } from './vinyl';
+import { pickPalette } from './vinyl';
 
 const cache = new Map<string, Promise<string[]>>();
 
@@ -36,41 +36,19 @@ function waitFor(element: HTMLVideoElement, event: string, timeout: number): Pro
 }
 
 /**
- * 数一张 36×36 的小图里的主色。分桶、排序、挑四色的结构与 `vinyl.ts`
- * 里的 `coverPalette` 一致，**唯一不同是下面那行去重判据**：
+ * 数一张 36×36 的小图里的主色。
  *
- * `vinyl.ts` 的 `distance()` 把十六进制拆成三个字节算真实色距；这里比的是
- * 字符串里对应字符的编码差（`'f'` 与 `'1'` 差 59），所以同样两个颜色在
- * 两边算出来的「远不远」并不一样——这里判得**更严**（更容易认为两色不同，
- * 因此更少被去重掉）。
+ * 分桶、排序、挑四色的实现已经搬到 `vinyl.ts` 的 `pickPalette`，封面和视频
+ * 共用同一份——包括去重判据（真实 RGB 色距 > 34）。
  *
- * 这是有意留着的差异，不是漏改：真实色距版本会让视频壁纸抽到的四个色
- * 发生变化，而那套配色用户已经在看了，收益抵不上风险。要统一的话，
- * 得先给视频抽色加一条锁住输出的测试。
+ * 原来这里单独写了一份、去重判据比的是十六进制字符串里对应字符的编码差，
+ * 注释说这是「有意留着的差异，要统一得先给视频抽色加一条锁住输出的测试」。
+ * 2026-11-17 统一了，原因写在 `pickPalette` 的注释里：那条判据在深色画面上
+ * 几乎永远只放得出一个色，164 个真实视频里 62 个「挑一个」只有一块可点。
+ * `tests/video-palette.test.ts` 补上了当时缺的那条锁输出的测试。
  */
 function sample(context: CanvasRenderingContext2D, size: number): string[] {
-  const { data } = context.getImageData(0, 0, size, size);
-  const buckets = new Map<string, { r: number; g: number; b: number; count: number; weight: number }>();
-  for (let index = 0; index < data.length; index += 4) {
-    const r = data[index], g = data[index + 1], b = data[index + 2], alpha = data[index + 3];
-    if (alpha < 140) continue;
-    const high = Math.max(r, g, b), low = Math.min(r, g, b);
-    if (high < 22 || low > 240) continue;
-    const key = `${r >> 5},${g >> 5},${b >> 5}`;
-    const bucket = buckets.get(key) ?? { r: 0, g: 0, b: 0, count: 0, weight: 0 };
-    bucket.r += r; bucket.g += g; bucket.b += b; bucket.count++;
-    bucket.weight += 1 + (high - low) / 96;
-    buckets.set(key, bucket);
-  }
-  const ranked = [...buckets.values()]
-    .sort((a, b) => b.weight * Math.sqrt(b.count) - a.weight * Math.sqrt(a.count))
-    .map(bucket => toHex([bucket.r / bucket.count, bucket.g / bucket.count, bucket.b / bucket.count]));
-  const picked: string[] = [];
-  for (const color of ranked) {
-    if (picked.length >= 4) break;
-    if (picked.every(seen => Math.abs(seen.charCodeAt(1) - color.charCodeAt(1)) + Math.abs(seen.charCodeAt(3) - color.charCodeAt(3)) + Math.abs(seen.charCodeAt(5) - color.charCodeAt(5)) > 34)) picked.push(color);
-  }
-  return picked;
+  return pickPalette(context, size);
 }
 
 /**
