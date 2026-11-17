@@ -119,9 +119,28 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
   // **松手那一句不能从 setLive 的 updater 里读**：updater 必须是纯函数，
   // StrictMode 下会被调用两次，`onChange` 会跟着发两条出去（桌面窗那边就是两条命令）。
   const liveRef = useRef<SpotMap>({});
+  // 正在拖的那块元素本身。拖拽期间坐标直接写进它的 style，
+  // 不走 React——理由见下面 onMove 里的注释。
+  const dragEl = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!drag) return;
+    /* 坐标写进元素自身，而不是 setLive 触发重渲染。
+     *
+     * 原来每一帧都 setLive，代价有两层：一是整个 LayerStack 连同它的
+     * 「上层刚送来的值是否已确认」两个 effect 一起重跑 60 次/秒；
+     * 二是 React 写完 CSS 变量后浏览器还要重新算布局（这几个变量的
+     * 消费方是 `.overlay` 的 left/top 与 `.dw` 的 left/top）。
+     *
+     * 现在只留后者，前者没了。为什么不连 left/top 一起换成 transform：
+     * 位置是「占容器的百分比」，而 transform 的百分比是相对元素自身的，
+     * 换不过去；改写成像素又会在窗口尺寸变化时错位。这两块本来就是
+     * 绝对定位、子节点只有一层，布局代价有限，先只摘掉确定没用的那半。
+     *
+     * 写的是 React 自己那一对变量名，所以松手后 setSettling 会让 React
+     * 把同一个变量写成新值，两边不会打架（值相同，React 也不会重复写）。 */
+    const xVar = skin === 'overlay' ? '--ox' : '--wx';
+    const yVar = skin === 'overlay' ? '--oy' : '--wy';
     const onMove = (event: PointerEvent) => {
       const box = boxOf();
       if (!box || !box.width || !box.height) return;
@@ -130,11 +149,18 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
         y: Math.min(1, Math.max(0, (event.clientY - box.top) / box.height)),
       };
       liveRef.current = { ...liveRef.current, [drag.id]: spot };
-      setLive(liveRef.current);
+      const el = dragEl.current;
+      if (el) {
+        el.style.setProperty(xVar, `${spot.x * 100}%`);
+        el.style.setProperty(yVar, `${spot.y * 100}%`);
+      }
     };
     const onUp = () => {
       const spot = liveRef.current[drag.id];
       liveRef.current = {};
+      // 清掉手里那块元素的引用：松手之后它交给 React 管，
+      // 再往它的 style 里写就会和下一次渲染抢同一个变量。
+      dragEl.current = null;
       setLive({});
       setDrag(null);
       if (!spot) return;
@@ -150,7 +176,7 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
     };
-  }, [drag, boxOf, onChange, value]);
+  }, [drag, boxOf, onChange, value, skin]);
 
   function start(event: ReactPointerEvent<HTMLDivElement>, id: LayerId) {
     // 只认主键；右键和滚轮不该把元素拖走
@@ -172,6 +198,10 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
     } catch {
       /* 抓不到也没关系：监听绑在 window 上，事件照样会冒上来 */
     }
+    // 记下这块元素，pointermove 时直接把坐标写进它，不走 React。
+    // 用 currentTarget 而不是 querySelector：同一块图层可能同时有
+    // 外层容器与内层壳体两个节点，只有真正绑了指针事件的那个才是位移目标。
+    dragEl.current = event.currentTarget;
     setDrag({ id });
   }
 

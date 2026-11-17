@@ -468,7 +468,15 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 }
 .play-card-close:hover { background: #ffffff26; color: var(--bold-bg); }
 
-/* 波形：48 根柱子，高度由 JS 每帧写 --h（0–1） */
+/* 波形：32 根柱子，高度由 JS 每帧写 --h（0–1）。
+ *
+ * 柱子高度用 scaleY 而不是 height：--h 每帧都变，而 height 是布局属性，
+ * 32 根柱子一起改高度就是每帧 32 次重排；scaleY 只走合成，不碰布局。
+ * 柱子本身固定占满容器高度，缩放的是它。
+ *
+ * 缩放原点留在正中心（默认值，这里显式写出来）：容器是 align-items: center，
+ * 原来 height 变化时柱子是从中线往上下两端一起长的，从中心缩放才和它一致。
+ * 换成 bottom 虽然更像电平表，但那是一次视觉改动，不该夹在性能修复里。 */
 .play-card-wave {
   display: flex;
   align-items: center;
@@ -479,12 +487,15 @@ body:has(.play-card:not(.is-leaving)) .dock-disc {
 .play-card-wave > span {
   flex: 1;
   min-width: 2px;
-  height: calc(var(--h, 0) * 100%);
-  min-height: 2px;
+  height: 100%;
   border-radius: 2px;
   background: var(--bold-bg);
   opacity: calc(.35 + var(--h, 0) * .65);
-  transition: height 90ms linear, opacity 90ms linear;
+  /* 0.96 + 0.04：--h 到底时留 4% 的底，替掉原来的 min-height: 2px
+     （46px 的 4% 约 1.8px）。不留这一笔的话，安静段会整排消失成一条空线。 */
+  transform: scaleY(calc(var(--h, 0) * 0.96 + 0.04));
+  transform-origin: 50% 50%;
+  transition: transform 90ms linear, opacity 90ms linear;
 }
 
 .play-card-progress {
