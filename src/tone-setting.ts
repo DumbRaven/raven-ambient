@@ -83,6 +83,14 @@ export function normaliseHex(raw: string): string {
 /** 把一档读成合法色值或空串。手填的六个字段全走这一条。 */
 const readField = (value: unknown) => (isHex(value) ? value.toLowerCase() : '');
 
+/**
+ * 读配色存档。四类脏数据都要能收敛：
+ * - mode 不认识 → auto；pick 越界 → 1；自定义色值不合法 → 空串（表示「没填」而不是「填了黑」）；
+ * - stone 是后加的字段，老存档没有，收敛回默认；
+ * - 整份 JSON 坏掉 → 默认值。
+ *
+ * 为什么色值非法要收敛成**空串**而不是黑：空串表示走自动，黑色是一个真实的选择。
+ */
 export function readTone(raw: string | null): ToneSetting {
   if (!raw) return defaultTone;
   try {
@@ -109,6 +117,7 @@ export function readTone(raw: string | null): ToneSetting {
   }
 }
 
+  /** 存配色。写失败静默——配色丢了只是回到自动取色，不该弹提示。 */
 export function writeTone(value: ToneSetting) {
   try { localStorage.setItem(toneKey, JSON.stringify(value)); } catch { /* 存不下就算了 */ }
 }

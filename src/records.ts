@@ -89,6 +89,14 @@ export function percentToDepth(percent: number): number {
   return percentToDb(percent);
 }
 
+/**
+ * 把存档里的柜子修成可用的。这是整个应用最脏的一段，因为要同时兼容三个年代的数据。
+ *
+ * 丢掉的：没有 id/assetId/name、category 不认识、id 重复的唱片（重复会让 React key 撞车）。
+ * 兼容的：旧数据只有 duckAmount 百分比，没有 duckDepth dB —— percentToDepth 换一次。
+ * 只留「还在库里、还是环境音」的静音 id：原来只校验类型，删掉一张唱片后它的 id 会永远
+ * 留在 muted 里并占着 slice(0,8) 的名额，用户明明只静音了 3 条却存不进新的。
+ */
 export function sanitizeCabinet(value: unknown): Cabinet {
   if (!value || typeof value !== 'object') return structuredClone(emptyCabinet);
   const v = value as Partial<Cabinet> & { duckAmount?: number; duckDepth?: number };
@@ -116,6 +124,12 @@ export function sanitizeCabinet(value: unknown): Cabinet {
       depthRange.min, depthRange.max,
     ),
   }));
+    /**
+    * 把一组 id 洗干净：去重、只留字符串、只留「还在库里且类别对得上」的。
+    *
+    * 这一步是必需的：删唱片时不会回头清 queue/ambience，所以存档里的 id 可能指向
+    * 已经不存在的东西。脏 id 传进播放器会让它以为队列里有歌，实际一张都放不出来。
+    */
   const ids = (list: unknown, type: RecordType) => [...new Set(Array.isArray(list) ? list : [])].filter((id): id is string => typeof id === 'string' && records.some(r => r.id === id && r.category === type));
   return { version: 2, records, queue: ids(v.queue, 'music'), ambience: ids(v.ambience, 'ambient').slice(0, 8),
     master: clamp(v.master ?? 60), musicVolume: clamp(v.musicVolume ?? 70), ducking: v.ducking !== false,
@@ -160,6 +174,11 @@ export function sanitizeCabinet(value: unknown): Cabinet {
       .filter((d): d is string => typeof d === 'string' && d.length > 0)
       .slice(0, 20) };
 }
+  /**
+  * 选中/取消一张唱片。音乐进 queue，环境音进 ambience。
+  *
+  * 环境音超过 8 张时**抛错**而不是静默拒绝：用户点了却什么都不发生，比报错更难懂。
+  */
 export function toggleRecord(cabinet: Cabinet, id: string): Cabinet {
   const record = cabinet.records.find(r => r.id === id);
   if (!record) return cabinet;
@@ -168,9 +187,11 @@ export function toggleRecord(cabinet: Cabinet, id: string): Cabinet {
   if (key === 'ambience' && !list.includes(id) && list.length >= 8) throw new Error('最多同时叠加 8 张环境音唱片。');
   return { ...cabinet, [key]: list.includes(id) ? list.filter(item => item !== id) : [...list, id] };
 }
+  /** 从库里删掉一张，同时把队列、环境音里的引用一起清掉——只删 records 会留下指向空气的 id。 */
 export function removeRecord(cabinet: Cabinet, id: string): Cabinet {
   return { ...cabinet, records: cabinet.records.filter(r => r.id !== id), queue: cabinet.queue.filter(item => item !== id), ambience: cabinet.ambience.filter(item => item !== id) };
 }
+  /** 顺序播放的下一个，到队尾回到开头。current 不在队列里时从头开始。 */
 export function nextInQueue(queue: string[], current?: string): string | undefined {
   if (!queue.length) return undefined;
   const index = current ? queue.indexOf(current) : -1;
@@ -186,6 +207,10 @@ export function nextInOrder(queue: string[], current: string | undefined, order:
   if (order === 'shuffle') return shufflePick(queue, current, random);
   return nextInQueue(queue, current);
 }
+  /**
+  * 上一个。随机模式下也是「抽一首别的」而不是回到上一首——
+  * 因为随机模式本来就没有「上一条」的概念，用户按倒退期待的是「换一首」。
+  */
 export function previousInOrder(queue: string[], current: string | undefined, order: PlayOrder, random: () => number = Math.random): string | undefined {
   if (!queue.length) return undefined;
   if (order === 'shuffle') return shufflePick(queue, current, random);
@@ -207,6 +232,12 @@ function shufflePick(queue: string[], current: string | undefined, random: () =>
   const at = Math.min(pool.length - 1, Math.max(0, Math.floor(random() * pool.length)));
   return pool[at] ?? queue[0];
 }
+  /**
+  * 柜子 → 混音参数。注意 `tracks[].id` 用的是 **assetId 而不是 record.id**：
+  * 引擎要的是存储层的键（去 IndexedDB 取文件），不是界面上的唱片号。
+  *
+  * `ducking: true` 写死是有意的：避让不是可选项，是这间屋子的基本行为，见交接文档「明确不改」。
+  */
 export function cabinetMix(cabinet: Cabinet): Mix {
   return {
     master: cabinet.master, musicVolume: cabinet.musicVolume, ducking: true,
@@ -219,6 +250,12 @@ export function cabinetMix(cabinet: Cabinet): Mix {
   };
 }
 export type CabinetFilter = 'selected' | RecordType;
+  /**
+  * 柜子里要显示哪些。三种过滤（选中 / 音乐 / 环境音）+ 搜索词。
+  *
+  * 外部音乐模式下的过滤是**只影响显示**的：queue 原样保存，切回正常模式时
+  * 用户之前选好的音乐都还在。这一点别改成「顺手清掉」——那等于每次切模式都清空选择。
+  */
 export function cabinetRecords(cabinet: Cabinet, filter: CabinetFilter, query = ''): RecordItem[] {
   // 外部音乐模式下音乐交给别的播放器，唱片柜里只剩环境音。
   // 这里只做显示层过滤，queue 原样保存，切回正常模式时音乐选择还在。
@@ -247,10 +284,12 @@ export function clampPage(page: number, total: number, size = PAGE_SIZE): number
   return Math.min(pages - 1, Math.max(0, Math.trunc(page)));
 }
 
+  /** 一共几页。至少一页：空库也要显示第一页，否则下面的翻页按钮会没有落点。 */
 export function pageCount(total: number, size = PAGE_SIZE): number {
   return Math.max(1, Math.ceil(total / size));
 }
 
+  /** 切出一页。页码越界时夹回有效范围而不是抛错——存档里可能留着旧页码。 */
 export function paginate<T>(items: T[], page: number, size = PAGE_SIZE): T[] {
   const at = clampPage(page, items.length, size);
   return items.slice(at * size, at * size + size);

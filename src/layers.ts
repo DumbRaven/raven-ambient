@@ -90,6 +90,10 @@ function clampScale(value: number) {
   return Math.min(SCALE_MAX, Math.max(SCALE_MIN, value));
 }
 
+/**
+ * 把一个来源不可信的坐标修成可用值。缺一个轴就整份退回默认位置，
+ * 不补成 0——那会把元素吸到左上角，比回到默认位置更像故障。
+ */
 function spotOf(value: unknown, fallback: LayerSpot): LayerSpot {
   if (!value || typeof value !== 'object') return fallback;
   const raw = value as Partial<LayerSpot>;
@@ -97,6 +101,7 @@ function spotOf(value: unknown, fallback: LayerSpot): LayerSpot {
   return { x: clamp01(raw.x), y: clamp01(raw.y) };
 }
 
+/** 把存档里的一块图层修成可用的。id 不认识就直接丢掉（旧版本删掉的图层会走到这）。 */
 function layerOf(value: unknown): Layer | null {
   if (!value || typeof value !== 'object') return null;
   const raw = value as Partial<Layer>;
@@ -196,6 +201,10 @@ export function readLayers(raw: string | null, overlayRaw: string | null = null,
   return structuredClone(defaultLayers);
 }
 
+/**
+ * 存图层位置。写失败直接吞掉——
+ * 位置丢了顶多下次回到默认位置，不该因为这个打断放映。
+ */
 export function writeLayers(value: LayerList) {
   try {
     localStorage.setItem(layersKey, JSON.stringify(value));
@@ -204,6 +213,7 @@ export function writeLayers(value: LayerList) {
   }
 }
 
+  /** 加一块。三种情况直接原样返回：id 不认识、已经满 12 块、这一块已经在场（不允许重复摆放）。 */
 export function addLayer(list: LayerList, id: LayerId, at?: LayerSpot): LayerList {
   const meta = findLayer(id);
   if (!meta) return list;
@@ -274,6 +284,14 @@ export function nudgeScale(scale: number, delta: number): number {
  */
 export type SpotMap = Partial<Record<LayerId, LayerSpot>>;
 
+  /**
+  * 记下「我正在等桌面窗确认这个新位置」。
+  *
+  * 为什么需要它：桌面放映窗是另一个渲染进程，拖完以后位置要绕一圈才回来——
+  * 发命令 → 主进程轮询取走 → 主窗口落盘 → 再发快照 → 主进程再推回来。
+  * 这一整圈里桌面窗手上的还是旧位置，会「先弹回原位、再瞬移到新位置」。
+  * 主窗口自己是同步的，但这一层不许假设上层是同步的。
+  */
 export function settleAt(current: SpotMap, id: LayerId, spot: LayerSpot): SpotMap {
   return { ...current, [id]: spot };
 }

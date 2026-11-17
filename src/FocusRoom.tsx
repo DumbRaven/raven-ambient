@@ -30,6 +30,10 @@ const SETTINGS_KEY = 'raven-focus-settings-v1';
 const HISTORY_KEY = 'raven-focus-history-v1';
 const BASE_TITLE = 'Raven Ambient · 唱片柜';
 
+/**
+ * 读一份本地存档。解析失败就退回 fallback —— 存档是上一个人写的，
+ * 里面可能是不受这个版本控制的内容（旧版本字段、手改过的 JSON）。
+ */
 function readStore<T>(key: string, fallback: T): T {
   try {
     const raw = getText(key);
@@ -39,6 +43,7 @@ function readStore<T>(key: string, fallback: T): T {
   }
 }
 
+/** 写一份本地存档。写失败只丢持久化，不让计时中断——番茄钟正在跑，报错也没意义。 */
 function writeStore(key: string, value: unknown) {
   try {
     setText(key, JSON.stringify(value));
@@ -260,6 +265,7 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
     else if (action === 'next') discCommands.current.onNext();
   }), [toggle, skip]);
 
+    /** 改偏好后立刻生效：已开始的这一轮不受影响（见 applyFocusSettings），未开始的跟着改。 */
   function applySettings(patch: Partial<FocusSettings>) {
     const next = sanitizeFocusSettings({ ...settings, ...patch });
     setSettings(next);
@@ -267,6 +273,7 @@ export default function FocusRoom({ active, playing, hasSelection, onPlaySelecti
     setState((current) => applyFocusSettings(current, next));
   }
 
+    /** 开始专注。顺手把音乐起起来（如果用户选过），但只在「本来没在放」时才动。 */
   function begin() {
     const at = Date.now();
     setNow(at);

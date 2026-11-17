@@ -30,6 +30,7 @@ export const templates: Template[] = [
 
 export const templateIds = templates.map(template => template.id);
 
+/** 按 id 找版式。存档里可能是旧版本删掉的 id，找不到就退回第一个而不是报错。 */
 export function findTemplate(value: unknown): Template {
   return templates.find(template => template.id === value) ?? templates[0];
 }
@@ -42,6 +43,7 @@ export function templateTitle(name: string, fromWallpaper: boolean): string {
 
 type Hsl = { h: number; s: number; l: number };
 
+/** 十六进制 → HSL。格式不对时退回 `#9a8b78`（中性暖灰）而不是抛错：来源是画面取色，脏值是常态。 */
 function toHsl(hex: string): Hsl {
   const clean = /^#[0-9a-f]{6}$/i.test(hex) ? hex : '#9a8b78';
   const r = Number.parseInt(clean.slice(1, 3), 16) / 255;
@@ -60,6 +62,12 @@ function toHsl(hex: string): Hsl {
   return { h: h * 360, s, l };
 }
 
+/**
+ * HSL → 十六进制。
+ *
+ * 饱和度为 0 时走灰阶分支：通用公式在 s=0 时会因为浮点误差吐出 RGB 不相等的结果，
+ * 灰会带上一丝颜色——这正是 2026-11-16 那轮修的「灰阶被强行染色」的另一半。
+ */
 function toHex({ h, s, l }: Hsl): string {
   const hue = (((h % 360) + 360) % 360) / 360;
   const sat = Math.min(1, Math.max(0, s));
@@ -148,6 +156,21 @@ export type ToneHint = {
   gold?: string;
 };
 
+/**
+ * 从取到的色板算出一整套配色。这是整个视觉层最核心的一段，改动前请先读这一节。
+ *
+ * 分三层：底色（暗）、右侧面板（中）、信息条（亮）。三层的**明度阶梯是固定的**，
+ * 不跟画面亮度走——实测三张参考图（樱花 / 深蓝 / 橄榄绿），亮图那张的底色也是暗的
+ * （`#deada4` 的底只有 l0.76，而深蓝图的底是 l0.15，橄榄绿是 l0.23）。
+ * 所以 `baseL` 固定 0.14，`pageLight` 只决定信息条要不要抬到 0.88。
+ *
+ * 饱和度分两种情况：有 `hint.sat`（用户在「挑一个」里挑了某个色块）就听它的，
+ * 否则听 `lead`（色板里最艳的那个）。**这个区别不能省**——只听 lead 的话，
+ * 用户挑一个几乎灰的绿会得到一片荧光绿面板（实测 s0.062 → s0.548）。
+ *
+ * 色相：`tinted`（s > 0.15）加权圆周平均，`coherence >= 0.35` 用平均角；
+ * 否则退回 30° 分桶投票。`pool` 全是很灰的颜色时 `hue = 0`，不做无意义的染色。
+ */
 export function collageTone(colors: string[], hint: ToneHint = {}): CollageTone {
   // 取不到色（图还没解码、路径不通）时，退回一个中性灰而不是暖砂色。
   // 暖砂色会让整套版式看着像棕色的，和画面完全不像——灰至少诚实。

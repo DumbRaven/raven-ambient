@@ -32,6 +32,12 @@ const DB_NAME = 'raven-ambient';
 const DB_STORE = 'assets';
 let connection: Promise<IDBDatabase> | undefined;
 
+/**
+ * 打开数据库，返回**同一个 Promise** —— 并发调用不会各开一次连接。
+ *
+ * 失败时把 connection 清掉，下次能重试。不清的话一次失败会把
+ * 这个模块废到页面刷新为止（浏览器里配额满了是能恢复的）。
+ */
 function db() {
   return connection ??= new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, 1);
@@ -59,6 +65,7 @@ export const browserDriver: StoreDriver = {
     localStorage.removeItem(key);
   },
 
+    /** 读一个文件。可能是 undefined（键不存在），调用方要自己判——空 Blob 和不存在不是一回事。 */
   async readBlob(key) {
     const database = await db();
     return new Promise((resolve, reject) => {
@@ -77,6 +84,12 @@ export const browserDriver: StoreDriver = {
     });
   },
 
+    /**
+    * 写一个文件；value 为空表示删除。
+    *
+    * 这三个回调都接了：oncomplete 才算真的落盘，onabort 也要 reject——
+    * 只等 onerror 会在事务被中断时永远挂着，用户看到的是「保存中…」不动。
+    */
   async writeBlob(key, value) {
     const database = await db();
     return new Promise<void>((resolve, reject) => {

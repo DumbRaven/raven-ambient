@@ -68,11 +68,17 @@ export const phaseCaptions: Record<FocusPhase, string> = {
   longBreak: 'LONG BREAK',
 };
 
+/** 把一个来源不可信的数值夹成整数。读存档时每个字段都过一遍——本地存档可能是旧版本写的。 */
 function whole(value: unknown, fallback: number, min: number, max: number): number {
   const next = Math.round(Number(value));
   return Number.isFinite(next) ? Math.min(max, Math.max(min, next)) : fallback;
 }
 
+/**
+ * 把存档里的番茄钟偏好修成可用的。上下限都是产品决定：
+ * 专注 1–180 分钟、小憩 1–60、长休 1–120、长休前 1–12 轮。
+ * 任何字段坏了就退回默认值，而不是整份作废——丢一个字段不该让用户重新设一遍。
+ */
 export function sanitizeFocusSettings(value: unknown): FocusSettings {
   if (!value || typeof value !== 'object') return { ...defaultFocusSettings };
   const raw = value as Partial<FocusSettings>;
@@ -85,6 +91,10 @@ export function sanitizeFocusSettings(value: unknown): FocusSettings {
   };
 }
 
+/**
+ * 修历史记录。丢掉的：不是对象、at/minutes 不是有限数、算完不足 1 分钟的。
+ * 只留最近 500 条：这是 localStorage，无限长会撑爆配额。
+ */
 export function sanitizeFocusHistory(value: unknown): FocusRecord[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -104,6 +114,7 @@ export function phaseMs(settings: FocusSettings, phase: FocusPhase): number {
   return focusMinutes(settings, phase) * MINUTE;
 }
 
+/** 全新的一轮。session 为空表示「还没开始」，此时时长跟着偏好走。 */
 export function initialFocusState(settings: FocusSettings, phase: FocusPhase = 'focus'): FocusState {
   return { phase, rounds: 0, running: false, endAt: 0, remainingMs: phaseMs(settings, phase) };
 }
@@ -126,6 +137,12 @@ export function elapsedFraction(state: FocusState, settings: FocusSettings, now:
   return Math.min(1, Math.max(0, 1 - remainingFocus(state, now) / total));
 }
 
+  /**
+  * 开始（或从暂停里继续）。
+  *
+  * 第一次开始会把「此刻的偏好」固化进 session：之后用户去改偏好，
+  * 这一轮不该中途变长变短——那会让进度环突然跳一下。
+  */
 export function startFocus(state: FocusState, settings: FocusSettings, now: number): FocusState {
   if (state.running) return state;
   const session = state.session ?? { durationMs: phaseMs(settings, state.phase), roundsBeforeLong: settings.roundsBeforeLong };
@@ -142,11 +159,13 @@ export function applyFocusSettings(state: FocusState, settings: FocusSettings): 
   return state.session ? state : { ...state, remainingMs: phaseMs(settings, state.phase) };
 }
 
+  /** 暂停：把「还剩多少」从 endAt 换算回 remainingMs 存下来。之后 endAt 清掉，时间不再流逝。 */
 export function pauseFocus(state: FocusState, now: number): FocusState {
   if (!state.running) return state;
   return { ...state, running: false, endAt: 0, remainingMs: Math.max(0, state.endAt - now) };
 }
 
+  /** 重置回本阶段起点。session 一并清掉，下一轮开始时会重新读偏好。 */
 export function resetFocus(state: FocusState, settings: FocusSettings): FocusState {
   return { ...state, session: undefined, running: false, endAt: 0, remainingMs: phaseMs(settings, state.phase) };
 }
@@ -162,6 +181,12 @@ function advance(state: FocusState, settings: FocusSettings, finished: FocusPhas
   return { phase: 'focus', rounds, running: false, endAt: 0, remainingMs: phaseMs(settings, 'focus') };
 }
 
+/**
+ * 每秒被调一次：到点了就推进阶段。
+ *
+ * 只有「专注」完成才记一条历史——休息不该算进番茄数；
+ * 而且记的是 session 里固化的时长，不是当前偏好（用户可能中途改过）。
+ */
 export function tickFocus(state: FocusState, settings: FocusSettings, now: number): FocusTick {
   if (!state.running || now < state.endAt) return { state };
   const finished = state.phase;
@@ -174,6 +199,11 @@ export function skipFocus(state: FocusState, settings: FocusSettings): FocusStat
   return advance(state, settings, state.phase);
 }
 
+/**
+ * 「今天」的键，用本地时区。
+ *
+ * 不能用 toISOString().slice(0,10)：那是 UTC，东八区的人会在早上 8 点前看到「今天是昨天」。
+ */
 export function dayKey(at: number): string {
   const date = new Date(at);
   return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;

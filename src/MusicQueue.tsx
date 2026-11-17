@@ -30,7 +30,11 @@ export default function MusicQueue({ queue, records, currentId, onPlay, onRemove
   const [moved, setMoved] = useState('');
   const settleLineTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const latest = useRef({ queue, onReorder }); latest.current = { queue, onReorder };
+    // dragRef 给事件回调读（它们闭包里拿不到最新 state），drag state 给渲染读。
+    // 两个都要写，且要在同一处写——分散写必然有一天只更新了一半。
   const publish = (next: Drag | null) => { dragRef.current = next; if (mounted.current) setDrag(next); };
+    // 把所有在跑的东西一次收干净：指针会话、两个定时器、拖拽类名。
+    // 卸载、队列被外部改动、按 Esc、标签页切走，全走这里。
   const cancel = () => {
     cancelPointer.current?.();
     clearTimeout(settleTimer.current); settleTimer.current = undefined;
@@ -48,6 +52,13 @@ export default function MusicQueue({ queue, records, currentId, onPlay, onRemove
     if (active && (queue.length !== active.queue.length || queue.some((id, index) => id !== active.queue[index]))) cancel();
   }, [queue]);
 
+    /**
+    * 开始一次长按拖拽。
+    *
+    * 分两阶段：**350ms 之前只观察不拦截**（用户可能只是想点一下播放），
+    * 超过 350ms 才 armed、才 setPointerCapture、才 publish 第一帧。
+    * 移动超过 8px 也算放弃长按——那是想滚列表。
+    */
   function beginDrag(event: ReactPointerEvent<HTMLLIElement>, from: number) {
     if (event.button !== 0 || !event.isPrimary || queue.length < 2 || dragRef.current?.settling) return;
     if ((event.target as HTMLElement).closest('.queue-remove, .queue-toggle')) return;
@@ -57,6 +68,11 @@ export default function MusicQueue({ queue, records, currentId, onPlay, onRemove
     let lastY = startY, armed = false;
     const original = [...queue];
     let holdTimer: ReturnType<typeof setTimeout>;
+    // 收尾。drop=false（Esc / 队列被改 / 卸载）就原样放弃，一帧都不改。
+    // 真落位时先把卡片滑到新位置（180ms），**滑完才真的改队列**：
+    // 顺序反了会看到卡片从一个位置瞬移到另一个位置，因为 React 先重排了 DOM。
+    // 改之前还要确认队列没被别人动过（长度和顺序都一致）——拖拽期间可能有唱片被删，
+    // 按旧下标重排会把顺序搞乱。
     const finish = (drop: boolean) => {
       clearTimeout(holdTimer); cancelPointer.current = null;
       window.removeEventListener('keydown', onKey);
@@ -87,12 +103,16 @@ export default function MusicQueue({ queue, records, currentId, onPlay, onRemove
         }
       }, duration);
     };
+        // 把指针位移换成「卡片应该偏移多少」并夹在槽位范围内。
+        // 不用指针位置直接算位置，是因为槽位高度不等（有的行有两行文字）。
     const moveTo = () => {
       const current = dragRef.current;
       if (!current || current.settling) return;
       const offset = clampQueueOffset(current.slots, from, lastY - startY + window.scrollY - scrollY);
       publish({ ...current, offset, to: queueDropIndex(current.slots, from, offset) });
     };
+        // 未 armed 时只判断「该不该放弃长按」：位移超过 8px 说明用户是在滚列表，
+        // 顺手把取消器掉，然后让浏览器自己滚。
     const onMove = (move: PointerEvent) => {
       lastY = move.clientY;
       if (!armed) { if (Math.abs(lastY - startY) > 8) { suppressClick.current = true; cancelPointer.current?.(); } return; }

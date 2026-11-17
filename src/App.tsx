@@ -35,11 +35,16 @@ import EditModal from './EditModal';
 
 const emptyStatus: RoomStatus = { running: false, playing: false, musicPlaying: false, ducked: false, level: 0, currentTime: 0, duration: 0, musicOn: true, ambientOn: true, lineInput: 0, lineLive: false, ambientIds: [] };
 type Modal = 'import' | 'settings' | 'edit' | 'guide' | null;
+/** 把任何抛出来的东西转成一句能给用户看的话。非 Error 的抛出（字符串、对象）也要有兜底。 */
 function message(error: unknown) { return error instanceof Error ? error.message : '没有完成，请重试。'; }
 // 大标题与右上角那个计数都跟着当前空间走。放在一张表里，
 // 加第二个空间时不会漏掉其中一处（以前标题和计数是两段独立的三元表达式，
 // 「专注」的计数一度写成了 Math.round(running ? 1 : 0)）。
 const viewTitles: Record<'cabinet' | 'listening' | 'focus' | 'media', string> = { cabinet: 'Cabinet', listening: 'Listening', focus: 'Focus', media: 'Gallery' };
+/**
+ * 应用根。这里放的是「跨页」的状态：唱片柜、当前页签、播放器实例、开关的面板。
+ * 单页内部的状态留在各自的组件里——根组件超过一千行时，多一个 state 都是负担。
+ */
 export default function App() {
   const [cabinet, setCabinet] = useState<Cabinet>(structuredClone(emptyCabinet));
   const cabinetRef = useRef(cabinet); cabinetRef.current = cabinet;
@@ -209,6 +214,10 @@ export default function App() {
     );
     return { x, y, r };
   }
+    /**
+    * 切页签。扩散动画的圆心取**触发元素**的位置，这样视觉上是从点的地方散开。
+    * 同一页时不重来：连点当前页签不该再放一遍动画。
+    */
   function selectView(next: 'cabinet' | 'listening' | 'focus' | 'media', trigger?: HTMLElement) {
     if (next === view) return;
     const stage = viewLayout.stageRef.current;
@@ -239,6 +248,7 @@ export default function App() {
     tabs.querySelectorAll('button').forEach(button => observer.observe(button));
     return () => { cancelAnimationFrame(ready); observer.disconnect(); };
   }, [filter, cabinet.lineMode, pageMotion.value]);
+    /** 切筛选。作用域是唱片柜那一块，所以圆心就地取筛选按钮，不用外层 stage。 */
   function selectFilter(next: CabinetFilter, trigger?: HTMLElement) {
     if (next === filter) return;
     const shelf = shelfRef.current;
@@ -398,11 +408,21 @@ export default function App() {
   // 用户会以为它在响、只是听不见。环境音这条按 ambientIds 逐张判。
   const isPlaying = (record: RecordItem) => status.running && (record.category === 'music' ? status.musicPlaying && status.currentId === record.id : status.ambientIds.includes(record.id));
 
+    /**
+    * 所有改动都从这里过：先落盘，成功了才更新内存与播放器。
+    *
+    * 顺序不能反。先 setCabinet 再 save 的话，落盘失败时界面已经变了
+    * ——用户会以为自己改成功了，重启之后发现没保住。
+    *
+    * 抛出去是有意的：调用方（change）需要知道失败，但提示已经在这里发过了。
+    */
   function commit(next: Cabinet) {
     try { cabinetStorage.current.save(next); cabinetRef.current = next; setCabinet(next); player.current?.update(next); }
     catch (error) { const reason = error instanceof CabinetWriteError ? error : new Error('设备存储空间不足，未保存这次修改。'); notify(message(reason)); throw reason; }
   }
+    /** 改几个字段。落盘失败的提示由 commit 发，这里只负责不让异常冒到渲染层。 */
   function change(changes: Partial<Cabinet>) { try { commit({ ...cabinetRef.current, ...changes }); } catch { /* notice already shown */ } }
+    /** 翻页。顺手清掉「当前展开的那张」：翻页之后它多半不在这一页了。 */
   function goToPage(next: number) { setPage(clampPage(next, visible.length)); setFocusId(undefined); }
   function turnPage(direction: number) { goToPage(currentPage + direction); }
   // 导入后要翻到最后一页；这里重新算一遍过滤结果，避免用到本次渲染前的 visible。
@@ -448,6 +468,7 @@ export default function App() {
       notify(`接不上外部音乐：${text}。`);
     }
   }
+    /** 开合唱片卡片。右侧详情读的是 focusId，跟开合是两件事——合上了也仍停在这张上。 */
   function toggleFlip(id: string) {
     // 右侧读的是 focusId，跟开合是两件事：合上了也仍然停在这张上。
     setFocusId(id);
@@ -489,14 +510,21 @@ export default function App() {
     if (cabinet.lineMode) { if (hasTrack(nowPlaying)) commandNowPlaying('toggle'); return; }
     player.current?.toggle();
   }
+    /** 上一首。只在「总开关开着」时才动，否则按了会连环境音一起起——那不是用户要的。 */
   function previousTrack() {
     if (cabinet.lineMode) { if (hasTrack(nowPlaying)) commandNowPlaying('previous'); return; }
     player.current?.previous();
   }
+    /** 下一首。只在总开关开着时动，否则按了会连环境音一起起。 */
   function nextTrack() {
     if (cabinet.lineMode) { if (hasTrack(nowPlaying)) commandNowPlaying('next'); return; }
     player.current?.next();
   }
+    /**
+    * 把用户选的图片处理成封面：缩放 + 取色，然后写回唱片。
+    *
+    * 取色失败不该让整个流程失败——封面图本身才是用户要的，颜色可以退回预设。
+    */
   async function loadCover(id: string, coverId: string) {
     const blob = await readAsset(coverId); if (!blob) return;
     const previous = urls.current.get(coverId); if (previous) URL.revokeObjectURL(previous);
@@ -588,6 +616,8 @@ export default function App() {
   }, [modal]);
   useEffect(() => {
     if (!sleepUntil) return;
+      // 80ms 一拍，只读播放器的实时电平给波形用。
+      // 不走 status：那是 200ms 推一次的节流数据，波形会一顿一顿。
     const tick = () => {
       const left = Math.max(0, Math.ceil((sleepUntil - Date.now()) / 1000));
       setRemaining(left);
@@ -609,6 +639,10 @@ export default function App() {
     tick(); const timer = setInterval(tick, 1000); return () => clearInterval(timer);
   }, [sleepUntil]);
 
+    /**
+    * 导入文件。逐张处理并在 report 里累积结果，**一张失败不中断整批**——
+    * 用户拖了 20 个文件进来，其中一个格式不对，其他 19 个还是要进的。
+    */
   async function importFiles(event: ChangeEvent<HTMLInputElement>) {
     const all = [...(event.target.files ?? [])]; event.target.value = '';
     if (!all.length || busyRef.current) return;
@@ -624,6 +658,8 @@ export default function App() {
     // 第三次再用 findIndex 找原文」——第三次就已经找不到（元素变了），
     // 于是写到 errors[-1] 上，20 个文件永远只显示「共 2 次」。
     const seen = new Map<string, { count: number; at: number }>();
+      // 往导入报告里追加一条错误。报告是给用户看的清单，不是日志——
+      // 每条都要是「哪个文件、为什么不行」这种能照着改的话。
     const pushError = (text: string) => {
       const hit = seen.get(text);
       if (!hit) {
@@ -691,6 +727,7 @@ export default function App() {
       notify(forCover ? '唱片换上了新的封面。' : '空间已染上这张照片的色彩。');
     } catch (error) { notify(message(error)); } finally { busyRef.current = false; setBusy(''); }
   }
+    /** 打开导入面板。清掉上一次的报告，否则用户会看到上一批的残留。 */
   function openImport(type?: RecordType) { setReport([]); if (type) setImportType(type); setModal('import'); }
   // 媒体库：把选中的目录移出。条目一起清掉，不然界面会留着一堆打不开的缩略图。
   function forgetMediaDir(dir: string) {
@@ -711,6 +748,7 @@ export default function App() {
     if (keep.length === cabinetRef.current.media.length) return;
     change({ media: keep });
   }
+    /** 打开编辑面板。默认编辑「当前展开的那张」，也可以从别处直接指定。 */
   function openEdit(record = focused) { if (!record) return; setFocusId(record.id); setDraft({ name: record.name, artist: record.artist, description: record.description }); setDraftError(''); setModal('edit'); }
   /**
    * 换封面：封面库和「按名称重新匹配」都走这里。
@@ -724,6 +762,7 @@ export default function App() {
     try { editRecord(focused.id, { coverId: undefined, coverPreset: cover.id, color: cover.color }); }
     catch (error) { notify(message(error)); }
   }
+    /** 自动配封面：给所有还没有封面的唱片按名字匹配预设。用户手动换过的不会被覆盖。 */
   function autoCover() {
     const cover = matchAmbientCover(draft.name);
     if (cover) { chooseCover(cover); notify(`已换成「${cover.name}」封面。`); }
@@ -792,10 +831,12 @@ export default function App() {
       notify(message(error));
     } finally { setBusy(''); busyRef.current = false; }
   }
+    /** 从唱片柜拿走一张（不是删文件）。队列与环境音里的引用一起清掉。 */
   function takeOffShelf(record: RecordItem) {
     // Remove only the catalog entry; preserve the stored asset and source file.
     try { commit(removeRecord(cabinetRef.current, record.id)); setFocusId(undefined); setModal(null); notify('已从唱片柜移除，源文件不受影响。'); } catch { /* notice already shown */ }
   }
+    /** 清空放映背景。图片资源一并释放（IndexedDB 里那份），不要只把界面上的引用摘掉。 */
   async function clearBackground() {
     // 和 clearCoverCache 一样要挡住并发：这里会整份 commit，跑到一半和导入 /
     // 封面写入交错，两边各写一次完整 cabinet，后来者把前者的改动盖掉。

@@ -64,11 +64,18 @@ export class RoomPlayer {
       this.onError(new Error(`这几张环境音起不来了：${detail}。文件可能被移走，重新添加一次就好。`));
     });
   }
+  /** 把当前状态推给房间。destroyed 之后一律不推——那时 listener 可能已经指向关掉的窗口。 */
   private emit() {
     if (!this.disposed) this.listener({ ...this.audio, running: this.running, currentId: this.currentId, musicOn: this.musicOn, ambientOn: this.ambientOn });
   }
   /** 实时电平（原始 RMS），给波形用。不是 state，每帧读一次即可。 */
   get level() { return this.engine.liveLevel; }
+  /**
+  * 用户在界面上改了柜子内容：换队列、换环境音、切外部音乐模式。
+  *
+  * 只在**选择变了**或**模式变了**时重排。音量、声像这类参数走 applyMix 热更新，
+  * 不需要重排——重排意味着重新解码，拖动音量滑杆会变成一场灾难。
+  */
   update(cabinet: Cabinet) {
     const selectionChanged = JSON.stringify([this.cabinet.queue, this.cabinet.ambience]) !== JSON.stringify([cabinet.queue, cabinet.ambience]);
     const modeChanged = this.cabinet.lineMode !== cabinet.lineMode;
@@ -77,6 +84,7 @@ export class RoomPlayer {
     if (this.running && (selectionChanged || modeChanged)) this.schedule();
     if (!this.running && this.currentId && !cabinet.queue.includes(this.currentId)) { this.currentId = undefined; this.emit(); }
   }
+  /** 从柜子算出混音参数，再乘上「当前这首自己的音量倍率」。返回它是因为 start() 还要用同一份。 */
   private applyMix() {
     const mix = cabinetMix(this.cabinet);
     mix.musicVolume *= (this.cabinet.records.find(r => r.id === this.currentId)?.volume ?? 100) / 100;
@@ -114,11 +122,19 @@ export class RoomPlayer {
     this.currentId = order.find(id => left.includes(id)) ?? left[0];
     return true;
   }
+  /** 这一轮该不该有音乐。/ none 一张都没坏才算有：全坏了就安静，别循环重试。 */
   private wantsMusic() {
     return this.running && this.musicOn && !this.cabinet.lineMode
       && this.cabinet.queue.some(id => !this.broken.has(id));
   }
+    /** 这一轮该不该有环境音。和 wantsMusic 是两条独立的判断，各自看自己的开关。 */
   private wantsAmbient() { return this.running && this.ambientOn && this.cabinet.ambience.length > 0; }
+  /**
+  * 总播放：把 running 打开后交给 schedule() 排。
+  *
+  * 外部音乐模式下本地音乐不参与，「有没有东西可放」只看环境音——
+  * 否则用户接上外部音乐后按播放，会因为队列空而什么都不发生。
+  */
   start() {
     // 外部音乐模式下本地音乐不参与，「有没有东西可放」只看环境音
     const musicReady = !this.cabinet.lineMode && this.cabinet.queue.length > 0;
@@ -140,6 +156,7 @@ export class RoomPlayer {
    * 并且按外部音乐的响度去压它。这条路上 running 必须为真，否则环境音根本不启动，
    * 避让也就没有任何作用对象。
    */
+  /** 只起环境音、不起音乐（专注页的「开始」走这条）。 */
   startAmbientOnly() {
     if (!this.cabinet.ambience.length) return;
     this.ambientOn = true;
@@ -175,6 +192,12 @@ export class RoomPlayer {
     if (!this.ambientOn) this.engine.stopAmbience();
     this.syncRunning();
   }
+  /**
+  * 两条路各自开关之后，统一重算「总开关该是什么」。
+  *
+  * 只有什么都不剩时才停：音乐关掉但环境音还在 → 继续 running；
+  * 两边都关 → 停总线、++revision 让在飞的加载作废。
+  */
   private syncRunning() {
     const musicReady = !this.cabinet.lineMode && this.cabinet.queue.length > 0;
     const anyOn = (this.musicOn && musicReady) || (this.ambientOn && this.cabinet.ambience.length > 0);
@@ -183,6 +206,12 @@ export class RoomPlayer {
     if (anyOn) this.schedule();
     else { this.running = false; ++this.revision; this.engine.stopAll(); this.emit(); }
   }
+  /**
+  * 下一首。
+  *
+  * broken 只在用户主动切歌时清空（manual=true）：那是「再试一次」的信号，硬盘可能刚插回来；
+  * 自动接下一首时不能清，否则一个坏文件会让整轮循环反复重试它。
+  */
   next(manual = true) {
     // 用户主动切歌 = 「再试一次」的信号：硬盘可能刚插回来。
     // 自动接下一首（manual=false）不清，否则一个坏文件会让整轮循环反复重试它。
@@ -192,6 +221,7 @@ export class RoomPlayer {
     this.armTransition(manual, from);
     this.emit(); if (this.running) this.schedule();
   }
+  /** 上一首。**不清 broken**——倒退不是「再试一次」的信号，用户只是想听前一首。 */
   previous() {
     const from = this.currentId;
     this.currentId = previousInOrder(this.cabinet.queue, from, this.cabinet.order);
@@ -206,6 +236,7 @@ export class RoomPlayer {
     const switched = !!from && !!this.currentId && this.currentId !== from;
     if (manual && switched && this.running && this.musicOn && this.loadedId) this.pendingTransition = this.cabinet.transition;
   }
+  /** 点某一张直接播。外部音乐模式下整体无效（本地音乐那一路是关的）。 */
   playRecord(id: string) {
     if (this.cabinet.lineMode || !this.cabinet.queue.includes(id)) return;
     const from = this.currentId;
@@ -216,6 +247,7 @@ export class RoomPlayer {
     this.armTransition(true, from);
     this.emit(); this.schedule();
   }
+  /** 跳转。只在「当前这首就是已经加载的那首」时才转给引擎——否则会跳到上一首的时间点上。 */
   seek(seconds: number) { if (this.loadedId === this.currentId) this.engine.seek(seconds); }
   /**
    * 试听一张唱片。播一段就停，期间暂停当前音乐，停下后按原样恢复。
@@ -255,6 +287,7 @@ export class RoomPlayer {
       this.previewSwitching = false;
     }
   }
+  /** 停止试听。会排一个 120ms 的收尾定时器让淡出走完，那个定时器记进 cleanups 供 dispose 取消。 */
   stopPreview() { this.previewToken++; this.engine.stopPreview(); }
   private restoreAfterPreview() {
     // 换段中间态：不是真的结束，恢复留到下一段结束时再做（previewRestore 还在）。
@@ -268,6 +301,17 @@ export class RoomPlayer {
   /** 接上外部音乐（虚拟声卡抓来的那股声音）。接上后避让就按它的响度来压环境音。 */
   attachLineIn(stream: MediaStream) { this.engine.attachLineIn(stream); this.emit(); }
   detachLineIn() { this.engine.detachLineIn(); this.emit(); }
+    /**
+    * 排一次播放。这是整个播放器的中枢，所有「该不该响、响什么」都汇到这里。
+    *
+    * 三条不变量：
+    * 1. **串行队列**：`this.pending` 保证同一时刻只有一轮在跑。外部（App、测试）
+    *    await 它就是「这一轮排完了」。
+    * 2. **环境音不挡音乐**：环境音的解码是不 await 的 `ambientWork`，音乐可以立刻走。
+    *    冷启动时这能省掉 1~1.5 秒（实测 1136ms → 88ms）。但 `finally` 里仍要 await 它，
+    *    因为「用户听到声音」和「这一轮排完」是两个不同的量。
+    * 3. **代次校验**：每一步 await 回来都用 `valid()` 复查，用户中途点了暂停/切歌就早退。
+    */
   private schedule() {
     this.engine.cancelPending();
     const revision = ++this.revision;

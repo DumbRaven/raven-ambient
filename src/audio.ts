@@ -22,6 +22,13 @@ const initialStatus: AudioStatus = { playing: false, musicPlaying: false, ducked
 /** 曲线只跟形状有关，算一次就够，不必每建一路声部重算一遍。 */
 let clipCurve: Float32Array<ArrayBuffer> | undefined;
 
+/**
+ * 软限幅曲线：拐点（70% 满幅）之前原样通过，之后用 tanh 压弯。
+ *
+ * 为什么不用硬切：硬切在过界处产生大量奇次谐波，听感是「劈」的一下；
+ * tanh 保留一点圆润的谐波，过界时只是变厚，不会变成噪音。
+ * 曲线只跟形状有关，所以算一次就缓存——不必每建一路声部重算一遍。
+ */
 function softClipCurve(): Float32Array<ArrayBuffer> {
   if (clipCurve) return clipCurve;
   const size = 2048;
@@ -119,6 +126,7 @@ export class AmbientEngine {
    * 而这里是「大部分照响，只有这几张没了」——两者的处理完全不同。
    */
   onAmbientLost(listener: (lost: Track[]) => void) { this.ambientLost.add(listener); return () => { this.ambientLost.delete(listener); }; }
+    /** 把状态推给房间。200ms 节流在 tick 里做，这里不做——需要「立刻」的地方（暂停、断开外部输入）直接调。 */
   private emit() {
     const previous = this.lastEmitted, next = this.status, now = this.ctx?.currentTime ?? 0;
     if (previous && (Object.keys(next) as (keyof AudioStatus)[]).every(key => previous[key] === next[key])) return;
@@ -134,6 +142,16 @@ export class AmbientEngine {
     this.lastEmitted = { ...next }; this.lastEmissionAt = now;
     for (const listener of this.listeners) listener({ ...next });
   }
+  /**
+   * 建 AudioContext 与整条信号链。只做一次，重复调用直接返回。
+   *
+   * 总线顺序是有讲究的：master(0.65) → 限幅器 → 扬声器。
+   * 限幅参数（threshold -9dB / ratio 12）是给「环境音叠了七八路 + 音乐」留的余量，
+   * 正常音量走不到它，只有瞬态被削——所以听起来不会糊。
+   *
+   * 两块唱盘：一块在响时另一块在后台把下一首准备好，过渡时只推音量，
+   * 声音不断。这是「切歌不卡」的前提，不是随手写的两份。
+   */
   private init() {
     if (this.destroyed) throw new Error('播放器已关闭。');
     if (this.ctx) return;
@@ -159,6 +177,8 @@ export class AmbientEngine {
       const gain = ctx.createGain(); gain.gain.value = 0;
       ctx.createMediaElementSource(el).connect(gain).connect(this.musicGain!);
       const deck: Deck = { el, gain, level: 0 };
+      // 唱盘的四个事件（ended/pause/play/error）只认「当前活跃的那块」：
+      // 后台那块也在正常加载，它的状态变化不是用户听到的声音变化。
       const isActive = () => this.decks[this.activeDeck] === deck;
       el.addEventListener('ended', () => { if (!isActive()) return; this.status.musicPlaying = false; this.tick(); for (const listener of this.endedListeners) listener(); });
       el.addEventListener('pause', () => { if (!isActive() || el.paused === false) return; this.status.musicPlaying = false; this.tick(); });
@@ -222,6 +242,13 @@ export class AmbientEngine {
   get liveLevel() {
     return this.live;
   }
+  /**
+   * 200ms 一拍：量电平、算避让、推状态。
+   *
+   * 电平取的是**用户此刻真正听到的主导声音**——接了外部音乐就以虚拟声卡那一路为准，
+   * 否则用本地音乐。避让要跟的是「音乐有多响」，不是固定的某一路。
+   * 真正每帧都要的波形不走这里，走 liveLevel getter。
+   */
   private tick() {
     if (!this.ctx || !this.analyser || !this.samples) return;
     this.analyser.getFloatTimeDomainData(this.samples);
@@ -280,6 +307,12 @@ export class AmbientEngine {
     if (needsTick && this.timer === undefined) this.timer = setInterval(() => this.tick(), 80);
     if (!needsTick && this.timer !== undefined) { clearInterval(this.timer); this.timer = undefined; }
   }
+  /**
+   * 启动环境音。两件事必须同时成立：够快（并发解码）＋ 一张坏文件不连累其它。
+   *
+   * 解码并发上限 3：串行要 8 秒，用户等了半天没声音就以为功能坏了；
+   * 再高会让主线程的 decodeAudioData 把 UI 拖住。
+   */
   async start(mix: Mix) {
     this.init();
     const revision = ++this.revision;
@@ -305,6 +338,7 @@ export class AmbientEngine {
       const failures: unknown[] = [];
       /** 起不来的那几张，用来告诉用户「哪张没了」。 */
       const lost: Track[] = [];
+      /** 一条解码通道。三条并发跑，谁先空出来谁接下一张。 */
       const lane = async () => {
         for (let next = pending.shift(); next; next = pending.shift()) {
           try {
@@ -354,21 +388,36 @@ export class AmbientEngine {
       }
     } catch (error) { if (valid()) { this.stopAmbience(); throw error; } }
   }
+  /** 停掉全部环境音。++revision 是关键：正在解码的那批回来时会发现代次变了，自己作废。 */
   stopAmbience() {
     ++this.revision;
     for (const voice of this.voices.values()) { voice.source.stop(); voice.source.disconnect(); voice.gain.disconnect(); voice.duck.disconnect(); voice.filter.disconnect(); voice.pan.disconnect(); voice.clip.disconnect(); }
     this.voices.clear(); this.status.playing = false; this.status.ducked = false; this.status.ambientIds = []; this.tick(); this.emit();
   }
+    /** 全停。顺序不能反：先环境音再音乐——反过来时音乐那声「咔」会被环境音的收尾盖住。 */
   stopAll() { this.stopAmbience(); this.pauseMusic(); }
   /** 调度器一接到新意图就取消旧加载，不必等串行队列轮到新任务。 */
   cancelPending() { ++this.revision; this.cancelMusicWork(); }
+  /**
+   * 音乐的「取消 / 开新工 / 判有效」三件套，靠 musicRevision 做代次。
+   *
+   * 为什么不复用 revision：那是环境音的代次。音乐换歌不该把正在解码的环境音一起取消。
+   * AbortController 是为了让挂住的 fetch/decode 能真的中断，不靠回来看见代次才早退。
+   */
   private cancelMusicWork() { ++this.musicRevision; this.musicAbort?.abort(); this.musicAbort = undefined; }
+    /** 开一次新的音乐操作。旧的那个先作废（abort），拿到自己的代次号和 signal。 */
   private beginMusicWork() { this.cancelMusicWork(); this.musicAbort = new AbortController(); return { revision: this.musicRevision, signal: this.musicAbort.signal }; }
+    /** 这次音乐操作还算数吗。两处 await 之间用户可能又点了一次，每次 await 回来都要过一遍。 */
   private musicValid(revision: number) { return !this.destroyed && revision === this.musicRevision; }
   private clearTransition() { clearTimeout(this.transitionTimer); this.transitionTimer = undefined; }
+  /** 把一块唱盘推到静音并停住。用 setValueAtTime 而不是线性斜坡，是要它立刻生效（过渡时由调用方自己铺斜坡）。 */
   private silence(deck: Deck) {
     deck.level = 0; deck.gain.gain.cancelScheduledValues(0); deck.gain.gain.setValueAtTime(0, this.ctx!.currentTime); deck.el.pause();
   }
+  /**
+   * 把混音参数铺到整条链上。参数没变也会被调，所有写入都用 setTargetAtTime 做平滑，
+   * 所以拖滑杆时不会「咔」地跳档。热更新：改音量/声像/暖度不用重建声部。
+   */
   setMix(mix: Mix) {
     this.mix = mix;
     if (!this.ctx) return;
@@ -400,6 +449,12 @@ export class AmbientEngine {
       }
     }
   }
+  /**
+   * 取一张环境音的 AudioBuffer，双层缓存。
+   *
+   * buffers 存已解码的；loading 存「正在解」的 Promise——同一张被两路同时要时，
+   * 后来者直接等前者的结果，不会重复解码一遍。这条在并发上限 3 下很重要。
+   */
   private async getBuffer(track: Track): Promise<AudioBuffer> {
     const cached = this.buffers.get(track.id);
     if (cached) return cached;
@@ -413,6 +468,11 @@ export class AmbientEngine {
     this.loading.set(track.id, pending);
     try { return await pending; } finally { this.loading.delete(track.id); }
   }
+  /**
+   * 导入前的校验。两个限制都是给用户的**可理解**边界，不是技术限制：
+   * 50 MB 挡住手滑选到整张专辑，10 分钟是「环境音是循环的，长的没意义」。
+   * 顺带在这里把文件解码一遍——解不开就当场报错，不要等到播放时才发现。
+   */
   async validateAmbient(file: File) {
     this.init();
     if (file.size > 50 * 1024 * 1024) throw new Error('单张环境音请控制在 50 MB 以内。');
@@ -421,6 +481,7 @@ export class AmbientEngine {
     return buffer;
   }
   cacheBuffer(id: string, buffer: AudioBuffer) { this.buffers.set(id, buffer); }
+  /** 彻底忘记一张环境音：断掉声部的每一段连线、清缓存、从「正在响的名单」里摘掉。 */
   forget(id: string) {
     const voice = this.voices.get(id);
     if (voice) { voice.source.stop(); voice.source.disconnect(); voice.gain.disconnect(); voice.duck.disconnect(); voice.filter.disconnect(); voice.pan.disconnect(); voice.clip.disconnect(); this.voices.delete(id); }
@@ -626,12 +687,19 @@ export class AmbientEngine {
     this.transitionTimer = setTimeout(() => { if (this.decks[this.activeDeck] !== from) this.silence(from); this.transitionTimer = undefined; }, Math.round(span * 1000) + 40);
     this.tick(); return true;
   }
+  /** 播放/暂停切换。没有 src 时抛错让上层提示——这里不静默吞掉，否则用户点了没反应。 */
   async toggleMusic() {
     this.init();
     if (!this.music?.src) throw new Error('先导入一首音乐，或试听内置旋律。');
     if (this.music.paused) await this.playMusic();
     else this.pauseMusic();
   }
+  /**
+   * 从暂停里恢复播放。
+   *
+   * 两处 await（resume、el.play）之间用户可能又暂停了，所以每步回来都要用 musicValid 复查；
+   * 复查失败时如果这块唱盘已经归这次操作管，还得把增益收回静音，否则会留下一路幽灵音量。
+   */
   async playMusic() {
     this.init();
     const { revision } = this.beginMusicWork();
@@ -647,12 +715,21 @@ export class AmbientEngine {
     if (!this.musicValid(revision)) { if (deck.owner === revision) this.silence(deck); return false; }
     this.status.musicPlaying = true; this.tick(); return true;
   }
+  /** 暂停音乐。顺手取消过渡定时器：过渡正跑到一半时暂停，那个定时器会把旧唱盘再 sil 一次。 */
   pauseMusic() {
     this.cancelMusicWork(); this.clearTransition();
     for (const deck of this.decks) this.silence(deck);
     this.status.musicPlaying = false; this.tick(); this.emit();
   }
+  /** 跳转。先夹到 [0, duration]：duration 在 metadata 到之前是 NaN，直接赋值会让播放器抛错。 */
   seek(seconds: number) { if (this.music && Number.isFinite(this.music.duration)) { this.music.currentTime = Math.max(0, Math.min(seconds, this.music.duration)); this.lastEmissionAt = -Infinity; this.tick(); } }
+    /**
+    * 彻底关掉。AudioContext 一旦 close 就再也不能用，所以这里要保证：
+    * 所有定时器取消、所有 URL 释放、所有监听器清空。
+    *
+    * stopPreview 会排一个 120ms 的收尾定时器，它必须被显式取消——
+    * 那个定时器闭包里握着 source/gain，而 ctx 马上要 close，再去碰就是碰死对象。
+    */
   dispose() {
     this.destroyed = true;
     this.stopAll(); this.stopPreview(); clearInterval(this.timer);
@@ -668,6 +745,13 @@ export class AmbientEngine {
   }
 }
 
+/**
+ * 内置试听旋律：手写生成一段 32 秒的 WAV，不占任何资源文件。
+ *
+ * 它的用途不只是「样例音乐」——第 8 个音之后插了 4 秒空档，
+ * 就是为了让「自动避让」（音乐一响环境音就压下去）能被人的耳朵听出来。
+ * 想改旋律请连那个空档一起考虑。
+ */
 export function makeDemoMusic(): Blob {
   const rate = 22050, duration = 32, length = rate * duration;
   const data = new Float32Array(length);

@@ -197,6 +197,8 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   const onDesktopRef = useRef(onDesktop);
   useEffect(() => { onDesktopRef.current = onDesktop; }, [onDesktop]);
   useEffect(() => {
+      // 200ms 一拍：量进度、推快进条。不挂 requestAnimationFrame——
+      // 快进条不需要 60fps，而这间屋子已经有波形在吃帧了。
     const tick = () => {
       const snapshot = readFocus();
       const shown = snapshot && snapshot.visible ? snapshot : null;
@@ -383,6 +385,8 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
   useEffect(() => {
     if (!expanded) { setChrome(true); return; }
     let timer: number | undefined;
+      // 用户动了：把控件重新亮出来，并重新开始计「多久没动」。
+      // 全屏看片时控件会自己隐去，这一下让它回来。
     const wake = () => {
       setChrome(true);
       window.clearTimeout(timer);
