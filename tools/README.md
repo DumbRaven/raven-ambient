@@ -33,6 +33,9 @@ env -u ELECTRON_RUN_AS_NODE node_modules/electron/dist/electron.exe tools/probe/
 | `rain-audit.cjs` | 汇总当前水珠的档位分布与几何 |
 | `ticket-fit.cjs` | 票根浮层在五种画幅下是否溢出。**离屏窗口改不了尺寸**，必须用 CDP `Emulation.setDeviceMetricsOverride` |
 | `ticket-face-height.cjs` | 量 `.ticket-lift` / `-shot` / `-panel` / `.ticket-face` / `.ticket-panel` 五层高度。票根「只剩一半」就是靠它查出来的：face 497.6px 而 panel 只有 204.8px |
+| `palette-live.cjs` | 用**真实** userData 与真实视频跑一遍取色，输出「取到哪一帧、几个色、三层色」。**不能用 harness**：它把 userData 换成 mkdtemp，那里没有用户的库 |
+| `tone-live.cjs` | 读实机 localStorage 里现在存的放映设置与配色设置（`raven-stage-tone` / `raven-stage-template` / `raven-cabinet-v2`） |
+| `tone-panel-live.cjs` | 实机打开「配色 → 挑一个」面板，把 4 个色块与 `palette` 数组一起抓下来——面板显示的才是用户看到的 |
 
 > 上表只列高频与门禁相关项。`probe/` 下共 140+ 个脚本，其余按文件名搜（命名都带领域：`ticket-*` / `tag-*` / `stone-*` / `desktop-*` / `template-*`）。
 

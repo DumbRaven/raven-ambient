@@ -115,6 +115,8 @@ export function writeTone(value: ToneSetting) {
 
 export type ToneHintOut = {
   hue?: number;
+  /** pick 模式下挑中那块的饱和度。不传就退回「画面里最艳那个色」。 */
+  sat?: number;
   base?: string;
   panel?: string;
   bar?: string;
@@ -138,6 +140,13 @@ export function toneHint(setting: ToneSetting, colors: string[]): ToneHintOut {
   }
   if (setting.mode === 'pick') {
     // 用画面里挑出来的那个色当主色相，三档明度还是自动排。
+    //
+    // **饱和度也要跟着走。** 这一条是补的，原来只传色相，饱和度仍取画面里
+    // 最艳的那个色——于是「挑一个」实际上只挑了一半：
+    // 挑一块 `#ccd2cd`（h130 s0.062，几乎是灰的绿），画面里同时有
+    // `#e4b08e`（s0.614）时，算出来的面板是 `#4dcb62`，饱和 0.548。
+    // 用户挑的是灰的，看到的是荧光绿，中间那 0.49 的饱和度是别人的。
+    // 这正是「取色怎么这么多绿色」的来源。
     const picked = colors[setting.pick] ?? colors[0];
     if (!picked) return {};
     const rgb = Number.parseInt(picked.slice(1), 16);
@@ -147,12 +156,18 @@ export function toneHint(setting: ToneSetting, colors: string[]): ToneHintOut {
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
     const d = max - min;
-    if (!d) return {};
+    // 纯灰也能挑：色相没有意义，就给 0，饱和度给 0，整套走灰阶。
+    // 原来这里 `if (!d) return {}` 会退回自动模式，等于用户点了没反应。
+    if (!d) return { hue: 0, sat: 0 };
     let h: number;
     if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
     else if (max === g) h = ((b - r) / d + 2) / 6;
     else h = ((r - g) / d + 4) / 6;
-    return { hue: h * 360 };
+    // HSL 的饱和度公式（chroma 归一化），和 templates.ts 里 toHsl 同一套。
+    const l = (max + min) / 2;
+    const denom = 1 - Math.abs(2 * l - 1);
+    const sat = denom > 1e-6 ? d / denom : 0;
+    return { hue: h * 360, sat };
   }
   return {};
 }

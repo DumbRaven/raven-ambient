@@ -128,12 +128,20 @@ export type CollageTone = {
  *
  * hint 允许用户指定：
  *   hue   强制主色相（0–360），不传就按画面算
+ *   sat   强制饱和度（0–1），不传就用画面里最艳那个色的饱和度
  *   base / panel / bar  直接指定某一档的底色，指定的那档原样用，其余照算
  *   onPanel / onBar     直接指定压在面板 / 信息条上的字色
  *   gold                竖排胶囊的四颗星、DUMBRAVEN 字母与右下角署名
+ *
+ * `sat` 是给「挑一个」模式补的。那个模式只传色相，饱和度仍然取画面里
+ * 最艳的那个色（`lead.s`）——于是用户挑一块几乎是灰的色块，算出来的面板
+ * 却顶着一整套高饱和。实测：`#ccd2cd`（h130 s0.062）配着画面里
+ * `#e4b08e`（s0.614）的饱和度，面板算出 `#4dcb62` 亮绿，饱和 0.548。
+ * 用户挑的是灰的，看到的是荧光绿——这就是「取色怎么这么多绿色」。
  */
 export type ToneHint = {
   hue?: number;
+  sat?: number;
   base?: string;
   panel?: string;
   bar?: string;
@@ -229,17 +237,28 @@ export function collageTone(colors: string[], hint: ToneHint = {}): CollageTone 
   // clamp 的下限不是「至少有点颜色」，而是「灰色就是没有颜色」——
   // 纯灰画面在 `hue` 那段已经被判成 0（走灰阶），这里再补饱和度就自相矛盾。
   const baseL = 0.14;
-  const baseS = clamp(lead.s * 0.55, 0, 0.42);
+
+  // 饱和度的来源：默认是画面里最艳那个色（自动模式的口径，别动），
+  // 但「挑一个」会把自己的饱和度传进来（`hint.sat`）。
+  //
+  // 为什么要能覆盖：挑一个模式原先把色相和饱和度拆给了两个不同的来源——
+  // 色相听用户挑的，饱和度仍听画面最艳的。挑一块 `#ccd2cd`（s0.062 的灰绿）
+  // 会得到 `#4dcb62`（s0.548 的荧光绿），中间的差额全是别人的。
+  const sat = typeof hint.sat === 'number' && Number.isFinite(hint.sat)
+    ? clamp(hint.sat, 0, 1)
+    : lead.s;
+
+  const baseS = clamp(sat * 0.55, 0, 0.42);
 
   // 面板比底色亮一档。深蓝那张实测 l15% → l34%；橄榄绿 l23% → l55%。
   // 两个都是「底色 + 0.20 左右」，所以暗图沿用旧的 +0.20 是对的。
   // 亮图（橄榄绿那种）面板要更亮一点才压得住深底色，给 0.55。
   const panelL = pageLight ? 0.55 : clamp(baseL + 0.20, 0.13, 0.36);
-  const panelS = clamp(lead.s * 0.9, 0, 0.55);
+  const panelS = clamp(sat * 0.9, 0, 0.55);
 
   // 信息条再亮一档，通常是「纸」的感觉。深蓝/橄榄绿都停在 l47~88%。
   const barL = pageLight ? 0.88 : 0.47;
-  const barS = clamp(lead.s * 0.35, 0, 0.30);
+  const barS = clamp(sat * 0.35, 0, 0.30);
 
   const base = hint.base || toHex({ h: hue, s: baseS, l: baseL });
   const panel = hint.panel || toHex({ h: hue, s: panelS, l: panelL });
