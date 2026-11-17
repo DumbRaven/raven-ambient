@@ -117,6 +117,11 @@ class DesktopStage {
     });
 
     this.win.setMenuBarVisibility(false);
+    // 和主窗口一致的两道拦截。这两个子窗口加载的也是本地文件、
+    // 也没有任何外部链接，但「现在没有入口」和「以后有人加一个」是两回事：
+    // 主窗口早就拦了，这里漏着只是当初没想到（三个窗口建在不同文件里）。
+    this.win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    this.win.webContents.on('will-navigate', (event) => event.preventDefault());
     this.win.loadFile(path.join(__dirname, '../dist/desktop.html'));
     // showInactive：亮出来但不抢焦点。用户点「放到桌面」之后焦点还在主窗口上，
     // 接着还能在主窗口里继续操作。

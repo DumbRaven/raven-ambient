@@ -99,6 +99,11 @@ class FocusMini {
     // 'screen-saver' 是最硬的一档，主窗最小化、别的程序全屏都能压住。
     this.win.setAlwaysOnTop(true, 'screen-saver');
     this.win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // 和主窗口一致的两道拦截。这两个子窗口加载的也是本地文件、
+    // 也没有任何外部链接，但「现在没有入口」和「以后有人加一个」是两回事：
+    // 主窗口早就拦了，这里漏着只是当初没想到（三个窗口建在不同文件里）。
+    this.win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    this.win.webContents.on('will-navigate', (event) => event.preventDefault());
     this.win.loadFile(path.join(__dirname, 'mini.html'));
     this.win.once('ready-to-show', () => { if (this.win && !this.win.isDestroyed()) this.win.showInactive(); });
     this.win.on('closed', () => { this.win = null; });
