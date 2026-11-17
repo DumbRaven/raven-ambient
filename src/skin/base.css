@@ -38,8 +38,6 @@
   --bold-mint: #a8e6c1;
   --bold-lilac: #c7c0f0;
   --bold-lemon: #d9eb6c;
-  --bold-coral: #f7b7a8;
-  --bold-sand: #efede6;
 
   /* 下面这批是「按用途拆开」的令牌，不是「按色值拆开」。
      同一个 #fff 在 color / background / border 里是三种东西：

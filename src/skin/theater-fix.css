@@ -362,13 +362,6 @@ body:has(.media-room.is-expanded) {
   }
 }
 
-/* 空台：库里一件都没有时播放台的样子。保持和正常播放台同样的占位高度，
-   免得列表一出现整个版面往上跳。 */
-.media-theater.is-blank .theater-screen {
-  display: grid;
-  place-items: center;
-}
-
 /* 窄屏：工具栏只剩分类胶囊一行，胶囊铺满（见上文 599px 那条）。 */
 
 /* 断链保底：原文件被挪走或删掉时，<img> 加载失败会塌成 0 高，

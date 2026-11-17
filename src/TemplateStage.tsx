@@ -321,7 +321,6 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, d
     '--tpl-panel': tone.panel,
     '--tpl-bar': tone.bar,
     '--tpl-ink': tone.ink,
-    '--tpl-ink-soft': tone.inkSoft,
     '--tpl-on-panel': tone.onPanel,
     '--tpl-on-bar': tone.onBar,
     '--tpl-gold': tone.gold,

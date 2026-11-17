@@ -538,11 +538,6 @@
      就显式重设成带 italic face 的字体族。 */
 }
 
-.template-collage .tpl-note-icon {
-  font-style: normal;
-  opacity: 0.8;
-}
-
 .template-collage .tpl-raven {
   position: absolute;
   right: 3.4%;
@@ -602,7 +597,6 @@
   --tpl-panel: #4a5363;
   --tpl-bar: #72777d;
   --tpl-ink: #f6f2ea;
-  --tpl-ink-soft: #f6f2ea9e;
   --tpl-on-panel: #ffffff;
   --tpl-on-bar: #ffffff;
   /* 压在半透明底上的浅金。主金色 #d4a040 只够压深色画面，

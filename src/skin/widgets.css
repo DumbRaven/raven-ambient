@@ -209,34 +209,6 @@
    音乐从别的播放器进到 CABLE，再从这里抓回来，和本地唱片共用同一套避让。
    ========================================================================== */
 
-.line-in-select {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.line-in-select > span {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--bold-muted);
-  flex: none;
-}
-
-/* 沿用 .sleep-select 的胶囊下拉，宽度吃满以便放得下设备名 */
-.line-in-select select {
-  flex: 1;
-  min-width: 0;
-  background: var(--bold-page);
-  border: 1px solid var(--bold-line);
-  border-radius: 999px;
-  color: var(--bold-ink);
-  padding: 9px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-}
-
 /* 电平条：一条细槽，绿色填充随外部音乐起伏 */
 .line-in-meter {
   display: flex;
@@ -398,13 +370,6 @@
   text-align: right;
   font: 600 11px "Inter", sans-serif;
   color: var(--bold-ink);
-}
-
-.line-in-hint {
-  margin: 14px 0 0;
-  font-size: 11px;
-  line-height: 1.75;
-  color: var(--bold-faint);
 }
 
 /* 环境音队列：没有「正在播这一首」，所以标题是静态文本，序号换成圈数 */

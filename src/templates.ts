@@ -102,8 +102,6 @@ export type CollageTone = {
   bar: string;
   /** 压在底色上的字。 */
   ink: string;
-  /** 次要文字。 */
-  inkSoft: string;
   /** 压在面板上的字。 */
   onPanel: string;
   /** 压在信息条上的字。 */
@@ -270,7 +268,6 @@ export function collageTone(colors: string[], hint: ToneHint = {}): CollageTone 
     panel,
     bar,
     ink: dark ? '#151515' : '#f6f2ea',
-    inkSoft: dark ? '#1515158f' : '#f6f2ea9e',
     // 字色也允许用户接管。留空就走「按底色明度自动翻深浅」这条老路——
     // 面板和信息条的明度可能被用户改到很浅，自动翻面仍然要能跟上。
     //

@@ -101,9 +101,3 @@ export function parseNowPlaying(raw: unknown): NowPlaying {
 
 /** 能让外部播放器执行的动作。都不是回执型：发出去就不管成功没成功。 */
 export type MediaAction = 'toggle' | 'next' | 'previous';
-
-export const mediaActions: Record<MediaAction, string> = {
-  toggle: '播放 / 暂停',
-  next: '下一首',
-  previous: '上一首',
-};

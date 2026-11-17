@@ -221,51 +221,6 @@
   background: #0d0d0d;
 }
 
-/* 还没拿到第一帧时的等待态。抓帧器启动要几十毫秒，
-   这段时间什么都不画会闪一下黑块。 */
-.theater-wait {
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 10px;
-  height: 100%;
-  color: var(--bold-muted);
-}
-
-.theater-wait p {
-  margin: 0;
-  font-size: 12px;
-  letter-spacing: 0.02em;
-}
-
-/* 直播指示灯：呼吸，表示画面在动。 */
-.theater-live-dot {
-  width: 7px;
-  height: 7px;
-  flex: none;
-  border-radius: 50%;
-  background: #a8e6c1;
-  box-shadow: 0 0 0 0 #a8e6c166;
-  animation: live-pulse 2s ease-in-out infinite;
-}
-
-@keyframes live-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 #a8e6c166; }
-  50% { box-shadow: 0 0 0 5px #a8e6c100; }
-}
-
-@media (max-width: 599px) {
-  .theater-live-dot {
-    display: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .theater-live-dot {
-    animation: none;
-  }
-}
-
 /* ---------- 放映：全屏 ---------- */
 
 /* 全屏时播放台铺满整个视口，工具栏、格子、来源全部让开。
@@ -313,8 +268,7 @@
 }
 
 .media-room.is-expanded .theater-screen video,
-.media-room.is-expanded .theater-screen img,
-.media-room.is-expanded .theater-live {
+.media-room.is-expanded .theater-screen img {
   width: 100%;
   height: 100%;
   max-height: none;

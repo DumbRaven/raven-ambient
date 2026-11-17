@@ -43,7 +43,8 @@
       "dist/**/*",
       "electron/**/*",
       "build/raven-logo.png",
-      "package.json"
+      "package.json",
+      "!electron/nowplaying/NowPlaying.cs"
     ],
     "extraResources": [
       {
