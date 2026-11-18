@@ -36,6 +36,12 @@ env -u ELECTRON_RUN_AS_NODE node_modules/electron/dist/electron.exe tools/probe/
 | `palette-live.cjs` | 用**真实** userData 与真实视频跑一遍取色，输出「取到哪一帧、几个色、三层色」。**不能用 harness**：它把 userData 换成 mkdtemp，那里没有用户的库 |
 | `tone-live.cjs` | 读实机 localStorage 里现在存的放映设置与配色设置（`raven-stage-tone` / `raven-stage-template` / `raven-cabinet-v2`） |
 | `tone-panel-live.cjs` | 实机打开「配色 → 挑一个」面板，把 4 个色块与 `palette` 数组一起抓下来——面板显示的才是用户看到的 |
+| `contrast-px.cjs` + `contrast-px.py` | **像素级对比度**。`.cjs` 收集所有自持文本的元素 + 截图，`.py` 用「矩形内出现最多的颜色」当底色算 WCAG。原有的 `contrast.cjs` 会误报：它只沿祖先链找背景，而本项目的激活态黑胶囊是**兄弟元素**画的 |
+| `mini-look.cjs` | 番茄钟小窗（`electron/mini.html`）八种状态下全部渲染 + 几何。**这个文件不在 `src/skin/` 体系里、也不被三道门禁覆盖**，改它只能靠这个探针 |
+| `mini-pressing-ab.cjs` | 小窗彩胶工艺与 `src/styles.css` 的 A/B。九方盘内逐像素比对（盘仅 38×38 = 1444 像素） |
+| `mini-halo-variants.cjs` | halo 的五种变体对比。结论：**不能照抄主界面的外发光**，那圈 11px/24px 是按主界面 72px 标签调的 |
+| `mini-contrast.cjs` | 小窗三阶段的文本元素 + 截图，配同一套「像素众数」算对比度 |
+| `theater-radius.cjs` | 放映台窗口态的实际圆角。**必须 `expand: false`**，否则会点成全屏、恒量到 0px |
 
 > 上表只列高频与门禁相关项。`probe/` 下共 140+ 个脚本，其余按文件名搜（命名都带领域：`ticket-*` / `tag-*` / `stone-*` / `desktop-*` / `template-*`）。
 
