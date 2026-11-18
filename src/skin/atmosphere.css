@@ -175,17 +175,6 @@
   box-shadow: inset 0 0 0 1px #ffffff24;
 }
 
-.overlay-disc .ov-disc-hole {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 3.2%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #0b0c0e;
-  translate: -50% -50%;
-}
-
 .overlay-now .ov-now {
   display: block;
   max-width: 62vw;

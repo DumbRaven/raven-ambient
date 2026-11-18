@@ -374,7 +374,6 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
                     className="ov-disc-label"
                     style={disc?.cover ? { backgroundImage: `url("${disc.cover}")` } : undefined}
                   />
-                  <i className="ov-disc-hole" />
                 </span>
               )}
               {scalabe && editable && (
@@ -433,7 +432,6 @@ export default function LayerStack({ value, onChange, remaining, now, disc, titl
                   className="dw-disc-label"
                   style={disc?.cover ? { backgroundImage: `url("${disc.cover}")` } : undefined}
                 />
-                <i className="dw-disc-hole" />
               </span>
             )}
             {item.id === 'now' && <span className="dw-now">{text('now') || '还没在放'}</span>}

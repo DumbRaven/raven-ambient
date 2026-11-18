@@ -497,7 +497,6 @@ export default function TemplateStage({ item, template, videoRef, onPlayState, d
                 className="tpl-disc-label"
                 style={discCover ? { backgroundImage: `url("${discCover}")` } : undefined}
               />
-              <i className="tpl-disc-hole" />
             </span>
 
             {/* 压在唱片右下角的署名胶囊。 */}
