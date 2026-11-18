@@ -29,7 +29,9 @@ jobs:
       # 本地有二进制所以永远复现不出来，只有 CI 会红（2026-11-18 push 0.4.0 时踩到）。
       # 给一个不存在的目录：index.js 走 ELECTRON_OVERRIDE_DIST_PATH 分支返回一个路径字符串，
       # 解构出来的 protocol/ipcMain 全是 undefined，desktop-stage.cjs 的 `if (ipcMain)` 自己会跳过。
-      ELECTRON_OVERRIDE_DIST_PATH: ${{ runner.temp }}/electron-no-binary
+      # 这里只能写 github 上下文（job 级 env 里 runner.temp 不可用，
+      # 用了会让整个 workflow 在启动前就失败，jobs 为空、0 秒结束）。
+      ELECTRON_OVERRIDE_DIST_PATH: ${{ github.workspace }}/.electron-not-installed
     steps:
       - uses: actions/checkout@v4
 
