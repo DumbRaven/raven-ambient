@@ -102,6 +102,12 @@
 .ticket-grid > li {
   container-type: inline-size;
 
+  /* 「移出」那个小圆点是绝对定位的、挂在 li 上（见下面 .ticket-remove），
+     所以 li 必须是它的包含块。**不能省**：`container-type: inline-size`
+     并不隐含 `contain: layout`（实测 computed `contain` 为 `none`），
+     少了这条，按钮会按最近的非 static 祖先定位，跑到视口左上角外面去。 */
+  position: relative;
+
   /* 票的厚度影写在这里，不写在 .ticket 上。理由是一次实测（tools/probe/
      ticket-pick.cjs）：`.ticket` 上有 box-shadow、而它的后代 `.ticket-panel`
      上有扇贝 mask 时，Chromium 会把面板这棵子树并进遮罩路径重算，列表里那张
@@ -149,6 +155,114 @@
     drop-shadow(0 0 1.8px #2a2318c2)
     drop-shadow(0 3px 12px #4a3f2b80)
     drop-shadow(0 8px 26px #6b5f453d);
+}
+
+/* 票根上的「移出」。
+ *
+ * 挂成 `.ticket` 的兄弟而不是子元素：`.ticket` 整块就是一个按钮（点开这张票），
+ * 按钮里再套按钮既是无效 HTML，点击也会先被外层吃掉。
+ *
+ * **必须给 li 补 position: relative**（写在 `.ticket-grid > li > .ticket-remove`
+ * 上面那条里）。早先这里写的是「container-type: inline-size 隐含 contain: layout，
+ * li 已经是包含块」——**实测是错的**：`getComputedStyle(li).contain` 是 `none`。
+ * 少了这一条，按钮会按最近的非 static 祖先定位，一路跑到视口左上角外面
+ * （实测 rect `[635, -388, 22, 22]`，`elementFromPoint` 命中 null），
+ * 而 opacity / pointer-events 全部正常——数字看着对，图上什么都没有。 */
+.ticket-grid > li > .ticket-remove {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 999px;
+  background: #efe8d8;
+  /* 光有纸色不够：票纸本身也是这个色（实测截图里票面 `#eee7d6`），
+     没边框就是「纸被咬掉一块」。一圈深一档的细线把它拉回「一个物件」。 */
+  border: 1px solid #a89a80;
+  color: #4a422f;
+  cursor: pointer;
+  /* 纸页上的小圆点：影子只轻轻压一圈，不能像票那样浮起来，
+     否则它会抢走「这张票被抬起」的那层关系。 */
+  filter: drop-shadow(0 1px 3px #3a302133);
+  /* 默认不显示，鼠标停在票上、或键盘 Tab 过来才出现。
+     相集这一页是刻意做成一张相册纸的，每张票角上常驻一个删除键会把纸读乱。
+     用 opacity 而不是 display/visibility：它必须能被 Tab 到，键盘用户才有入口。 */
+  opacity: 0;
+  /* 不可点是为了不挡鼠标：不可见却可点，等于在纸角埋一个隐形陷阱。
+     键盘聚焦不受 pointer-events 影响，所以下面那条 :focus-visible 仍然够得着。 */
+  pointer-events: none;
+  transition: opacity 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.ticket-grid > li:hover > .ticket-remove,
+.ticket-grid > li:focus-within > .ticket-remove,
+.ticket-grid > li > .ticket-remove:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 上膛（等第二次点击）时**常驻显示**：这时候它已经不是一个可选的角落，
+   而是「再点一下东西就没了」的确认键，藏起来等于骗人。
+   颜色取 `--bold-danger`，与唱片柜笔记的 `notes-remove.armed`
+   （`src/skin/shelf.css:266`）同一套：红色只在这一步出现，平时不吓人。 */
+.ticket-grid > li > .ticket-remove.armed {
+  opacity: 1;
+  pointer-events: auto;
+  background: var(--bold-danger, #c04a34);
+  border-color: var(--bold-danger, #c04a34);
+  color: #fff;
+}
+
+.ticket-remove:hover {
+  background: #e2d7c0;
+  border-color: #8a7c60;
+  color: #2a2318;
+}
+
+/* 上膛后悬停走更深的红（`--bold-danger-deep`），不是换回黑 —— 与
+   `notes-remove.armed:hover` 一致：越靠近「要删了」，红只会更重。 */
+.ticket-remove.armed:hover {
+  background: var(--bold-danger-deep, #a13a26);
+  border-color: var(--bold-danger-deep, #a13a26);
+  color: #fff;
+}
+
+/* 浮层里的那个：位置在整块遮罩的右上角，而不是贴着票根。
+   票根在浮层里是要按住往下撕的，角上贴一个小按钮会被拖拽手势吃进去。 */
+.ticket-stage > .ticket-remove {
+  position: absolute;
+  top: 22px;
+  right: 26px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  /* 这块压在深色遮罩上，纸色底才看得清；透明度只到 0.12 会糊成灰。 */
+  background: #efe8d833;
+  color: #efeada;
+  font: 500 12px/1 "Inter", "Microsoft YaHei UI", sans-serif;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.ticket-stage > .ticket-remove:hover { background: #efe8d855; }
+
+.ticket-stage > .ticket-remove.armed {
+  background: var(--bold-danger, #c04a34);
+  color: #fff;
+}
+
+.ticket-stage > .ticket-remove.armed:hover {
+  background: var(--bold-danger-deep, #a13a26);
 }
 
 /* 票根列表本身是**一页相册纸**：参考图上票不是直接浮在网页背景上，

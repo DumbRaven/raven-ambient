@@ -136,6 +136,25 @@ class MediaGrants {
   }
 
   /**
+   * 撤销单个文件（用户在票根上点了「移出」）。
+   *
+   * 必须单独开一个，不能靠 `removeDir`：单独导入的文件从来没进过 `dirs`，
+   * 那个 Set 里删它是一次空操作，台账里留着的话 `media://` 仍然读得到它，
+   * 于是「移出」只从界面消失、文件本身还在可读范围里——和目录那边
+   * `forget` 不撤授权是同一个错误（见 media.cjs 里 `forget` 的注释）。
+   */
+  removeFile(file) {
+    if (typeof file !== 'string' || !file) return false;
+    // `insideAllowed` 同时比对 `path.resolve(target)` 与 `realpathOf(target)`，
+    // 所以两份都要撤。只删 resolved 的话，一条符号链接登记过以后仍然读得到。
+    const removed = this.files.delete(path.resolve(file));
+    const real = realpathOf(file);
+    const removedReal = real ? this.files.delete(real) : false;
+    if (removed || removedReal) this.dirty = true;
+    return removed || removedReal;
+  }
+
+  /**
    * 迁移用：把页面递来的路径补登记进来。
    *
    * 这个口子是**故意留的、也只能开一次**：台账文件还不存在，说明用户是从

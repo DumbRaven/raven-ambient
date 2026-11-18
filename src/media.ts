@@ -156,6 +156,21 @@ export function forgetMediaDir(dir: string) {
   push({ type: 'forget', dir });
 }
 
+/**
+ * 把**单个文件**移出媒体库，并撤销主进程的读取授权。
+ *
+ * 与 `forgetMediaDir` 分开是必须的：单独导入的文件（「选几张文件」那条路，
+ * 见 App.tsx 里 `'files'` 分支）从来不会进 `mediaDirs`，因为主进程扫码是按目录扫的。
+ * 所以它既匹配不上任何 `isInside`，也没有 `source`，两个按目录工作的「移出」
+ * 都碰不到它——这就是「图片完全没法删除」的来源。
+ *
+ * 注意这**不删磁盘上的文件**：移出的是这份收藏。文件夹里的条目下次重新扫描
+ * 还会回来（那是用户主动点的），单独导入的不会——没有目录可扫，它一移出就真的走了。
+ */
+export function forgetMediaFile(file: string) {
+  push({ type: 'forget', file });
+}
+
 /** 让窗口进/出真全屏。页面铺满只能盖住内容区，任务栏和窗口边框要主进程来收。 */
 export function setWindowFullscreen(on: boolean) {
   push({ type: 'fullscreen', on });

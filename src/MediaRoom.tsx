@@ -51,6 +51,14 @@ type Props = {
   onPickFiles: () => void;
   onRescan: (dir: string) => void;
   onForgetDir: (dir: string) => void;
+  /**
+   * 移出**单个**条目（票根上的删除按钮）。
+   *
+   * 与 `onForgetDir` 是两件事：那个撤的是整个目录的授权，这个只动一条收藏。
+   * 文件夹里的条目删掉后，用户下次主动「重新扫描」还会看到它——这是用户
+   * 2026-11-19 明确选的口径（「删的只是这一份收藏」），不是漏做的持久删除。
+   */
+  onForgetItem: (id: string) => void;
   onScanWallpapers: () => void;
   /** 把壁纸库读进来的那批清掉。自己加的文件夹和单独导入的文件不受影响。 */
   onForgetWallpapers: () => void;
@@ -125,7 +133,7 @@ function AddMenu({ open, onClose, onPick, onPickFiles }: { open: boolean; onClos
   );
 }
 
-export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, onRescan, onForgetDir, onScanWallpapers, onForgetWallpapers, exitFullscreen, disc, ambience, now, onPrevTrack, onNextTrack }: Props) {
+export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, onRescan, onForgetDir, onForgetItem, onScanWallpapers, onForgetWallpapers, exitFullscreen, disc, ambience, now, onPrevTrack, onNextTrack }: Props) {
   // 只有图片和视频两档，不再有「全部」。
   // 混在一起看意义不大：两种东西的缩略图行为不同（一张解码、一段读首帧），
   // 而且用户来这儿通常心里已经知道要看哪一种。
@@ -726,6 +734,7 @@ export default function MediaRoom({ items, dirs, active, onPick, onPickFiles, on
               page={page}
               onPage={setPage}
               onPick={id => { setCurrentId(id); setPlaying(true); }}
+              onForget={onForgetItem}
             />
           ) : (
             <div className="no-results">

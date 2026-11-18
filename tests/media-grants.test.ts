@@ -25,6 +25,7 @@ const { MediaGrants, looksLikeFolder, isWithin } =
       load: () => unknown; save: () => boolean;
       addDir: (dir: string) => boolean; addFile: (file: string) => boolean;
       removeDir: (dir: string) => boolean;
+      removeFile: (file: string) => boolean;
       migrate: (dirs: unknown, files: unknown) => number;
     };
     looksLikeFolder: (dir: string) => boolean;
@@ -159,6 +160,58 @@ test('移出目录会真的撤销授权', () => {
 
     const back = new MediaGrants(file).load() as any;
     assert.equal(back.dirs.size, 0, '撤销要落盘');
+  } finally {
+    cleanup();
+  }
+});
+
+test('移出单个文件也会真的撤销授权', () => {
+  // 单独导入的文件从来进不了 `dirs`（主进程扫码是按目录扫的），所以 `removeDir`
+  // 对它是空操作。没有这条的话，用户在票根上点「移出」，界面上的条目没了、
+  // 台账里那条 file 还在，`media://` 照样读得到——和目录那边同一个错误。
+  const { root, cleanup } = tempTree();
+  try {
+    const file = path.join(root, 'media-grants.json');
+    const real = path.join(root, 'a.png');
+    fs.writeFileSync(real, 'x');
+
+    const g = new MediaGrants(file).load() as any;
+    g.addFile(real);
+    g.save();
+    assert.equal(g.files.size, 1);
+
+    assert.equal(g.removeFile(real), true);
+    assert.equal(g.files.size, 0);
+    assert.equal(g.removeFile(real), false, '已经没了');
+    // 拿它当目录删是空操作，这正是为什么必须单独开一个 removeFile
+    assert.equal(g.removeDir(path.dirname(real)), false, '它不是目录，从未登记为目录');
+    g.save();
+
+    const back = new MediaGrants(file).load() as any;
+    assert.equal(back.files.size, 0, '撤销要落盘');
+  } finally {
+    cleanup();
+  }
+});
+
+test('移出文件时把链接指向的真实路径一起撤掉', () => {
+  // `insideAllowed` 同时比对 `path.resolve(target)` 与 `realpathOf(target)`。
+  // 只删 resolved 那一份的话，一条登记过的符号链接仍然读得到它的真实目标。
+  const { root, cleanup } = tempTree();
+  try {
+    const file = path.join(root, 'media-grants.json');
+    const real = path.join(root, 'real.png');
+    const link = path.join(root, 'link.png');
+    fs.writeFileSync(real, 'x');
+    try { fs.symlinkSync(real, link); } catch { return; } // 没有创建链接的权限就跳过
+
+    const g = new MediaGrants(file).load() as any;
+    g.addFile(link);
+    // 手工把 realpath 也塞进去，模拟「曾经按真实路径登记过」
+    g.files.add(fs.realpathSync.native(real));
+
+    g.removeFile(link);
+    assert.equal(g.files.has(fs.realpathSync.native(real)), false, '真实路径那一份也要撤');
   } finally {
     cleanup();
   }

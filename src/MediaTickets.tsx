@@ -11,7 +11,7 @@
 // 「撕」必须是人拖出来的，不能自动播：这一下既是确认，也是让他看清自己点的是哪张。
 // 判据（拖多少算撕开、灰烬怎么散、飞行落点）在 ticket-tear.ts，纯函数，有测试。
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
 import { mediaSrc } from './media';
 import { folderOf, titleOf } from './media-text';
 import {
@@ -207,7 +207,7 @@ function TicketShot({ item, playing }: { item: MediaItem; playing: boolean }) {
 }
 
 function Ticket({
-  item, index, playing, picked, onOpen,
+  item, index, playing, picked, onOpen, onForget, confirming,
 }: {
   item: MediaItem;
   /** 它在整张列表里的位次——票号印的是这个，不是这一页里的第几张。 */
@@ -215,9 +215,22 @@ function Ticket({
   playing: boolean;
   picked: boolean;
   onOpen: (trigger: HTMLElement) => void;
+  /** 移出这一条。要两次点击才真的删（`confirming` 为 true 时是第二次）。 */
+  onForget: () => void;
+  confirming: boolean;
 }) {
   return (
     <li data-id={item.id}>
+      {/* 删除按钮是票根的**兄弟**，不能塞进去：外面那个按钮整块就是「点开这张」，
+          嵌套 button 既是无效 HTML，也会让点击先被外层吃掉。
+          定位交给 CSS（绝对定位到票根右上角，悬停或键盘聚焦时出现）。 */}
+      <button
+        className={`ticket-remove ${confirming ? 'armed' : ''}`}
+        aria-label={confirming ? `确认移出 ${titleOf(item)}` : `移出 ${titleOf(item)}`}
+        onClick={onForget}
+      >
+        {confirming ? <Check size={12} /> : <Trash2 size={12} />}
+      </button>
       <button
         className={`ticket ${picked ? 'is-current' : ''}`}
         data-kind={item.kind}
@@ -242,7 +255,7 @@ type Phase = 'idle' | 'cutting' | 'flying';
  * 用布尔表达这三种互斥关系会写出八个组合，其中有几个不可能出现。
  */
 function TicketStage({
-  item, index, template, onClose, onDone,
+  item, index, template, onClose, onDone, onForget, confirming,
 }: {
   item: MediaItem;
   index: number;
@@ -250,6 +263,9 @@ function TicketStage({
   template: string;
   onClose: () => void;
   onDone: (id: string) => void;
+  /** 移出这一条。浮层里也放一个：这张票已经放大了，比列表里好点得多。 */
+  onForget: () => void;
+  confirming: boolean;
 }) {
   const [phase, setPhase] = useState<Phase>('idle');
   /* 手往下拖了多少像素。整条票根跟着这个数往下平移，就这么多。
@@ -422,6 +438,16 @@ function TicketStage({
       onClick={event => { if (event.target === stageRef.current) onClose(); }}
       onDragStart={event => event.preventDefault()}
     >
+      {/* 浮层里的「移出」挂在整块遮罩上，不贴票根：票根在这里是要按住往下撕的，
+          贴一个小按钮上去会被拖拽手势吃进来。放大了的这张最好点，所以这里给文字。 */}
+      <button
+        className={`ticket-remove ${confirming ? 'armed' : ''}`}
+        aria-label={confirming ? `确认移出 ${titleOf(item)}` : `移出 ${titleOf(item)}`}
+        onClick={onForget}
+      >
+        {confirming ? <Check size={13} /> : <Trash2 size={13} />}
+        {confirming ? '再点一次移出' : '移出'}
+      </button>
       <div
         className="ticket-lift"
         ref={liftRef}
@@ -488,10 +514,20 @@ type Props = {
   page: number;
   onPage: (index: number) => void;
   onPick: (id: string) => void;
+  /** 移出这一条（只动收藏，不删磁盘文件）。 */
+  onForget: (id: string) => void;
 };
 
-export default function MediaTickets({ items, active, seen, currentId, listRef, template, page, onPage, onPick }: Props) {
+export default function MediaTickets({ items, active, seen, currentId, listRef, template, page, onPage, onPick, onForget }: Props) {
   const [openId, setOpenId] = useState('');
+  /**
+   * 哪一张正在「等你确认移出」。
+   *
+   * 删除是两步的（第一次点亮成勾，第二次才真删），理由和唱片柜那边一致
+   * （`src/RecordNotes.tsx:52`）：一张票根上点一下就永久消失，误触概率太高。
+   * 只存一个 id 而不是 Set：同一时刻只会有一张在等确认，点另一张就把这张收起。
+   */
+  const [forgetId, setForgetId] = useState('');
   // 关掉浮层之后把焦点还给「打开它的那张票」。不还的话焦点落到 <body>，
   // 键盘用户得从头 Tab 一遍才能继续挑下一张。
   const opener = useRef<HTMLElement | null>(null);
@@ -535,6 +571,23 @@ export default function MediaTickets({ items, active, seen, currentId, listRef, 
   const slips = slipPage(items, pageInfo.index);
   const opened = openId ? items.find(item => item.id === openId) : undefined;
   const openedIndex = opened ? items.findIndex(item => item.id === opened.id) : 0;
+
+  /**
+   * 点了移出按钮。第一次只是「上膛」，第二次才真的删。
+   *
+   * 上膛状态放在这里而不是每一张票里：一张票只会同时出现在列表或浮层之一，
+   * 但两处都要读同一个状态，放进来才不用往两层各传一遍。
+   * 删完之后把上膛清掉——不清的话，删掉的那条 id 会留着，如果下次碰巧
+   * 又有一条同 id 的（重新扫描把同一个文件扫回来），它一出现就是待确认态。
+   */
+  const forget = useCallback((id: string) => {
+    if (forgetId !== id) { setForgetId(id); return; }
+    setForgetId('');
+    // 正在浮层里看着这一张：删完它就不存在了，浮层必须一起关掉，
+    // 否则 `opened` 变成 undefined，下面渲染会拿到空值。
+    if (openId === id) { opener.current = null; close(); }
+    onForget(id);
+  }, [forgetId, openId, close, onForget]);
 
   // 筛选切到「视频」之后条目数会变，停在越界的页码上会看到一页空白。
   useEffect(() => {
@@ -595,6 +648,8 @@ export default function MediaTickets({ items, active, seen, currentId, listRef, 
               opener.current = trigger;
               setOpenId(item.id);
             }}
+            onForget={() => forget(item.id)}
+            confirming={forgetId === item.id}
           />
         ))}
       </ul>
@@ -639,6 +694,8 @@ export default function MediaTickets({ items, active, seen, currentId, listRef, 
           template={template}
           onClose={close}
           onDone={id => { setOpenId(''); opener.current = null; onPick(id); }}
+          onForget={() => forget(opened.id)}
+          confirming={forgetId === opened.id}
         />
       )}
     </>

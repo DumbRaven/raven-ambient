@@ -433,6 +433,11 @@ class MediaBridge {
       // 台账里留着的话，那个目录仍然可以被 `media://` 读到，等于「移出」没生效。
       const dir = typeof action.dir === 'string' ? path.resolve(action.dir) : '';
       if (dir) { grantsOf().removeDir(dir); grantsOf().save(); }
+      // 单文件是另一条路：它不在任何目录里，`removeDir` 对它是一次空操作。
+      // 两种都收在同一条消息里（而不是新开一个 type），因为页面那边「移出」
+      // 本来就是一个动作，主进程没必要知道它移的是目录还是文件。
+      const file = typeof action.file === 'string' ? path.resolve(action.file) : '';
+      if (file) { grantsOf().removeFile(file); grantsOf().save(); }
       this.push(webContents, { type: 'ready', dirs: allowedDirs() });
       return;
     }

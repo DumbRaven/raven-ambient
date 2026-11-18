@@ -21,7 +21,7 @@ import RollNumber from './roll-number';
 import { LineIn, lineInError } from './line-in';
 import { appLabel, emptyNowPlaying, hasTrack, parseNowPlaying, type NowPlaying } from './now-playing';
 import { askNowPlaying, commandNowPlaying, listenNowPlaying } from './now-playing-bridge';
-import { askMedia, dropWallpapers, forgetMediaDir as forgetMediaDirGrant, isInside, listenMedia, looseMedia, mergeMedia, pickMediaFiles, pickMediaFolder, replaceMediaDir, replaceWallpapers, rescanMediaFolder, restoreMediaDirs, scanWallpapers, toMediaItem, toWallpaperItem, type MediaMessage } from './media';
+import { askMedia, dropWallpapers, forgetMediaDir as forgetMediaDirGrant, forgetMediaFile as forgetMediaFileGrant, isInside, listenMedia, looseMedia, mergeMedia, pickMediaFiles, pickMediaFolder, replaceMediaDir, replaceWallpapers, rescanMediaFolder, restoreMediaDirs, scanWallpapers, toMediaItem, toWallpaperItem, type MediaMessage } from './media';
 import MediaRoom from './MediaRoom';
 import ListeningRoom from './ListeningRoom';
 import type { StageNow } from './TemplateStage';
@@ -748,6 +748,32 @@ export default function App() {
     if (keep.length === cabinetRef.current.media.length) return;
     change({ media: keep });
   }
+  /**
+   * 移出**单个**条目（票根上的删除按钮）。
+   *
+   * 两种来源行为不同，这是有意的、也是用户选过的（2026-11-19）：
+   *
+   * - 文件夹里的条目：只从这份收藏里移出，**磁盘上不删**。下次他主动点
+   *   「重新扫描」还会回来——扫描的语义就是「这个目录现在长这样」，让删除
+   *   永久生效就得在收藏里额外记一份黑名单，代价是存储结构要改。用户明确
+   *   选了「删的只是这一份收藏」，所以这里不记黑名单。
+   * - 单独导入的文件：它不属于任何目录，没有东西能把它扫回来，所以移出就是
+   *   真的走了。对应的读取授权必须一起撤，否则 `media://` 还读得到。
+   *
+   * 不撤目录授权：条目所在的目录是整批加进来的，删一张图不该连累别的。
+   */
+  function forgetMediaItem(id: string) {
+    const item = cabinetRef.current.media.find(entry => entry.id === id);
+    if (!item) return;
+    const next = cabinetRef.current.media.filter(entry => entry.id !== id);
+    change({ media: next });
+    // 只对「不在任何目录里」的条目撤文件授权。文件夹里的条目靠目录授权读，
+    // 在这里多撤一次不影响使用，但会白白写一次台账文件。
+    if (!cabinetRef.current.mediaDirs.some(dir => isInside(item.path, dir))) forgetMediaFileGrant(item.path);
+    // 当前正在放映的恰好是被删的那张：台面上会留着一个指向空条目的画面。
+    // 这里不清 currentId——MediaRoom 内部自己按 `usable` 重新找 current，
+    // 找不到就落到第一件，删完立刻切过去是它的既有行为。
+  }
     /** 打开编辑面板。默认编辑「当前展开的那张」，也可以从别处直接指定。 */
   function openEdit(record = focused) { if (!record) return; setFocusId(record.id); setDraft({ name: record.name, artist: record.artist, description: record.description }); setDraftError(''); setModal('edit'); }
   /**
@@ -1024,6 +1050,7 @@ export default function App() {
           onPick={pickMediaFolder}
           onRescan={rescanMediaFolder}
           onForgetDir={forgetMediaDir}
+          onForgetItem={forgetMediaItem}
           onScanWallpapers={scanWallpapers}
           onPickFiles={pickMediaFiles}
           onForgetWallpapers={forgetWallpapers}
