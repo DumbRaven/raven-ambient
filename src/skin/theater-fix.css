@@ -26,8 +26,10 @@ body:has(.media-room.is-expanded) {
 .theater-screen {
   position: relative;
   /* 软件里别的卡片都是圆角，放映台在窗口里也是「一块卡片」。
-     全屏时它不是卡片而是整块屏，下面单独把那两个角收回去。 */
-  border-radius: 16px;
+     全屏时它不是卡片而是整块屏，下面单独把那两个角收回去。
+     26px 是与 `.cabinet`（唱片柜那张大卡）对齐的值：同一个 App 里两块最大的
+     面用同一个弧度，视觉上才是一套系统。原来是 16px，比同页其它卡片都小一档。 */
+  border-radius: 26px;
   overflow: hidden;
 }
 

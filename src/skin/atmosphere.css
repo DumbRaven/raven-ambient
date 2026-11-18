@@ -65,6 +65,21 @@
   filter: drop-shadow(0 0 1.5px #101010cc);
 }
 
+/* 关掉浏览器补的那圈 outline。
+ *
+ * `styles.css` 的焦点环只挂在 button / a / input / select / textarea / summary 上，
+ * 而这几块是 `<div tabindex>`，不在那个名单里——浏览器于是按默认行为给了一圈
+ * `outline: auto`（Chromium 下是橙黄色）。实测截图里能同时看到两层：
+ * 里圈橙黄实线、外圈白色虚线，同一个交互读起来像两个东西。
+ *
+ * `.dw`（透明版式那套，见 stage.css）自己写了 outline 所以没这问题；
+ * 这里不跟着写实线，是因为作者原本的意图是「复用悬停那圈虚线」——
+ * 虚线画在 ::after 上，不占布局，浅底深底都靠 drop-shadow 兜住。
+ * 所以只关掉默认值，让虚线成为唯一的焦点指示。 */
+.overlay:focus-visible {
+  outline: none;
+}
+
 .overlay.is-dragging::after {
   border-color: #ffffffa6;
 }
@@ -342,7 +357,7 @@
   max-height: none;
   min-height: 0;
   aspect-ratio: auto;
-  /* 窗口态给了 16px 圆角（见 .theater-screen 本体），全屏这条特异性最高，
+  /* 窗口态给了 26px 圆角（见 .theater-screen 本体），全屏这条特异性最高，
      所以直角也只能在这里收回——只在 0,3,0 那条写是不够的。 */
   border-radius: 0;
 }
