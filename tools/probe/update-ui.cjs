@@ -30,14 +30,17 @@ const READ = `(() => {
   const groups = [...document.querySelectorAll('.settings-group')];
   const group = groups.find(g => (g.querySelector('h3')?.textContent || '').trim() === '版本');
   if (!group) return { found: false };
-  const p = group.querySelector('p');
+  const p = group.querySelector('p:not(.update-note)');
   const button = group.querySelector('button');
   const help = document.querySelector('.import-help');
   return {
     found: true,
     text: (p?.textContent || '').trim(),
+    note: ((group.querySelector('.update-note')?.textContent) || '').trim(),
+    noteHeight: Math.round(group.querySelector('.update-note')?.getBoundingClientRect().height || 0),
     button: (button?.textContent || '').trim(),
     buttonDisabled: !!button?.disabled,
+    buttonHeight: Math.round(button?.getBoundingClientRect().height || 0),
     spinning: !!group.querySelector('.loading-spin'),
     help: (help?.textContent || '').trim().replace(/\\s+/g, ' '),
     box: (() => { const r = group.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) }; })(),
@@ -100,6 +103,32 @@ const INJECT_VERSION = `(() => {
   };
 })();`;
 
+/**
+ * 慢速桥：延迟若干毫秒才回一个指定结局。
+ *
+ * 为什么需要它：「正在检查…」这个中间态只在等待期间存在，回得太快就量不到，
+ * 而按钮会不会在中间变字/变灰正是这次要验的东西。
+ */
+const slowBridge = (result, delay) => `(() => {
+  const handlers = new Map();
+  window.raven = {
+    send(channel) {
+      if (channel === 'update:check') {
+        setTimeout(() => {
+          const h = handlers.get('update:result');
+          if (h) h({ current: '0.4.2', result: ${JSON.stringify(result)} });
+        }, ${delay});
+        return true;
+      }
+      return false;
+    },
+    on(channel, handler) {
+      handlers.set(channel, handler);
+      return () => { if (handlers.get(channel) === handler) handlers.delete(channel); };
+    },
+  };
+})();`;
+
 /** 把弹窗滚到底：「版本」那一组在滚动区之外，不滚就截不到。 */
 const SCROLL_END = `(() => {
   const dialog = document.querySelector('dialog[open]');
@@ -115,6 +144,17 @@ const CLOSE = `(() => {
   if (!x) return false;
   x.click();
   return true;
+})();`;
+
+/** 点设置面板里「版本」那一组的按钮。 */
+const CLICK_CHECK = `(() => {
+  const groups = [...document.querySelectorAll('.settings-group')];
+  const group = groups.find(g => (g.querySelector('h3')?.textContent || '').trim() === '版本');
+  const button = group?.querySelector('button');
+  if (!button) return null;
+  const before = { text: button.textContent.trim(), disabled: button.disabled, height: Math.round(button.getBoundingClientRect().height) };
+  button.click();
+  return before;
 })();`;
 
 /**
@@ -204,6 +244,50 @@ app.whenReady().then(async () => {
   const opened = await run('!!window.__opened');
   log('点去下载 → 发出 update:open :', opened);
   if (!opened) fail.push('点「去下载」没有发出 update:open');
+
+  // ---- 情形四：手动点击「检查更新」，结局是「已是最新」 ----
+  //
+  // 验的是 2026-11-18 用户报的那个问题：点一下只抖了抖，什么都没说。
+  // 三条断言：等待期间按钮不变字不变灰；等完出现「已经是最新版本」；按钮高度全程不变。
+  await run(CLOSE);
+  await wait(500);
+  await run(slowBridge({ status: 'current' }, 700));
+  await run(OPEN);
+  await wait(1200);
+  await run(SCROLL_END);
+  await wait(200);
+  const beforeCurrent = await run(READ);
+  await run(CLICK_CHECK);
+  await wait(250); // 还在等待期
+  const duringCurrent = await run(READ);
+  await shot(win, '4-current-waiting');
+  await wait(900); // 等回包
+  const afterCurrent = await run(READ);
+  log('情形四 手动/已是最新:', JSON.stringify({ during: duringCurrent.note, note: afterCurrent.note, button: afterCurrent.button, h: afterCurrent.buttonHeight }));
+  await shot(win, '5-current-done');
+  if (duringCurrent.button !== '检查更新') fail.push(`等待期间按钮不该换字，实际「${duringCurrent.button}」`);
+  if (duringCurrent.buttonDisabled) fail.push('等待期间按钮不该禁用（全局 disabled 会让它变淡）');
+  if (!duringCurrent.note) fail.push('等待期间 `.update-note` 该有「正在检查…」');
+  if (afterCurrent.note !== '已经是最新版本。') fail.push(`点完该说「已经是最新版本。」，实际「${afterCurrent.note}」`);
+  if (afterCurrent.button !== beforeCurrent.button) fail.push('点完按钮文字变了');
+  if (afterCurrent.buttonHeight !== beforeCurrent.buttonHeight) fail.push(`按钮高度变了：${beforeCurrent.buttonHeight} → ${afterCurrent.buttonHeight}`);
+  if (!afterCurrent.noteHeight) fail.push('结论行高度为 0，说明它没占位（会出现上下位移）');
+
+  // ---- 情形五：手动点击，结局是「没能查到」 ----
+  await run(CLOSE);
+  await wait(500);
+  await run(slowBridge({ status: 'unknown', reason: 'timeout' }, 700));
+  await run(OPEN);
+  await wait(1200);
+  await run(SCROLL_END);
+  await wait(200);
+  await run(CLICK_CHECK);
+  await wait(1100);
+  const afterUnknown = await run(READ);
+  log('情形五 手动/查不到  :', JSON.stringify({ note: afterUnknown.note, button: afterUnknown.button }));
+  await shot(win, '6-unknown-done');
+  if (afterUnknown.note !== '没能查到，稍后再试。') fail.push(`查不到时该说「没能查到，稍后再试。」，实际「${afterUnknown.note}」`);
+  if (afterUnknown.button !== '检查更新') fail.push('查不到时按钮该仍是「检查更新」');
 
   log('');
   if (fail.length) {

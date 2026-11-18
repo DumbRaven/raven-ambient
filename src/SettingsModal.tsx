@@ -1,4 +1,4 @@
-import { type CSSProperties, type RefObject, useCallback, useEffect, useState } from 'react';
+import { type CSSProperties, type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { ImagePlus, LoaderCircle, RotateCcw } from 'lucide-react';
 import Slider from './Slider';
 import { radioKeyDown } from './radio-keys';
@@ -32,17 +32,43 @@ export default function SettingsModal({ cabinet, busy, background, lineError, st
    * 检查更新的状态。
    *
    * 打开面板就静默查一次（用户不点也能看到结果），点按钮是手动重查。
-   * `busy` 只在手动点击时置上——静默那次不该让按钮变成转圈，
-   * 用户还没打算做这件事，界面先动了才是噪音。
+   * `checking` 与 `note` 都只在**手动**那次置上：静默那次是用户没要求过的动作，
+   * 界面先动起来才是噪音。
+   *
+   * `note` 只记手动那次的结局，因为「已经是最新」与「根本没查」在画面上没有区别——
+   * 用户点完必须拿到一句话，否则只能靠按钮抖一下来猜结论。2026-11-18 用户报的
+   * 「点击后抖动一下但没看见变化，是不是结果只停留一瞬间」就是这件事：改了按钮
+   * 文字又改回来，而 current/unknown 两种结局在旧实现里一个字都不显示。
    */
   const [update, setUpdate] = useState<UpdateReply | null>(null);
   const [checking, setChecking] = useState(false);
+  const [note, setNote] = useState<'current' | 'unknown' | null>(null);
+
+  /**
+   * 手动那次是否还没回来。
+   *
+   * 用 ref 而不是读 `checking`：`runCheck` 的依赖必须保持空数组，否则下面那个
+   * effect 会跟着 `checking` 翻转重跑，「打开面板查一次」会变成「每次检查都重查一遍」。
+   */
+  const manualInFlight = useRef(false);
 
   const runCheck = useCallback(async (manual: boolean) => {
-    if (manual) setChecking(true);
+    if (manual) {
+      // 重复点击直接吞掉，不做禁用：`button:disabled { opacity: .35 }` 是全局规则，
+      // 禁用态等于整个按钮变淡一下，那正是要消掉的抖动。
+      if (manualInFlight.current) return;
+      manualInFlight.current = true;
+      setChecking(true);
+      setNote(null);
+    }
     const reply = await checkForUpdate();
     setUpdate(reply);
-    if (manual) setChecking(false);
+    if (manual) {
+      manualInFlight.current = false;
+      setChecking(false);
+      // newer 有自己的画面（版本号 + 去下载），不需要这行字。
+      setNote(reply.result.status === 'newer' ? null : reply.result.status);
+    }
   }, []);
 
   // 静默查一次。空依赖：面板每次打开都是新挂载，这一次就是「打开时查一次」。
@@ -152,8 +178,14 @@ export default function SettingsModal({ cabinet, busy, background, lineError, st
         <h3>版本</h3>
         {/*
           有新版的画面就是这一组：一句新版本号 + 一个「去下载」。
-          没有新版（含查不到、超时）只剩一个「检查更新」按钮，不解释、不报错——
-          网络不通是常态，用户打开设置不是为了解决网络。
+          没有新版时按钮文字与状态都不变，结论写在按钮下面那行 `.update-note` 里。
+
+          为什么改成了「按钮不动、结果另起一行」（2026-11-18）：
+          原来按钮在「检查更新 ↔ 正在检查…」之间换字、还顺手 disabled，而
+          `button:disabled { opacity: .35 }` 是全局规则，于是点一下整个按钮淡下去又弹回来——
+          用户看到的就是「抖一下」。更要紧的是 `current`（已是最新）与 `unknown`（查不到）
+          两种结局在旧实现里一个字都不显示，用户分不清「查完了没事」和「根本没查」。
+          换字改成不动字，是因为结果本身要先说清楚；按钮尺寸与透明度全程不变。
 
           为什么版本号不写在这句里：它是异步拿到的（主进程 app.getVersion()），
           写在这里会让面板打开的头一两秒显示「当前版本 —。」，那是不该有的闪烁。
@@ -167,10 +199,15 @@ export default function SettingsModal({ cabinet, busy, background, lineError, st
             </button>
           </>
         ) : (
-          <button className="secondary-button full-width" disabled={checking} onClick={() => void runCheck(true)}>
-            {checking ? <LoaderCircle size={15} className="loading-spin" /> : null}
-            {checking ? '正在检查…' : '检查更新'}
-          </button>
+          <>
+            <button className="secondary-button full-width" onClick={() => void runCheck(true)}>
+              检查更新
+            </button>
+            {/* 高度常驻，避免「出现/消失」把下面几组顶下去。 */}
+            <p className="update-note" aria-live="polite">
+              {checking ? '正在检查…' : note === 'current' ? '已经是最新版本。' : note === 'unknown' ? '没能查到，稍后再试。' : ''}
+            </p>
+          </>
         )}
       </div>
 
