@@ -74,12 +74,15 @@
   }
   .disc.is-light::after { background-color: #3c4634; }
 
-  /* 四种压片工艺，参数与 styles.css 里的 .pressing-* 对齐 */
+  /* 四种压片工艺，参数与 styles.css 里的 .pressing-* 对齐。
+     mini 不加载 skin-bold.css，这些渐变只能在这里重画一遍，所以每改一处都要
+     回头对一眼 src/styles.css 的 .pressing-* —— 2026-11-18 就查出 swirl 少了一层。 */
   .disc.pressing-swirl {
     background-image:
       radial-gradient(ellipse 66% 46% at 28% 22%, var(--v-accent) 0%, transparent 64%),
       radial-gradient(ellipse 54% 64% at 76% 66%, var(--v-accent-2) 0%, transparent 62%),
       radial-gradient(ellipse 88% 38% at 52% 94%, var(--v-accent) 0%, transparent 58%),
+      radial-gradient(ellipse 40% 60% at 12% 72%, var(--v-accent-2) 0%, transparent 66%),
       radial-gradient(circle at 50% 50%, var(--v-sheen) 16%, var(--v-base) 76%);
   }
   .disc.pressing-marble {
@@ -99,9 +102,23 @@
       radial-gradient(circle at 90% 82%, var(--v-accent) 0 2%, transparent 2.5%),
       radial-gradient(circle at 50% 50%, var(--v-base) 26%, var(--v-sheen) 100%);
   }
-  .disc.pressing-glow, .disc.pressing-halo {
+  .disc.pressing-glow {
     background-image:
       radial-gradient(circle at 50% 50%, var(--v-base) 24%, var(--v-accent) 56%, var(--v-base) 76%, var(--v-sheen) 100%);
+  }
+
+  /* halo 是「盘心一圈窄光环」，glow 是「宽亮带」，两者在 styles.css 里本就是
+     两条不同的渐变（halo 中间色标在 48%，glow 在 56%）。
+     以前这里把 halo 并进 glow 那条，导致两种工艺在这个窗口里长得一模一样
+     （实测盘内 68.1% 的像素不同）。
+
+     只改渐变，**不要**照抄主界面的 .pressing-halo .vinyl-label 那圈外发光：
+     主界面标签直径约 72px，那条 0 0 11px / 0 0 24px 是按那个尺寸调的；
+     这个窗口的标签只有 13px，同样的光晕半径会把标签整个糊成一团亮斑。
+     真要给这个小标签加光，半径得压到 4px/9px 以下才不糊。 */
+  .disc.pressing-halo {
+    background-image:
+      radial-gradient(circle at 50% 50%, var(--v-base) 26%, var(--v-accent) 48%, var(--v-base) 74%, var(--v-sheen) 100%);
   }
 
   /* 转起来。有碟就一直挂着 spinning 类，靠 play-state 冻住——
