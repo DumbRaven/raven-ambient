@@ -38,12 +38,21 @@ async function boot(locked: boolean) {
     loadFile() {}
   }
   runInNewContext(readFileSync(new URL('../electron/main.cjs', import.meta.url), 'utf8'), {
-    require: (id: string) => id === 'electron' ? { app, BrowserWindow, screen: { getPrimaryDisplay: () => ({ workAreaSize: { width: 1000, height: 1000 } }) }, session: { defaultSession: { setPermissionRequestHandler() {}, setPermissionCheckHandler() {} } } }
+    require: (id: string) => id === 'electron' ? {
+      app,
+      BrowserWindow,
+      screen: { getPrimaryDisplay: () => ({ workAreaSize: { width: 1000, height: 1000 } }) },
+      session: { defaultSession: { setPermissionRequestHandler() {}, setPermissionCheckHandler() {} } },
+      // 检查更新的两条通道注册在 whenReady 里，这里只需要能被调用。
+      ipcMain: { on: () => undefined },
+    }
       : id === 'node:path' ? path
       : id === './now-playing.cjs' ? { attachNowPlaying: () => undefined }
       : id === './focus-mini.cjs' ? { attachFocusMini: () => undefined }
       : id === './desktop-stage.cjs' ? { attachDesktopStage: () => undefined }
       : id === './media.cjs' ? { registerMediaScheme: () => undefined, attachMedia: () => undefined }
+      // 这个测试关心的是窗口生命周期，更新检查只要不炸就行。
+      : id === './update.cjs' ? { attachUpdate: () => ({ check: async () => ({ status: 'current' }), open: () => false }) }
       : { existsSync: () => false },
     process: { env: { RAVEN_DATA_DIR: 'F:/Vibe/.qa/mock-only' }, platform: 'win32', resourcesPath: 'F:/Vibe/.qa/mock-only' }, __dirname: 'F:/Vibe/electron',
     // 主进程里有个「万一 ready-to-show 不来也要露脸」的兜底定时器，沙箱里没有 setTimeout

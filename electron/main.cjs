@@ -1,9 +1,10 @@
-const { app, BrowserWindow, screen, session } = require('electron');
+const { app, BrowserWindow, screen, session, ipcMain } = require('electron');
 const path = require('node:path');
 const { attachNowPlaying } = require('./now-playing.cjs');
 const { attachFocusMini } = require('./focus-mini.cjs');
 const { attachDesktopStage } = require('./desktop-stage.cjs');
 const { registerMediaScheme, attachMedia } = require('./media.cjs');
+const { attachUpdate } = require('./update.cjs');
 
 if (process.env.RAVEN_DATA_DIR) app.setPath('userData', path.resolve(process.env.RAVEN_DATA_DIR));
 
@@ -109,6 +110,21 @@ app.whenReady().then(() => {
   });
   createWindow();
   app.on('activate', () => { if (!mainWindow || mainWindow.isDestroyed()) createWindow(); });
+
+  // 检查更新。放在主进程而不是页面里：CSP 保持 `default-src 'self'` 不动，
+  // 渲染进程永远发不出网络请求，只有「请你查一下」这个动作能过去（见 preload.cjs 的白名单）。
+  const update = attachUpdate();
+  ipcMain.on('update:check', async (event) => {
+    // 版本号从 app 读，不信任页面传来的——页面传什么都不该影响「我是什么版本」。
+    const current = app.getVersion();
+    const result = await update.check(current);
+    // 事件来源可能已经关了（用户点完立刻切走），send 会抛。
+    if (!event.sender.isDestroyed()) event.sender.send('update:result', { current, result });
+  });
+  ipcMain.on('update:open', () => {
+    // 不读 payload：要打开的地址是 check 时缓存在 update 里的那一个。
+    update.open();
+  });
 });
 // 小组件是独立窗口，主窗口关掉后它还在，所以不能靠「窗口全关」来退出。
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

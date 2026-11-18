@@ -1,9 +1,11 @@
-import { type CSSProperties, type RefObject } from 'react';
+import { type CSSProperties, type RefObject, useCallback, useEffect, useState } from 'react';
 import { ImagePlus, LoaderCircle, RotateCcw } from 'lucide-react';
 import Slider from './Slider';
 import { radioKeyDown } from './radio-keys';
 import { formatTime } from './model';
 import { trackTransitions, transitionHints, transitionNames, type Cabinet, type TrackTransition } from './records';
+import { checkForUpdate, openDownload } from './update-bridge';
+import type { UpdateReply } from './update-state';
 
 /**
  * 设置面板：空间颜色、音量、外部音乐、换片方式、存储清理、定时休息。
@@ -26,6 +28,29 @@ export default function SettingsModal({ cabinet, busy, background, lineError, st
   onClearCoverCache: () => void;
   onSetSleep: (raw: string) => void;
 }) {
+  /**
+   * 检查更新的状态。
+   *
+   * 打开面板就静默查一次（用户不点也能看到结果），点按钮是手动重查。
+   * `busy` 只在手动点击时置上——静默那次不该让按钮变成转圈，
+   * 用户还没打算做这件事，界面先动了才是噪音。
+   */
+  const [update, setUpdate] = useState<UpdateReply | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const runCheck = useCallback(async (manual: boolean) => {
+    if (manual) setChecking(true);
+    const reply = await checkForUpdate();
+    setUpdate(reply);
+    if (manual) setChecking(false);
+  }, []);
+
+  // 静默查一次。空依赖：面板每次打开都是新挂载，这一次就是「打开时查一次」。
+  useEffect(() => { void runCheck(false); }, [runCheck]);
+
+  const newer = update?.result.status === 'newer' ? update.result : null;
+  const version = update?.current ?? '';
+
   return (
     <>
       <h2 id="modal-title">设置</h2>
@@ -124,6 +149,32 @@ export default function SettingsModal({ cabinet, busy, background, lineError, st
       </div>
 
       <div className="settings-group">
+        <h3>版本</h3>
+        {/*
+          有新版的画面就是这一组：一句新版本号 + 一个「去下载」。
+          没有新版（含查不到、超时）只剩一个「检查更新」按钮，不解释、不报错——
+          网络不通是常态，用户打开设置不是为了解决网络。
+
+          为什么版本号不写在这句里：它是异步拿到的（主进程 app.getVersion()），
+          写在这里会让面板打开的头一两秒显示「当前版本 —。」，那是不该有的闪烁。
+          版本号放在最底部那行固定文案里，拿到了才出现。
+        */}
+        {newer ? (
+          <>
+            <p>新版 {newer.version} 可以下载了。</p>
+            <button className="secondary-button full-width" onClick={openDownload}>
+              去下载
+            </button>
+          </>
+        ) : (
+          <button className="secondary-button full-width" disabled={checking} onClick={() => void runCheck(true)}>
+            {checking ? <LoaderCircle size={15} className="loading-spin" /> : null}
+            {checking ? '正在检查…' : '检查更新'}
+          </button>
+        )}
+      </div>
+
+      <div className="settings-group">
         <h3>定时休息</h3>
         <label className="sleep-select">
           在这之后停止全部声音
@@ -140,8 +191,9 @@ export default function SettingsModal({ cabinet, busy, background, lineError, st
 
       <p className="import-help">
         你的音频、封面和介绍仅保存在这台设备。
-        <br />
-        Raven Ambient · 0.3.3
+        {/* 版本号由主进程给（app.getVersion()）。没拿到（探针环境没有 preload）时整行不出现，
+            不留一个「—」在那——那比没有更让人困惑。 */}
+        {version ? <><br />Raven Ambient · {version}</> : null}
       </p>
     </>
   );

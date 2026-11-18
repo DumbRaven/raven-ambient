@@ -42,6 +42,16 @@ const SEND = new Set([
   'stage:command',
   /** 主窗口把放映快照推给主进程，由它转给桌面窗。 */
   'stage:snapshot',
+  // 设置面板点了「检查更新」。主进程去问一次 GitHub，结果走 receive 的 update:result。
+  'update:check',
+  /**
+   * 设置面板点了「去下载」。
+   *
+   * ⚠ 这条**不带参数**，传了也用不上：主进程只打开它自己上一次查到并缓存的地址。
+   * 如果允许页面传 URL 过来，这个通道就变成「打开任意网址」——那是最容易被
+   * 利用来钓鱼的形状，而它本身只需要一个固定动作。
+   */
+  'update:open',
 ]);
 
 /**
@@ -70,6 +80,14 @@ const RECEIVE = new Set([
   'stage:closed',
   /** 桌面放映窗上按下的动作，主进程转给主窗口（见下面 SEND 里同名的那条）。 */
   'stage:press',
+  /**
+   * 检查更新的结果。形状三选一，页面按 status 判：
+   * `current` 已是最新 / `newer` 有新版本（带 version、notes、url）/ `unknown` 查不到（带 reason）。
+   *
+   * ⚠ 这段注释里不要出现单引号字符串：`tests/channels.test.ts` 用正则从这两个
+   * Set 里抽所有单引号字面量来守白名单，写了就会被当成通道名。
+   */
+  'update:result',
 ]);
 
 contextBridge.exposeInMainWorld('raven', {

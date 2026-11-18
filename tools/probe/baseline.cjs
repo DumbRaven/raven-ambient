@@ -191,6 +191,9 @@ const FREEZE_RANDOM = `(() => {
   window.__probeClock = {
     advance(ms) { offset += ms; return at(); },
     now() { return at(); },
+    // 不含 offset 的基准点。给需要「钉成固定文案」的地方用：
+    // 那些地方不能在 advance 之后算，否则算出来的值会跟着推进量变。
+    base() { return BASE; },
   };
   return 1;
 })()`;
@@ -248,15 +251,59 @@ const CLOSE_CARDS = `(() => {
 /**
  * 把跟当天有关的文本换成固定串，跨天跑不会平白多出差异。
  *
- * 两处来源：`todayStamp`(App.tsx:370) 渲染进 `.today-stamp > span:first-child`，
- * `stampDate`(TemplateStage.tsx:165) 渲染进 `.tpl-corner-date`（形如「2026 / 1114」，
- * 中间是 `<br>`）。注意 `.today-stamp` 里还有 `.today-count` 那个 span，只取第一个。
+ * 三处来源：
+ *   - `todayStamp`(App.tsx:370) 渲染进 `.today-stamp > span:first-child`；
+ *     注意 `.today-stamp` 里还有 `.today-count` 那个 span，只取第一个。
+ *   - `stampDate`(TemplateStage.tsx:165) 渲染进 `.tpl-corner-date`（形如
+ *     「2026 / 1114」，中间是 `<br>`）。
+ *   - `LayerStack.tsx:304` 的时钟图层渲染进 `.ov-clock`（以及桌面窗那份
+ *     `.dw-clock`），是「时:分」两位。
+ *
+ * 第三处是后补的，补的原因值得记下来：`__probeClock` 冻的是 `Date`，
+ * 但 `LayerStack` 用 `setInterval(…, 20_000)` 每 20 秒才**采样**一次。
+ * 专注页那一步 `advance(600000)` 把基准点推了 10 分钟，之后有没有一次
+ * 采样落进「拍相集全屏」之前，取决于这一轮跑得快慢——实测同一份代码
+ * 连抓两次，一次 `08:00`、一次 `08:10`，28 张里只有这一张对不上。
+ * 这不是样式回归，是标尺自己会漂。所以这里把文本直接钉成基准点那一刻，
+ * 和上面两处同一套做法：不跟时钟赛跑，直接写死。
+ *
+ * 为什么钉 `base()` 而不是 `now()`：`now()` 在专注页那步之后是 08:10，
+ * 而基线里存的是 08:00。钉 `now()` 会让新抓的图与旧基线差 10 分钟，
+ * 正好是这次要消掉的那个差异。
+ *
+ * **选择器陷阱（踩过一次，写下来）**：`.dw-clock` 不止命中里面那个只装
+ * 文字的 `<b>`，还命中**外层容器** `<div class="dw dw-clock">`——两处
+ * `className` 里都有这个类。给容器写 `textContent` 会把它的三个子节点
+ * （`<b>` 时钟、`.layer-grip` 手柄、`.dw-kill` 删除按钮）全部替换成一段
+ * 纯文字，图层当场少掉手柄和删除按钮。当初是靠打印容器 `outerHTML`
+ * 才发现的：它的 `textContent` 是 `19:48×`，`×` 就是被吞进文本里的
+ * 删除按钮。所以只用 `.ov-clock, .dw-clock` 里**没有元素子节点**的那些
+ * ——那才是真正装文字的节点。
  */
 const FREEZE_DATES = `(() => {
   const stamp = document.querySelector('.today-stamp > span');
   if (stamp) stamp.textContent = 'FRI · NOV 14';
   const corner = document.querySelector('.tpl-corner-date');
   if (corner) corner.innerHTML = '2026<br>1114';
+  // 时钟图层：全部按基准点算，不受 advance 影响。
+  const base = new Date(window.__probeClock.base());
+  const hhmm = String(base.getHours()).padStart(2, '0')
+    + ':' + String(base.getMinutes()).padStart(2, '0');
+  const paint = () => {
+    for (const node of document.querySelectorAll('.ov-clock, .dw-clock')) {
+      // 只认真正装文字的那个节点。容器也带同名类，动它会杀掉子按钮。
+      if (node.children.length) continue;
+      if (node.textContent !== hhmm) node.textContent = hhmm;
+    }
+  };
+  paint();
+  // 只写一次不够：\`LayerStack\` 那个 20 秒的 setInterval 还活着，它下一次
+  // 采样会把 React 里的 at 换成 advance 之后的时间、顺带换掉这个文本。
+  // 所以留一个便宜的看门狗，发现被改回去就再写一遍。
+  // 只在探针进程里存在，不影响产品代码。
+  if (!window.__probeClockGuard) {
+    window.__probeClockGuard = window.setInterval(paint, 200);
+  }
   return 1;
 })()`;
 
