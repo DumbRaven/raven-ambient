@@ -22,6 +22,14 @@ jobs:
     env:
       # CI 不启动 Electron，省掉 ~100MB 的二进制下载
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      # 但跳过下载的代价是 electron 的 postinstall 直接 exit(0)，**不写 path.txt**。
+      # 而 tests/media-scan.test.ts 要 require('../electron/media.cjs') 测扫描函数，
+      # 那个文件第一行就 require('electron')，于是 node_modules/electron/index.js 的
+      # getElectronPath() 找不到 path.txt，抛「Electron failed to install correctly」。
+      # 本地有二进制所以永远复现不出来，只有 CI 会红（2026-11-18 push 0.4.0 时踩到）。
+      # 给一个不存在的目录：index.js 走 ELECTRON_OVERRIDE_DIST_PATH 分支返回一个路径字符串，
+      # 解构出来的 protocol/ipcMain 全是 undefined，desktop-stage.cjs 的 `if (ipcMain)` 自己会跳过。
+      ELECTRON_OVERRIDE_DIST_PATH: ${{ runner.temp }}/electron-no-binary
     steps:
       - uses: actions/checkout@v4
 

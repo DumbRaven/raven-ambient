@@ -11,6 +11,11 @@ import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 
 const require = createRequire(import.meta.url);
+// ⚠ 这里 require 的 media.cjs 第一行就 require('electron')，所以跑这个测试的前提是
+// node_modules/electron 能解析出一个路径。本地装了二进制没问题；CI 用
+// ELECTRON_SKIP_BINARY_DOWNLOAD 跳过下载时**不会生成 path.txt**，index.js 会抛
+// 「Electron failed to install correctly」。CI 里靠 ELECTRON_OVERRIDE_DIST_PATH 绕过，
+// 见 .github/workflows/ci.yml 那条注释——不要把它当成多余的配置删掉。
 const { scan } = require('../electron/media.cjs') as {
   scan: (root: string, depth?: number, out?: ScanItem[]) => ScanItem[];
 };
