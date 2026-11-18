@@ -66,3 +66,4 @@ Thumbs.db
 
 # 打包用的中间产物
 build/icon-preview.png
+.video/
