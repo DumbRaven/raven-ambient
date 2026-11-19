@@ -57,6 +57,13 @@ jobs:
           echo "exe:  $(stat -c%s "$exe") 字节"
           echo "asar: $(stat -c%s "$asar") 字节"
 
+      # 版本号在这里解析一次，后面几步全部读 $env:TAG / $env:VERSION。
+      #
+      # 原来只有这一步自己算 tag（inputs.tag 优先，否则 github.ref_name），
+      # 后面两步各自从 github.ref_name 读 —— 手动 workflow_dispatch 触发时
+      # ref_name 是 `main` 不是 tag，于是「整理更新内容」去找 `## main` 那一节、
+      # 找不到直接 exit 1，「发布到 Release」的 if 条件也判 false 被跳过。
+      # 打包全成功、最后两步全崩，就是这么来的。
       - name: 打成 zip 分发包
         shell: pwsh
         run: |
@@ -64,6 +71,8 @@ jobs:
           if (-not $tag) { $tag = '${{ github.ref_name }}' }
           $env:RAVEN_VERSION = $tag
           node scripts/make-release.cjs
+          "TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "VERSION=$($tag -replace '^v','')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "ARCHIVE=release/dist/Raven-Ambient-$tag-win-x64.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: 上传构建产物
@@ -80,7 +89,7 @@ jobs:
       - name: 整理这一版的更新内容
         shell: pwsh
         run: |
-          $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          $version = $env:VERSION
           $lines = Get-Content CHANGELOG.md -Encoding utf8
           $start = -1
           for ($i = 0; $i -lt $lines.Count; $i++) {
@@ -114,9 +123,13 @@ jobs:
           # 正文是交给 action 读文件用的，出错时从日志里翻不到内容就很难查，先打一遍
           Get-Content RELEASE-NOTES.md -Encoding utf8 | ForEach-Object { Write-Host $_ }
 
+      # 条件里不能写 startsWith(github.ref, 'refs/tags/v')：手动 workflow_dispatch
+      # 触发时 github.ref 是 refs/heads/main，这条永远为假，发布会被静默跳过。
+      # 改成「版本号解析出来了就发」——两种触发方式都能走到这里。
       - name: 发布到 Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: env.TAG != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG }}
           files: ${{ env.ARCHIVE }}
           body_path: RELEASE-NOTES.md
