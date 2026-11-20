@@ -1,10 +1,16 @@
-// 外部音乐信息：常驻 NowPlaying.exe，把「别的播放器在放什么」推给渲染进程。
+// 外部音乐信息：常驻一个只读小程序，把「别的播放器在放什么」推给渲染进程。
 //
 // 页面是 sandbox: true + 无 preload，里面没有 ipcRenderer，也不允许改这个安全设置。
 // 但主进程可以主动在页面里执行代码，所以约定是这样：
 //   页面把 'start' / 'stop' / 'ping' / 动作（toggle、next、prev）压进 outbox 数组
 //   主进程每 400ms 去读它；想要推送，页面把 window.__ravenNowPlaying 挂上。
 // 也就是说页面永远是被动的一方，不依赖任何 Node 能力。
+//
+// 两个平台的后端是 **两个文件**，协议相同：
+//   Windows：NowPlaying.exe（C#，读系统媒体会话 SMTC），本文件直接 spawn 它
+//   macOS  ：media-control（brew 装的 perl CLI，绕过 MediaRemote 的 bundle id 限制），
+//            平台差异全收在 now-playing-mac.cjs 里
+// 本文件只做调度：谁提供数据、数据怎么送到页面。判断依据见下面的 backend()。
 const { spawn } = require('node:child_process');
 const { ipcMain } = require('electron');
 const fs = require('node:fs');
@@ -24,6 +30,10 @@ function exePath() {
   return candidates.find((file) => file && fs.existsSync(file)) || '';
 }
 
+// macOS 没有 exe 可找——数据源是用户自己 brew 装的 media-control，
+// 位置由 now-playing-mac.cjs 的 TOOL_CANDIDATES 负责（GUI 启动拿不到终端 PATH）。
+const IS_MAC = process.platform === 'darwin';
+
 class NowPlayingBridge {
   constructor() {
     this.child = null;
@@ -34,6 +44,13 @@ class NowPlayingBridge {
     this.last = EMPTY;
     /** 页面有没有用 preload 发过动作。详见 handle() 的注释。 */
     this.viaIpc = false;
+    /**
+     * macOS 的后端。**惰性 require**：这个文件只在 darwin 上有意义，
+     * 在 Windows 上连加载都省了，也避免它那句「依赖可能随时失效」的注释
+     * 被误读成 Windows 的行为。
+     * @type {import('./now-playing-mac.cjs').MacBackend | null}
+     */
+    this.mac = null;
   }
 
   /**
@@ -72,6 +89,14 @@ class NowPlayingBridge {
 
   start(webContents) {
     this.target = webContents;
+    // macOS：交给自己那个后端。它内部管长驻进程与去重，
+    // 拿不到数据源（没装 media-control）时返回 false，这里就当成「没有外部音乐」。
+    if (IS_MAC) {
+      if (!this.mac) this.mac = new (require('./now-playing-mac.cjs').MacBackend)();
+      const ok = this.mac.start((payload) => this.handle(this.target, payload));
+      if (!ok) this.handle(webContents, EMPTY);
+      return ok;
+    }
     if (this.child) return true;
     const exe = exePath();
     if (!exe) { this.handle(webContents, EMPTY); return false; }
@@ -98,6 +123,7 @@ class NowPlayingBridge {
    * 不另起进程：每次起 SMTC 连接要几百毫秒，连按两下会明显迟滞。
    */
   send(action) {
+    if (IS_MAC) return this.mac ? this.mac.send(action) : false;
     if (!this.child || !this.child.stdin || this.child.stdin.destroyed) return false;
     try {
       this.child.stdin.write(action + '\n');
@@ -123,6 +149,10 @@ class NowPlayingBridge {
   }
 
   stop() {
+    // macOS 的后端自己有进程要收，交回给它；下面那套 child/buffer 只有 Windows 用。
+    if (this.mac) {
+      try { this.mac.stop(); } catch { /* 已经退了 */ }
+    }
     if (this.child) {
       const child = this.child;
       this.child = null;

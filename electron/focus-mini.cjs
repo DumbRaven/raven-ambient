@@ -55,7 +55,8 @@ class FocusMini {
     // 设一次就够了，不需要每轮刷新。
     if (!this.win.isVisible()) {
       this.win.showInactive();
-      this.win.setAlwaysOnTop(true, 'screen-saver');
+      // 档位与 create() 里保持一致，理由见那里的注释。
+      this.win.setAlwaysOnTop(true, process.platform === 'darwin' ? 'floating' : 'screen-saver');
     }
   }
 
@@ -97,7 +98,18 @@ class FocusMini {
       },
     });
     // 'screen-saver' 是最硬的一档，主窗最小化、别的程序全屏都能压住。
-    this.win.setAlwaysOnTop(true, 'screen-saver');
+    //
+    // **macOS 上换一档**：'screen-saver' 在 macOS 对应 NSWindowLevel 1000，
+    // 比系统警报、吸附提示都高。一个番茄钟小窗压在所有东西之上（包括系统自己的
+    // 弹窗）是越权的，而且用户没法用 Cmd+Tab 理解它为什么永远在最前面。
+    // 'floating' 是 macOS 上「始终在前、但不骑在系统 UI 头上」的常规档。
+    if (process.platform === 'darwin') {
+      this.win.setAlwaysOnTop(true, 'floating');
+    } else {
+      this.win.setAlwaysOnTop(true, 'screen-saver');
+    }
+    // 「出现在所有桌面空间，包括别人全屏的时候」——这一条两个平台都要，
+    // 也是番茄钟小窗存在的意义（用户常常全屏写东西）。
     this.win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     // 和主窗口一致的两道拦截。这两个子窗口加载的也是本地文件、
     // 也没有任何外部链接，但「现在没有入口」和「以后有人加一个」是两回事：

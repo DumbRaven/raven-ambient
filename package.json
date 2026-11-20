@@ -12,6 +12,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "desktop": "npm run build && electron .",
     "package:win": "node scripts/build-nowplaying.cjs && node scripts/package-win.cjs",
+    "package:mac": "node scripts/build-nowplaying.cjs && node scripts/package-mac.cjs",
     "test": "node --test tests/*.test.ts",
     "build:nowplaying": "node scripts/build-nowplaying.cjs",
     "make:release": "node scripts/make-release.cjs"

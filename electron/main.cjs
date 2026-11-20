@@ -32,9 +32,15 @@ function createWindow() {
     backgroundColor: '#ffffff',
     // 关掉 Windows 11 的 Mica：窗口在画出第一帧之前会先把桌面壁纸的色调透出来
     // （本机壁纸偏青，看上去就是一块青蓝色的空壳）。我们自己的界面是纯白的，不需要这种材质。
-    backgroundMaterial: 'none',
+    //
+    // **只在 Windows 上传这个值**：macOS 没有 Mica，而且把不认识的选项递给
+    // BrowserWindow 在不同 Electron 版本上行为不一致（有的直接忽略、有的警告）。
+    // 用条件展开而不是「反正 mac 会忽略」——那是在赌实现细节。
+    ...(process.platform === 'win32' ? { backgroundMaterial: 'none' } : {}),
     title: 'Raven Ambient · 唱片柜',
-    icon: appIcon(),
+    // macOS 的窗口图标由 .app 包里的 AppIcon.icns 决定，BrowserWindow 的 icon 不生效
+    // （传了也是白传），所以这一项也不带过去。
+    ...(process.platform === 'win32' ? { icon: appIcon() } : {}),
     autoHideMenuBar: true,
     // 先不显示：窗口一出现就露出底色，蓝色的空壳比白屏还难看。
     // 等页面画出第一帧（开屏）再亮出来，用户点开就是 logo。
