@@ -299,10 +299,33 @@ const FREEZE_DATES = `(() => {
   paint();
   // 只写一次不够：\`LayerStack\` 那个 20 秒的 setInterval 还活着，它下一次
   // 采样会把 React 里的 at 换成 advance 之后的时间、顺带换掉这个文本。
-  // 所以留一个便宜的看门狗，发现被改回去就再写一遍。
-  // 只在探针进程里存在，不影响产品代码。
+  //
+  // 用 MutationObserver 而不是纯轮询：轮询有个几毫秒到 200ms 的空窗，截图
+  // 正好落在「React 刚写回 08:10、看门狗还没跑」那一刻就会拍错（2026-11-25
+  // 就这么拍到过一张，与代码改动无关却让门禁红了一次）。观察者回调在重绘
+  // 之前跑，所以画面永远看不到中间态。
+  //
+  // 外层容器（\`.dw-clock\` 同时也是容器，里面装 b 与两个按钮）不能直接改
+  // textContent，否则会连删除按钮一起抹掉——只改存文字的叶子节点。
   if (!window.__probeClockGuard) {
-    window.__probeClockGuard = window.setInterval(paint, 200);
+    const leaves = () => [...document.querySelectorAll('.ov-clock, .dw-clock')]
+      .filter((node) => !node.children.length);
+    const observer = new MutationObserver(paint);
+    const watch = () => {
+      for (const node of leaves()) {
+        if (!node.__probeWatched) {
+          node.__probeWatched = true;
+          observer.observe(node, { childList: true, characterData: true, subtree: true });
+        }
+      }
+    };
+    watch();
+    // 节点可能被 React 整个换掉（重渲染换了 DOM），所以低频重扫一遍补挂观察。
+    window.__probeClockGuard = window.setInterval(() => {
+      paint();
+      watch();
+    }, 500);
+    window.__probeClockObserver = observer;
   }
   return 1;
 })()`;

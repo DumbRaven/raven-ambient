@@ -15,6 +15,13 @@ const { spawn } = require('node:child_process');
 const { ipcMain } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
+// 子窗口判据与 media.cjs 共用一份实现。**这个 require 不能省**：这个文件里
+// 有两处 `isSubWindow(...)`，从前它既没定义也没 require 进来，于是
+// attachNowPlaying 的 400ms 轮询每跑一次就抛一个 UnhandledPromiseRejection
+// （`ReferenceError: isSubWindow is not defined`），外部音乐在「页面还没用
+// preload 说过话」的那几百毫秒里取不到。Windows 上同样存在，只是窗口小、
+// 多数时候没人注意到。
+const { isSubWindow } = require('./sub-window.cjs');
 
 const EMPTY = { app: '', title: '', artist: '', album: '', status: 'None', playing: false, cover: '' };
 // 页面把动作写进这个数组，主进程来取。见 src/now-playing-bridge.ts 的说明。

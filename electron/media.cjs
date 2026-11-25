@@ -74,16 +74,10 @@ function allowedDirs() {
  * 这个渲染进程是不是子窗口（桌面放映窗 / 专注小窗）。
  *
  * 两者都用同一份 preload，白名单也共享，所以「能发」不等于「该处理」。
- * 判据看 URL：子窗口各有自己的 html，主窗口是 index.html。
- * URL 拿不到时按**是**处理——宁可让主窗口的一条请求被吃掉，
- * 也不要让子窗口把 `target` 换走（那会让对话框开在一块看不见的窗口上）。
+ * 实现抽到了 `sub-window.cjs`，因为 `now-playing.cjs` 也要用同一份判据
+ * （它以前直接引用一个不存在的符号，见那个文件里记的来由）。
  */
-function isSubWindow(webContents) {
-  if (!webContents || webContents.isDestroyed()) return true;
-  const url = webContents.getURL();
-  if (!url) return true;
-  return url.includes('mini.html') || url.includes('desktop.html');
-}
+const { isSubWindow } = require('./sub-window.cjs');
 
 /** 把目录加进白名单。**只给探针和主进程内部用**；页面来的路径走不到这里。 */
 function allowDir(dir) {  if (grantsOf().addDir(dir)) grantsOf().save();
