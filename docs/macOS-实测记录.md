@@ -291,50 +291,68 @@ curl -L -H "Authorization: Bearer $TOKEN" \
 
 验这一步需要一首带内嵌封面的歌，也就是等装第三方播放器（网易云）+ 手机验证码登录之后。
 
-### 5.2 lineMode：这台机器打不开，因为缺虚拟声卡
+### 5.2 lineMode：已解耦，没声卡也能显示歌名（`ae28db8` 落地）
 
-**这和 media-control 无关，是两个不同的缺口。**
+**原来的问题**（保留下来当背景，它是这条设计决定的由来）：`cabinet.lineMode` 一个开关同时管了两件事——显示外部播放器歌名（只要元数据），和用虚拟声卡抓声音做环境音避让（要 `MediaStream`）。绑在一起的后果是：抓不到声卡时 `toggleLineMode` 里 `change({ lineMode: true })` 走不到，而 `App` 里 `if (!cabinet.lineMode) { setNowPlaying(emptyNowPlaying); return; }` 把订阅链路的入口整个关掉——连歌名都拿不到，`media-control` 永远不会被拉起。
 
-- media-control 只提供**元数据**（歌名/歌手/封面），给不了 `attachLineIn()` 需要的 `MediaStream`。
-- 音频流那一路要虚拟声卡。`src/line-in.ts:24` 的正则是 `/cable\s*(output|out)|vb-?audio\s*(virtual\s*)?cable/i`，只认 **VB-Cable**（Windows 那个）。这台机器两个都没有，`openCable()` 抛 `DOMException('没有找到虚拟声卡', 'NotFoundError')`。
+**现在的语义**：「我要接入外部播放器，有没有声卡都行」。开关打开先试抓声卡：
 
-后果是 `src/App.tsx:450` 的 `toggleLineMode` 里：
+- 抓到 → 全都开，与以前一致；
+- 抓不到 → **仍然打开**。歌名、封面照常显示（它们来自系统媒体会话，与声卡无关），环境音照常起来（它是这个模式里唯一还会出声的东西），设置面板用 `noCableHint` 一次说清缺什么、装好之后怎么让它生效。
 
-```js
-const stream = await line.current.open();   // 这里就抛了
-player.current?.attachLineIn(stream);
-change({ lineMode: true });                  // 永远走不到
+**为什么不用另外两种改法**（都考虑过，都否了）：
+
+1. 新增 `extInfo` 字段：只解决「能读到元数据」。而显示层全都挂在 `lineMode` 上（`App` 里的 `externalDisc`、`playingNow`/`discTitle`/`discSubtitle`/`discCover`/`miniDiscSource`/`canSkipDisc`、`stageNow`，以及 `ListeningRoom` 里那处），不一起放宽的话界面上一个字都不会多，属于做了等于没做；还会引入两个 effect 抢同一个 media-control 子进程。
+2. 拆成两个开关：设置面板从 1 维变 2 维，而 Mac 上「有元数据没声卡」是常态，每次都让用户面对两个开关去猜该开哪个。
+
+**错误分类也一起改了**：`src/line-in.ts` 新增 `isRetriable()`。`lineError` 只装**可重试**的失败（`NotAllowedError` / `NotReadableError` / `OverconstrainedError`）——那三样配「再试一次」按钮有意义；`NotFoundError`（没装/没插）是**常态不是故障**，放进带按钮的位置等于给一条必然失败的假出路，它改走 `noCableHint` 那条状态说明。
+
+**剩下的能力边界（没变）**：`src/line-in.ts` 的 `cablePattern` 只认 VB-Cable，装 BlackHole 也不会被认出来。所以 Mac 上「外部音乐响起时压低环境音」这个核心功能**仍然用不了**——这与上面的解耦无关，是另一件事。
+
+本机实测的三态（2026-11-27）：
+
+| 状态 | 电表行 | 错误块 |
+|---|---|---|
+| 没装声卡 | `noCableHint`（含「装好之后关掉再打开这个开关」） | 不出现 |
+| 系统拒权限 | 「外部音乐没有接通」 | 「系统拒绝了录音权限」+「再试一次」 |
+| 关掉开关 | 整块不渲染 | 不出现 |
+
+第一行和错误块**永远不同时出现**，这是 `isRetriable` 那条规则直接推出来的结果。
+
+### 5.3 测试：434 全过；那 5 条失败曾经是函数真失守，不是平台差异
+
+**这一节在 2026-11-27 晚改过两次，第二次把结论整个推翻了。**
+
+原先记的是：Mac 上 429 通过 / 5 失败，5 条来自 `tests/media-grants.test.ts`，断言 `looksLikeFolder('C:\\')` 这类 Windows 路径语义，判定为「在 macOS 上本来就不成立，不是回归」，处理方式是「加平台跳过」。
+
+**这个判断是错的。** 那 5 条能失败，是因为 `looksLikeFolder()` 在 macOS 上真的失守了——它对任何路径都返回 `true`。实测（`ae28db8` 之前）：
+
+```
+"/"                true   ← 整个磁盘可以授权进来
+"/System"          true
+"/System/Library"  true
+"/private"         true
+"/Applications"    true
+"/Volumes/Ext"     true
 ```
 
-`cabinet.lineMode` 保持 `false`，而 `src/App.tsx:123` 只在它为真时才 `askNowPlaying('start')`——**所以 media-control 根本不会被拉起来**。这解释了「应用启动后看不到 media-control 进程」的现象。
+三个根因：
 
-**`lineMode` 在 `src/` 里命中 48 行**（App.tsx 28 / player.ts 6 / PlayCard.tsx 5 / records.ts 4 / SettingsModal.tsx 4 / ListeningRoom.tsx 1），但真正把「显示」和「避让」锁死的只有 **2 行**——`src/App.tsx:121` 的 `if (!cabinet.lineMode)` 与 `:128` 的依赖数组。其余 46 行是 `cabinet.lineMode && …` 短路或三元，表达的是「音乐源是外部播放器，所以本地音乐让位」，属于音频层语义，解耦后应继续挂着 `lineMode`。
+1. 黑名单 `['c:\\windows', 'c:\\program files', ...]` 全是 Windows 路径，在 macOS 上传入的 `/System` 一个都匹配不上。
+2. 更隐蔽：`blocked.some(prefix => lower.startsWith(prefix + '\\'))` 把分隔符硬编码成反斜杠。即使往黑名单里加 `/System`，也判断不出 `/System/Library`（Mac 用 `/`）。
+3. 根目录判据 `/^[a-zA-Z]:$/` 只认盘符。`/` 去掉尾斜杠是**空串**，一路放行。
 
-**耦合不深，但它卡的位置是全链路入口**：`lineMode` 为 false → 不 `listenNowPlaying` → `nowPlaying` 永远是 `emptyNowPlaying` → `hasTrack()` 恒假 → 后面所有守卫都短路。入口锁住，后面再多的判断也白搭。
+**`ae28db8` 的修法——不改测试，改函数**：
 
-**关键的结构事实（决定改法）**：显示层所有地方都是 `cabinet.lineMode && hasTrack(nowPlaying)` 或 `if (cabinet.lineMode)` 分支——`src/App.tsx:312` 的 `externalDisc`、`:319-339` 的 `playingNow`/`discTitle`/`discSubtitle`/`discCover`/`miniDiscSource`/`canSkipDisc`、`:374` 的 `stageNow`、`src/ListeningRoom.tsx:79`。所以**只放开设订阅条件是不够的**：那样交付的只是「能读到」，界面上一个字都不会多出来，属于做了等于没做。
+- 按**路径自身长什么样**选解析器，不按跑在哪台机器上：有盘符或 UNC 前缀走 `path.win32`，以 `/` 开头走 `path.posix`，裸相对路径才用宿主平台。于是 `C:\Windows` 在 Mac 上也拒、`/System` 在 Windows 上也拒，两条契约与宿主无关。
+- 黑名单按平台分两份（`WINDOWS_BLOCKED` / `POSIX_BLOCKED`），**逐段比对**而不是前缀字符串拼接。
+- 根目录与挂载盘根单独挡（`/`、`/Volumes`、`/Volumes/<盘名>`），盘里的子目录照常放行——用户的素材通常在 `/Volumes/Ext/素材` 下面。
 
-**改法（未实施）**：不新增字段、不拆开关，而是把 `lineMode` 的语义从「我要听外部音乐（且已接好声卡）」放宽成「我要接入外部播放器（有没有声卡都行）」。开关打开时先试抓声卡：抓到 → 全都开（现状不变）；抓不到 → **仍然打开**，显示歌名 + 说明「这台机器没有虚拟声卡，所以环境音不会自动避让」。因为显示层那 6 处已经挂在 `lineMode` 上，`lineMode` 一为真它们就自动生效，不需要动。
+**现在的数字**：Mac 与 Windows **都是 434 tests / 434 pass / 0 fail**。`tests/media-grants.test.ts` 从 12 条涨到 15 条，新增的 3 条把这次 bug 本身固化成回归（含「在 Mac 上 `C:\Windows` 也必须拒」这条与宿主无关的契约）。
 
-**为什么 Windows 上不会回归**（已实测，不是推断）：`askNowPlaying('start')` 在 `src/` 里只有一处（`src/App.tsx:123`），而 `electron/now-playing.cjs` 的 `attachNowPlaying()` 只创建 bridge 并注册 IPC + 一个 400ms 的 outbox 轮询，**它自己从不调 `start()`**；`bridge.start()` 只有两个入口（`:72` 走 IPC、`:213` 走 outbox），都由页面主动发起。所以订阅仍然完全由开关控制——`lineMode` 为 false 时 `nowPlaying` 恒空，显示层放宽的那个 `||` 分支永远进不去。
+**教训一（比结论有用）**：把测试失败归因成「这个平台不适用」之前，先确认它在那个平台上**该不该**通过。这次差点用 5 条 `skip` 把一个「整盘可授权」的安全洞盖掉。判据是：测的是「什么该被拒绝」，就别问「这个平台上成不成立」，要问「这个平台上对应的是什么」。
 
-**仍未解决**：`cablePattern` 只认 VB-Cable，装 BlackHole 也不会被认出来（要加 `/blackhole/i`）。所以 Mac 上「外部音乐响起时压低环境音」这个核心功能**确实用不了**，这与上面那条解耦无关，属于能力边界。
-
-### 5.3 测试套件里那 5 条环境依赖的失败
-
-**这一节在 2026-11-27 晚改过一次。** 原先这里记的是 6 条失败，其中一条是 `tests/now-playing-mac.test.ts` 第 9 条「找不到工具时返回空串」：
-
-```js
-assert.equal(toolPath(), '');
-```
-
-它当时的前提是「这台机器上没有 media-control」，而本机恰恰装了，而且正是 `a552096` 让它被认出来的——于是它和第 10 条（要求候选列表必须有 `~/.local/bin`）互相矛盾：工具真装了，第 9 条必红。实测过：把 `~/.local/bin/media-control` 移走 → 10/10 全过；移回来 → 9/10。
-
-**这条已在提交 `5b46183` 修掉。** 错不在代码，在断言方式：拿「本机恰好没装」当契约。改法是验契约——返回值要么是空串，要么是磁盘上真实存在的文件，绝不能是「候选列表里的第一条」这种没验证过的字符串（后者正是原 bug 的形态）。负面验证：把 `toolPath()` 改成 `return TOOL_CANDIDATES[0]`，测试立刻失败。
-
-**现在 Mac 上是 429 通过 / 5 失败**（`# tests 429 / # pass 424`），5 条全部来自 `tests/media-grants.test.ts`（第 41/101/128/220/272 行），断言 `looksLikeFolder('C:\\')` 这类 **Windows 路径语义**——盘符、`System32`、8.3 短名、末尾点号空格。这些在 macOS 上本来就不成立，不是回归。
-
-**该怎么处理（未做）**：给这 5 条加平台跳过，例如 `const windowsOnly = { skip: process.platform !== 'win32' }`，或用 `describe` 包一层。现在没做是因为它们在 Windows 上是真保护（授权目标黑名单是安全边界），改成条件跳过要确保 Windows 上一条不少。**判断依据：这 5 条测的是「哪个目录不许授权」，属于 Windows 专属语义，Mac 上对应的边界应该是另一套（`/System`、`/Library` 等），不是把 Windows 路径塞进 Mac。
+**教训二**：`isVolumeRoot()` 第一版写了 `if (process.platform !== 'darwin') return false;`，和上面刚立的原则正相反——Windows 上它直接跳过，`/Volumes/Ext` 就放行了。是新增的测试抓出来的。判「该用哪个默认解析器」时用 `process.platform` 是对的，判「某个具体路径该不该拒」时用它就错。
 
 ---
 

@@ -106,7 +106,9 @@ export default function SettingsModal({ cabinet, busy, background, lineError, no
       <div className="settings-group">
         <h3>外部音乐</h3>
         <p>
-          把播放器的输出切到 CABLE Input，再打开下面的开关。<span>外部音乐会在响起时压低环境音。</span>
+          {noCable
+            ? <>装好之后，把播放器的输出切到 CABLE Input。<span>外部音乐会在响起时压低环境音。</span></>
+            : <>把播放器的输出切到 CABLE Input，再打开下面的开关。<span>外部音乐会在响起时压低环境音。</span></>}
         </p>
         <label className="line-mode-toggle">
           <input type="checkbox" checked={cabinet.lineMode} onChange={e => onToggleLineMode(e.target.checked)} />

@@ -209,23 +209,29 @@
    音乐从别的播放器进到 CABLE，再从这里抓回来，和本地唱片共用同一套避让。
    ========================================================================== */
 
-/* 电平条：一条细槽，绿色填充随外部音乐起伏。
-   允许换行：说明文字可能很长（比如「没接上虚拟声卡…装好之后关掉再打开这个开关」），
-   不换行的话它会撑出面板右边缘，还会盖住下面那行「外部音乐音量」。 */
+/* 电平条：一条细槽，绿色填充随外部音乐起伏，说明文字在槽下面。
+   两行**必须**靠 flex-direction 保证，不能靠「文字够长就会换行」：
+   说明短的时候（「外部音乐没有接通」只有 88px）row+wrap 会把它摆在槽右边，
+   槽就被压到不足百像素，看着像条没画完的线。整句话可能很长，所以允许它
+   自己折行，max-width 压住不出面板。 */
 .line-in-meter {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   margin-top: 12px;
 }
 
 .line-in-meter > span {
   position: relative;
-  flex: 1;
+  /* 固定占一行满宽：column 布局下 flex:1 会连高度一起拉伸。 */
+  flex: none;
+  width: 100%;
   height: 4px;
   border-radius: 999px;
-  background: var(--bold-sunken);
+  /* 用 --bold-line 而不是 --bold-sunken：后者 #f0efea 在白底上只有 1.06:1，
+     --level 为 0 时整条槽等于隐形。要和旁边的分隔线一样看得见，就得同色。 */
+  background: var(--bold-line);
   overflow: hidden;
 }
 
