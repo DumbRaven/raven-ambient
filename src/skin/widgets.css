@@ -209,9 +209,12 @@
    音乐从别的播放器进到 CABLE，再从这里抓回来，和本地唱片共用同一套避让。
    ========================================================================== */
 
-/* 电平条：一条细槽，绿色填充随外部音乐起伏 */
+/* 电平条：一条细槽，绿色填充随外部音乐起伏。
+   允许换行：说明文字可能很长（比如「没接上虚拟声卡…装好之后关掉再打开这个开关」），
+   不换行的话它会撑出面板右边缘，还会盖住下面那行「外部音乐音量」。 */
 .line-in-meter {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   margin-top: 12px;
@@ -236,9 +239,14 @@
   transition: width 90ms linear;
 }
 
+/* 说明可能是一整句话，所以允许它自己换行，并压住最大宽度不撑出面板：
+   flex:none 是「不要被压缩成一条缝」的意思，不是「不许换行」——换行由
+   max-width:100% + 正常的 word wrapping 负责。 */
 .line-in-meter small {
   flex: none;
+  max-width: 100%;
   font-size: 11px;
+  line-height: 1.6;
   color: var(--bold-muted);
 }
 

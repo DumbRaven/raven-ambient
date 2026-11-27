@@ -19,6 +19,18 @@ test('可执行名带前缀也能认出来（Chromium 打包的播放器常见�
   assert.equal(appLabel('NetEase.CloudMusic.exe'), '网易云音乐');
 });
 
+test('macOS 给的是 bundle id，先归一成可执行名再查表', () => {
+  // 桥只能放在 appLabel 里：appNames 的 key 是可执行名，混进 bundle id 之后
+  // 「显示名」和「平台标识」就成了同一张表，下一个人不知道该往哪边加。
+  assert.equal(appLabel('com.apple.Music'), 'Apple Music');
+  assert.equal(appLabel('com.netease.163music'), '网易云音乐');
+  assert.equal(appLabel('com.tencent.QQMusicMac'), 'QQ 音乐');
+  // 陌生 bundle id 原样返回，不编造名字。
+  assert.equal(appLabel('com.example.SomePlayer'), 'com.example.SomePlayer');
+  // 桥是按整串匹配的，不是子串：
+  assert.equal(appLabel('com.netease.163music.helper'), 'com.netease.163music.helper');
+});
+
 test('没有标题就算没在放，空白字符串也不算', () => {
   assert.equal(hasTrack(track()), false);
   assert.equal(hasTrack(track({ title: '   ' })), false);

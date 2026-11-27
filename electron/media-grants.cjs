@@ -16,13 +16,141 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+/**
+ * 这条路径是不是 Windows 形态（盘符绝对路径或 UNC）。
+ *
+ * 为什么要认平台，而不是直接用宿主机的 `path`：`looksLikeFolder` 有两条
+ * 契约要在所有平台上一致——「`C:\Windows` 不收」和「`/System` 不收」。
+ * 直接用宿主 `path.resolve` 的话，在 Mac 上解析 `C:\Windows` 会得到
+ * `/Users/<who>/Vibe-bold/C:\Windows`（POSIX 把反斜杠当普通字符），
+ * 黑名单永远比不上；实测过，`C:\Windows` `C:\PROGRA~1` 全部返回 true。
+ * 反过来 Windows 上解析 `/System` 也会带上盘符。
+ *
+ * 所以解析器由「路径自己声称属于哪个平台」决定，而不是由跑在哪决定。
+ * 台账里存的是用户在自己机器上选出来的路径，它是什么形态是确定的。
+ */
+function isWindowsPath(p) {
+  return /^[a-zA-Z]:([\\/]|$)/.test(p) || /^\\\\/.test(p);
+}
+
+/**
+ * 这条路径该用哪套语义（`path.win32` / `path.posix`）来解析。
+ *
+ * 规则是「看路径自己长什么样」，不是「看跑在哪台机器上」：
+ *   - 有盘符或 UNC 前缀 → Windows；
+ *   - 以 `/` 开头 → POSIX（在 Windows 上 `/System` 也是这个意思，
+ *     不能让它变成 `C:\System` 去比黑名单）；
+ *   - 裸相对路径（`素材`、`../x`）→ 由宿主平台解析。Windows 上用 posix 解析
+ *     会把 cwd 里的 `\` 原样拼进来，得到 `C:\a\b/素材` 这种混合分隔符。
+ */
+function platformFor(p) {
+  if (isWindowsPath(p)) return path.win32;
+  if (p.startsWith('/')) return path.posix;
+  return process.platform === 'win32' ? path.win32 : path.posix;
+}
+
+/** 按路径自己的平台语义做规范化。所有「存进台账 / 拿去比对」的地方都要过它。 */
+function normalizePath(p) {
+  return platformFor(p).resolve(p);
+}
+
+/**
+ * 各平台的系统目录黑名单（小写、无尾斜杠，分隔符用该平台自己的）。
+ *
+ * 判据是「用户选中它几乎一定是选错了」——也就是他自己不会把素材放在那儿。
+ * 反过来，正常存素材的地方必须放行，否则功能本身就不能用了。
+ *
+ * macOS 侧逐条理由：
+ *   - `/system` `/library` `/usr` `/bin` `/sbin` `/cores` `/private`：系统本体，
+ *     装应用、放系统配置的地方，没有任何一类素材属于这里。`/etc` `/tmp` `/var`
+ *     的真实路径都在 `/private` 下（`/etc` → `/private/etc`），已经顺带被挡住，
+ *     这里仍单独列出：用户看得见的是 `/etc` 那个名字，挡在入口更直接。
+ *   - `/applications`：装的是 .app 而不是素材。误选成整个应用目录之后，
+ *     `media://` 能扫到所有 app 包的内部。
+ *   - `/dev`：里面是设备节点，读它没有意义还有风险。
+ *
+ * 明确**不挡**的两个：
+ *   - `/users`：那是他存素材的地方（`/Users/<名>/Pictures`、`/Music`…）。
+ *     挡住的话 Mac 上功能直接不可用。`/Users/Shared` 同理放行。
+ *   - `/volumes` 下的**子目录**：外接盘的素材在 `/Volumes/<盘名>/素材`，
+ *     盘根另由 `isVolumeRoot` 处理（见下）。
+ */
+const WINDOWS_BLOCKED = [
+  'c:\\windows', 'c:\\program files', 'c:\\program files (x86)',
+  'c:\\programdata', 'c:\\$recycle.bin', 'c:\\system volume information',
+];
+
+/**
+ * POSIX 侧（macOS / Linux）。两个系统的系统目录高度重合，用同一份。
+ * **不含 `/volumes`**：盘根由 `isVolumeRoot` 单独挡，这里的每一条都会连
+ * 子目录一起挡——把 `/volumes` 放进来，`/Volumes/Ext/素材` 就读不了了。
+ */
+const POSIX_BLOCKED = [
+  '/system', '/library', '/usr', '/bin', '/sbin', '/cores', '/private',
+  '/applications', '/dev', '/etc', '/tmp', '/var',
+];
+
+/**
+ * 挂载盘的盘根算不算「整个磁盘」。
+ *
+ * `/Volumes/Ext` 就是一块外接盘的根，和 Windows 的 `C:\` 同义——授权它等于
+ * 整块盘可读。`/Volumes` 自己同理：那是所有挂载点的汇集处，授权它等于把
+ * 每一块外接盘都纳进来。
+ *
+ * 挡的只是「盘根」这一层，盘里的**子目录**照常放行：用户的素材通常在
+ * `/Volumes/Ext/素材` 下面，不该为了挡盘根把外接盘整个废掉。
+ *
+ * **不判 `process.platform`**：这里判的是「这个路径是不是盘根」，属于路径本身
+ * 的语义，和跑在哪台机器上无关。`/Volumes/Ext` 永远是 POSIX 形态的盘根，
+ * 在 Windows 上也一样——那边的文件对话框根本选不出这种路径，多挡这一下
+ * 不会误伤任何人。反过来，若在这里按宿主平台提前 return false，同一份黑名单
+ * 在 Windows 上就漏了这条，测试会在那边失败（实测过）。
+ */
+function isVolumeRoot(trimmed) {
+  return /^\/volumes$/i.test(trimmed) || /^\/volumes\/[^/]+$/i.test(trimmed);
+}
+
+/**
+ * `parts` 是否落在 `blocked` 里某一项之下。逐段比对，不是前缀字符串比对——
+ * 前缀比对要靠分隔符拼接，而分隔符写死 `\` 的话，`/System` 就挡不住
+ * `/System/Library`（Mac 用 `/`）。这正是这条函数存在的原因。
+ *
+ * `shortNames` 打开时，允许某一段是 8.3 短名：`PROGRA~1` 的前六位就是
+ * `Program Files` 的前六位。只在拿不到真实路径时才有意义（见 `looksLikeFolder`
+ * 里的说明）；Windows 上 `realpathSync.native` 会把短名展开，用不到它。
+ */
+function insideBlocked(parts, blocked, sep, shortNames) {
+  return blocked.some(prefix => {
+    const target = prefix.split(sep).filter((part, index) => index > 0 || part !== '');
+    const got = parts.filter((part, index) => index > 0 || part !== '');
+    if (target.length > got.length) return false;
+    for (let i = 0; i < target.length; i++) {
+      const mine = got[i].toLowerCase();
+      if (mine === target[i]) continue;
+      if (shortNames) {
+        const match = /^([^~]{1,6})~\d+$/.exec(mine);
+        if (match && target[i].startsWith(match[1].replace(/[ .]+$/, ''))) continue;
+      }
+      return false;
+    }
+    return true;
+  });
+}
+
 /** 能授出去的路径必须有这些特征，否则一律拒绝（见 `accept()` 的说明）。 */
 function looksLikeFolder(dir) {
-  const resolved = path.resolve(dir);
+  if (typeof dir !== 'string' || !dir) return false;
+  const plat = platformFor(dir);
+  const win = plat === path.win32;
+  const resolved = plat.resolve(dir);
   const trimmed = resolved.replace(/[\\/]+$/, '');
-  // 盘根（`C:\` 去掉尾斜杠只剩 `C:`）不收：用户想整理素材不会选区区的整个磁盘，
-  // 而误选到盘根会把整个盘变成可读范围。
-  if (/^[a-zA-Z]:$/.test(trimmed)) return false;
+  // 文件系统根不能授权：用户想整理素材不会选区区的整个磁盘，而误选到根目录
+  // 会把整块盘变成可读范围。
+  //   - Windows 的 `C:\` 去掉尾斜杠只剩 `C:`，用盘符判断；
+  //   - POSIX 的 `/` 去掉尾斜杠是空串（`///` 也是这样），必须单独判空。
+  // 只写盘符那一条的话，Mac 上 `/` 会一路放行——实测过。
+  if (!trimmed || /^[a-zA-Z]:$/.test(trimmed)) return false;
+  if (isVolumeRoot(trimmed)) return false;
   // 系统目录不收。用户选中它们，几乎一定是选错了。
   //
   // 比对必须先把「用户可能写出来的等价形式」都摊平：
@@ -38,12 +166,12 @@ function looksLikeFolder(dir) {
   if (stripped) forms.add(stripped.toLowerCase());
   const real = realpathOf(resolved);
   if (real) forms.add(real.replace(/[\\/]+$/, '').toLowerCase());
-  const blocked = [
-    'c:\\windows', 'c:\\program files', 'c:\\program files (x86)',
-    'c:\\programdata', 'c:\\$recycle.bin', 'c:\\system volume information',
-  ];
+  const blocked = win ? WINDOWS_BLOCKED : POSIX_BLOCKED;
   for (const lower of forms) {
-    if (blocked.some(prefix => lower === prefix || lower.startsWith(prefix + '\\'))) return false;
+    // 8.3 短名只在「路径的真实形态拿不到」时才需要猜：Windows 上
+    // `realpathSync.native` 会展开它，Mac 上根本打不开这个路径（forms 里只有
+    // 用户写的那一份），这时按前六位比对是唯一能挡住 `C:\PROGRA~1` 的办法。
+    if (insideBlocked(lower.split(plat.sep), blocked, plat.sep, win)) return false;
   }
   return true;
 }
@@ -70,10 +198,10 @@ class MediaGrants {
     try {
       const parsed = JSON.parse(fs.readFileSync(this.file, 'utf8'));
       for (const dir of Array.isArray(parsed.dirs) ? parsed.dirs : []) {
-        if (typeof dir === 'string' && dir) this.dirs.add(path.resolve(dir));
+        if (typeof dir === 'string' && dir) this.dirs.add(normalizePath(dir));
       }
       for (const file of Array.isArray(parsed.files) ? parsed.files : []) {
-        if (typeof file === 'string' && file) this.files.add(path.resolve(file));
+        if (typeof file === 'string' && file) this.files.add(normalizePath(file));
       }
     } catch {
       // 台账坏了不能让应用起不来：当作空的，用户下次选目录会重新写一份。
@@ -109,7 +237,7 @@ class MediaGrants {
    */
   addDir(dir) {
     if (typeof dir !== 'string' || !dir) return false;
-    const resolved = path.resolve(dir);
+    const resolved = normalizePath(dir);
     if (this.dirs.has(resolved)) return true;
     if (!looksLikeFolder(resolved)) return false;
     this.dirs.add(resolved);
@@ -120,7 +248,7 @@ class MediaGrants {
   /** 登记单个文件。调用方已经确认它是文件。 */
   addFile(file) {
     if (typeof file !== 'string' || !file) return false;
-    const resolved = path.resolve(file);
+    const resolved = normalizePath(file);
     if (this.files.has(resolved)) return true;
     this.files.add(resolved);
     this.dirty = true;
@@ -130,7 +258,7 @@ class MediaGrants {
   /** 撤销一个目录（用户点了「移出」）。 */
   removeDir(dir) {
     if (typeof dir !== 'string' || !dir) return false;
-    const removed = this.dirs.delete(path.resolve(dir));
+    const removed = this.dirs.delete(normalizePath(dir));
     if (removed) this.dirty = true;
     return removed;
   }
@@ -147,7 +275,7 @@ class MediaGrants {
     if (typeof file !== 'string' || !file) return false;
     // `insideAllowed` 同时比对 `path.resolve(target)` 与 `realpathOf(target)`，
     // 所以两份都要撤。只删 resolved 的话，一条符号链接登记过以后仍然读得到。
-    const removed = this.files.delete(path.resolve(file));
+    const removed = this.files.delete(normalizePath(file));
     const real = realpathOf(file);
     const removedReal = real ? this.files.delete(real) : false;
     if (removed || removedReal) this.dirty = true;

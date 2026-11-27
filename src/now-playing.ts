@@ -42,12 +42,30 @@ const appNames: Record<string, string> = {
   telegram: 'Telegram',
 };
 
+/**
+ * macOS 的媒体会话给的是 bundle id，Windows 给的是可执行名。
+ * `appNames` 只认可执行名（那是 Windows 侧真正的一等公民），所以在查表之前
+ * 先把 bundle id 归一到可执行名——桥单独放在这里，不往 `appNames` 里塞
+ * 长得像 exe 名的 key。
+ *
+ * 为什么要分开：将来遇到新的 Mac 播放器，只加一行桥；加的这一行天然带语义
+ * （左边是 Apple 认的 id，右边是我们认的播放器），不会和「显示名」混在一起。
+ * 左边的 key 一律小写（查表前已 toLowerCase），右边必须是 `appNames` 里的 key。
+ */
+const bundleIds: Record<string, string> = {
+  'com.apple.music': 'applemusic',
+  'com.netease.163music': 'cloudmusic',
+  'com.tencent.qqmusicmac': 'qqmusic',
+};
+
 export function appLabel(app: string): string {
   if (!app) return '';
-  const key = app.replace(/\.exe$/i, '').toLowerCase();
+  const raw = app.replace(/\.exe$/i, '');
+  // 先过桥，再查表：两边的 key 都已是小写，比较时不用再转。
+  const key = bundleIds[raw.toLowerCase()] ?? raw.toLowerCase();
   if (appNames[key]) return appNames[key];
   const hit = Object.keys(appNames).find(name => key.includes(name));
-  return hit ? appNames[hit] : app.replace(/\.exe$/i, '');
+  return hit ? appNames[hit] : raw;
 }
 
 /** 有没有歌在放。只有拿到标题才算数，空白字符串不算。 */

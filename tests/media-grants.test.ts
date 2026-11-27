@@ -275,3 +275,61 @@ test('8.3 短名也绕过不了系统目录黑名单', () => {
   assert.equal(looksLikeFolder('C:\\PROGRA~1'), false);
   assert.equal(looksLikeFolder('C:\\PROGRA~1\\Common Files'), false);
 });
+
+/**
+ * 上面那批断言原来全写着 Windows 路径，所以在 macOS 上「跑不过」被当成了
+ * 「这个平台的测试不适用」——其实它们抓到的是真的没保护：`looksLikeFolder()`
+ * 用宿主 `path.resolve` 解析，Mac 上 `C:\Windows` 会被当成
+ * `/Users/<who>/repo/C:\Windows` 这种相对路径，黑名单永远比不上。
+ *
+ * 现在 `looksLikeFolder` 按**路径自己声称的形态**选解析器（盘符/UNC → win32，
+ * 其余 → posix），所以两种形态的路径在任何平台上都得到同一个答案。
+ * 下面这些就是补上的另一半：Mac 的系统目录真挡、Mac 的用户目录真放。
+ */
+test('macOS 系统目录与盘根一律拒，用户目录一律放', () => {
+  // 拒：这些目录里没有一类是用户会放素材的地方
+  for (const dir of [
+    '/', '///', '//',
+    '/System', '/System/Library', '/System/Volumes/Data',
+    '/Library', '/usr', '/usr/local/bin', '/bin', '/sbin', '/cores',
+    '/private', '/private/etc', '/private/var', '/etc', '/tmp', '/var',
+    '/Applications', '/Applications/Raven Ambient.app', '/dev',
+  ]) {
+    assert.equal(looksLikeFolder(dir), false, `${dir} 不该被授权`);
+  }
+
+  // 放：这才是他存素材的三个地方——家目录、共享目录、外接盘里的目录
+  for (const dir of [
+    '/Users/dumbraven', '/Users/dumbraven/Pictures', '/Users/dumbraven/Music',
+    '/Users/dumbraven/Downloads', '/Users/Shared', '/Users/Shared/素材',
+    '/Volumes/Ext/素材', '/Volumes/Ext/素材/壁纸',
+  ]) {
+    assert.equal(looksLikeFolder(dir), true, `${dir} 应当放行`);
+  }
+});
+
+test('外接盘的盘根拒，盘里的子目录放', () => {
+  // `/Volumes/Ext` 和 Windows 的 `C:\` 同义：授权它等于整块盘可读。
+  // 但用户的素材在 `/Volumes/Ext/素材` 下面，为了挡盘根把整块盘废掉就过了。
+  assert.equal(looksLikeFolder('/Volumes/Ext'), false);
+  assert.equal(looksLikeFolder('/Volumes/Ext/'), false, '尾斜杠不改变语义');
+  assert.equal(looksLikeFolder('/Volumes/Ext/素材'), true);
+  // 挂载点根本身也不该能授权
+  assert.equal(looksLikeFolder('/Volumes'), false);
+});
+
+test('系统目录判据按路径自身的平台，与跑在哪台机器无关', () => {
+  // 这是这次 bug 的核心：在 Mac 上跑，`C:\Windows` 也必须被拒。
+  // 靠的是「有盘符就用 win32 语义解析」，而不是靠宿主平台的 path。
+  assert.equal(looksLikeFolder('C:\\Windows'), false);
+  assert.equal(looksLikeFolder('C:\\Windows\\Fonts'), false);
+  assert.equal(looksLikeFolder('c:\\program files\\steam'), false);
+  assert.equal(looksLikeFolder('C:\\PROGRA~1'), false);
+  assert.equal(looksLikeFolder('C:\\Windows.'), false);
+  // 反过来，在 Windows 上跑时 `/System` 也得被拒
+  assert.equal(looksLikeFolder('/System'), false);
+  assert.equal(looksLikeFolder('/etc/passwd'), false);
+  // 不带盘符的两个平台的素材目录都要放
+  assert.equal(looksLikeFolder('D:\\素材\\壁纸'), true);
+  assert.equal(looksLikeFolder('/Users/dumbraven/Pictures'), true);
+});

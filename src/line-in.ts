@@ -94,13 +94,41 @@ export class LineIn {
   }
 }
 
-/** 把浏览器抛出的错误翻成用户能看懂的一句话。 */
+/**
+ * 把浏览器抛出的错误翻成用户能看懂的一句话。
+ *
+ * ⚠ 只用来填「可重试的失败」——设置面板会把它和「再试一次」并排显示。
+ * 「没装虚拟声卡」不在此列：那是常态，重试必然再失败，见下面的 `noCableHint`。
+ */
 export function lineInError(error: unknown): string {
   const name = (error as { name?: string })?.name;
   if (name === 'NotAllowedError') return '系统拒绝了录音权限';
-  if (name === 'NotFoundError') return '没找到虚拟声卡，先装好 VB-Cable 再打开这个开关';
   if (name === 'NotReadableError') return '虚拟声卡正被别的程序占用';
   if (name === 'OverconstrainedError') return '虚拟声卡不支持这个采样格式';
   const message = (error as { message?: string })?.message;
   return message || '未知原因';
 }
+
+/**
+ * 这个失败值不值得让用户点「再试一次」。
+ *
+ * `NotFoundError` 是唯一不可重试的一种：设备根本没装或没插，重试还是同样的结果。
+ * 它属于常态而不是故障，所以界面上走「状态说明」那条路（见 SettingsModal 的电表行），
+ * 不占用错误块那个带按钮的位置。
+ */
+export function isRetriable(error: unknown): boolean {
+  return (error as { name?: string })?.name !== 'NotFoundError';
+}
+
+/**
+ * 没有虚拟声卡时的那句状态说明。
+ *
+ * 一次说完四件事：现在是什么状态、缺什么、还能用什么、补齐之后怎么让它生效。
+ * 不能只说「没接上」——那会让用户以为外部音乐整个不可用，而歌名、封面明明都
+ * 来自系统媒体会话，与声卡无关。
+ *
+ * 最后那半句是必须的：这个场景没有「再试一次」按钮（见 `isRetriable`），
+ * 不说清楚怎么重连，用户装完声卡就只能对着这句说明发呆。注意措辞是「关掉再
+ * 打开这个开关」而不是「按再试一次」——那个按钮在这里不存在。
+ */
+export const noCableHint = '没接上虚拟声卡（要装 VB-Cable）。只有歌名，环境音不会自动避让；装好之后关掉再打开这个开关。';

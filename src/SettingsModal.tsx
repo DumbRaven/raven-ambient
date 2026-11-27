@@ -5,6 +5,7 @@ import { radioKeyDown } from './radio-keys';
 import { formatTime } from './model';
 import { trackTransitions, transitionHints, transitionNames, type Cabinet, type TrackTransition } from './records';
 import { checkForUpdate, openDownload } from './update-bridge';
+import { noCableHint } from './line-in';
 import type { UpdateReply } from './update-state';
 
 /**
@@ -13,11 +14,13 @@ import type { UpdateReply } from './update-state';
  * 每一项都是「一件具体的事」，所以按组排，不放总说明——用户是来找某一项的，
  * 不是来读目录的。说明文字只在「为什么值得做」这一层出现（比如清理只删封面图）。
  */
-export default function SettingsModal({ cabinet, busy, background, lineError, status, sleepUntil, remaining, imageInput, onChange, onClearBackground, onToggleLineMode, onClearCoverCache, onSetSleep }: {
+export default function SettingsModal({ cabinet, busy, background, lineError, noCable, status, sleepUntil, remaining, imageInput, onChange, onClearBackground, onToggleLineMode, onClearCoverCache, onSetSleep }: {
   cabinet: Cabinet;
   busy: string;
   background: string;
   lineError: string;
+  /** 这台机器没装虚拟声卡。与 lineError 互斥：它不占用带「再试一次」的错误块。 */
+  noCable: boolean;
   status: { lineInput: number; ducked: boolean; lineLive: boolean };
   sleepUntil: number;
   remaining: number;
@@ -124,8 +127,20 @@ export default function SettingsModal({ cabinet, busy, background, lineError, st
                 : /* 设备被拔掉、或者被别的程序抢走之后，lineLive 会变 false，
                      而 lineInput 在没声音的时候本来就一直是 0——只读 lineInput
                      的话，「已接上虚拟声卡，等待声音」这句话在源断开后照样成立，
-                     用户会一直等一个已经不可能来的声音。 */
-                  status.lineLive
+                     用户会一直等一个已经不可能来的声音。
+                     往下分三种，各自只占一行、互不重复：
+                     - lineError：可重试的失败（权限/占用/格式）。具体原因和「再试一次」
+                       在下面的错误块里，这里只说状态，否则同一件事说两遍。
+                       措辞必须是中性的「没接通」而不是「没接上声卡」——这三种失败里
+                       声卡是装着的，说成没装就成了假话（用户会去重装一个已经装好的东西）。
+                     - noCable：这台机器没装虚拟声卡。它不是失败，是常态，所以没有
+                       「再试一次」——点了必然再失败。说明怎么办的那句话并进 state。
+                     - 其余：连上过但断了，重连有意义，才让人去关开一次。 */
+                  lineError
+                  ? '外部音乐没有接通'
+                  : noCable
+                  ? noCableHint
+                  : status.lineLive
                   ? '已接上虚拟声卡，等待声音'
                   : '虚拟声卡断开了 · 关掉再打开这个开关可以重连'}
             </small>

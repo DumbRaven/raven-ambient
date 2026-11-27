@@ -18,7 +18,7 @@ import { type TurntableDisc } from './RecordPlayer';
 import PlayCard from './PlayCard';
 import { dismissSplash } from './splash';
 import RollNumber from './roll-number';
-import { LineIn, lineInError } from './line-in';
+import { LineIn, isRetriable, lineInError } from './line-in';
 import { appLabel, emptyNowPlaying, hasTrack, parseNowPlaying, type NowPlaying } from './now-playing';
 import { askNowPlaying, commandNowPlaying, listenNowPlaying } from './now-playing-bridge';
 import { askMedia, dropWallpapers, forgetMediaDir as forgetMediaDirGrant, forgetMediaFile as forgetMediaFileGrant, isInside, listenMedia, looseMedia, mergeMedia, pickMediaFiles, pickMediaFolder, replaceMediaDir, replaceWallpapers, rescanMediaFolder, restoreMediaDirs, scanWallpapers, toMediaItem, toWallpaperItem, type MediaMessage } from './media';
@@ -98,6 +98,9 @@ export default function App() {
   const [remaining, setRemaining] = useState(0);
   // 外部音乐输入：开关一开就抓虚拟声卡，设备写死，不需要用户选
   const [lineError, setLineError] = useState('');
+  // 「这台机器没有虚拟声卡」是常态而不是故障：它不占用 lineError（那个位置带「再试一次」），
+  // 由设置面板的电表行单独说明。和 lineError 分开存，是为了两句话不会同时出现。
+  const [noCable, setNoCable] = useState(false);
   const line = useRef(new LineIn());
   // 正在试听哪一张。试听是「听一下就走」，8 秒后自己停，所以不放进 status 里。
   const [previewId, setPreviewId] = useState<string>();
@@ -440,33 +443,46 @@ export default function App() {
   }
   /**
    * 开关外部音乐模式。
-   * 开：先抓虚拟声卡，抓不到就整体不生效（免得界面进了外部模式却没声音）；
+   *
+   * 「接入外部播放器」不等于「接上了虚拟声卡」：歌名、封面来自系统媒体会话，
+   * 跟声卡无关；声卡只决定**音频**能不能进来，也就是能不能做避让。
+   * 所以抓不到声卡时不再整体失败——模式照开、歌名照显示，只是没有避让。
+   * 反过来做的后果是：没装声卡的机器连「现在在放什么」都看不到，
+   * 而这条信息本来就拿得到。
+   *
    * 关：断开流，回到本地唱片。
    */
   async function toggleLineMode(next: boolean) {
     setLineError('');
+    setNoCable(false);
     if (!next) {
       line.current.close();
       player.current?.detachLineIn();
       change({ lineMode: false });
       return;
     }
+    // 先把模式打开：订阅元数据这件事与声卡无关，抓声卡失败也不该把它拦下来。
+    change({ lineMode: true });
     try {
       const stream = await line.current.open();
       player.current?.attachLineIn(stream);
-      change({ lineMode: true });
-      // 不用在这里 setFilter 把「音乐」改掉：渲染时 activeFilter 会把
-      // lineMode 下的 music 降级成 ambient（见那边的注释）。改 state 反而会
-      // 把用户原来的选择吃掉——他关掉外部模式后回不到音乐那一栏了。
-      // 打开外部音乐模式就等于「要听了」：环境音必须同时起来。
-      // 否则外部音乐在响、环境音静音，避让没有任何东西可以压，
-      // 用户只会觉得「避让没生效」。
-      player.current?.startAmbientOnly();
     } catch (error) {
-      const text = lineInError(error);
-      setLineError(text);
-      notify(`接不上外部音乐：${text}。`);
+      // 没声卡只是「没有音频」，不是失败：原因交给设置面板的状态行说（noCable），
+      // 不再用 toast 说「接不上外部音乐」——歌名是接上的，那句话会误导。
+      //
+      // 只有可重试的原因才进 lineError：那个位置带一个「再试一次」按钮，
+      // 而设备没装的时候点了必然再失败，给用户一个假出路比不说更糟。
+      setLineError(isRetriable(error) ? lineInError(error) : '');
+      setNoCable(error instanceof Error && error.name === 'NotFoundError');
     }
+    // 不用在这里 setFilter 把「音乐」改掉：渲染时 activeFilter 会把
+    // lineMode 下的 music 降级成 ambient（见那边的注释）。改 state 反而会
+    // 把用户原来的选择吃掉——他关掉外部模式后回不到音乐那一栏了。
+    // 打开外部音乐模式就等于「要听了」：环境音必须同时起来。
+    // 否则外部音乐在响、环境音静音，避让没有任何东西可以压，
+    // 用户只会觉得「避让没生效」。没接上声卡时也一样——那种情况下
+    // 环境音是这个模式里唯一还会出声的东西。
+    player.current?.startAmbientOnly();
   }
     /** 开合唱片卡片。右侧详情读的是 focusId，跟开合是两件事——合上了也仍停在这张上。 */
   function toggleFlip(id: string) {
@@ -567,25 +583,24 @@ export default function App() {
         if (!active) return;
         // 封面到位，界面已经能看了，这时才撤开屏，免得撤完再补一张张封面闪一下
         dismissSplash();
-        // 上次开着外部音乐模式就自动接回来。抓不到就退回本地模式，不打扰启动。
+        // 上次开着外部音乐模式就自动接回来。
+        // 抓不到声卡不再退回本地模式：模式（元数据）和音频是两件事，
+        // 没声卡时歌名照样能显示，退回本地反而把拿得到的信息也关掉了。
         if (saved.lineMode) {
           try {
             const stream = await line.current.open();
             if (!active) { for (const track of stream.getTracks()) track.stop(); return; }
             player.current?.attachLineIn(stream);
-            player.current?.startAmbientOnly();
           } catch (error) {
-            // 虚拟声卡没装或没插，退回本地模式：界面不能停在「只有环境音」却收不到外部声音
+            // 没声卡只是「没有音频」。原因写进设置面板，不再每次启动弹一句 toast：
+            // 没装声卡的机器每次开机都被提醒一遍，那是噪音，不是信息。
+            // 与 toggleLineMode 同一条规则：只有可重试的原因才占用错误块。
             if (active) {
-              change({ lineMode: false });
-              const text = lineInError(error);
-              setLineError(text);
-              // 必须说出来。此前这里只是把错误塞进设置弹窗里的一个 <p>，
-              // 而用户没理由为了「声音怎么不对」去翻设置——他看到的只是
-              // 「明明开着外部音乐模式，重启之后却没声了」。
-              notify(`上次开着外部音乐，这次没接上：${text}。装好之后在设置里点「再试一次」。`);
+              setLineError(isRetriable(error) ? lineInError(error) : '');
+              setNoCable(error instanceof Error && error.name === 'NotFoundError');
             }
           }
+          if (active) player.current?.startAmbientOnly();
         }
       } catch (error) {
         // 走到这里说明连「读盘」这一步本身都炸了（比如存储驱动不可用）。
@@ -1121,6 +1136,7 @@ export default function App() {
         busy={busy}
         background={background}
         lineError={lineError}
+        noCable={noCable}
         status={status}
         sleepUntil={sleepUntil}
         remaining={remaining}
