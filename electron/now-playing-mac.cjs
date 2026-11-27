@@ -15,6 +15,8 @@
 // 绝不影响播放器本身的任何功能。
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 /**
  * GUI 启动的 app 拿不到终端里的 PATH（通常只有 /usr/bin:/bin:/usr/sbin:/sbin），
@@ -25,6 +27,10 @@ const TOOL_CANDIDATES = [
   '/opt/homebrew/bin/media-control', // Apple Silicon 的 brew 默认位置
   '/usr/local/bin/media-control',    // Intel Mac / 旧 brew
   '/opt/local/bin/media-control',    // MacPorts
+  // 没装 brew 的机器上，用户自己下载二进制放到 ~/.local/bin 是最可能的去处。
+  // 少了这一条，toolPath() 会返回空串、start() 直接 false，整个外部音乐静默失效——
+  // 症状是「明明装好了、命令行能跑，应用里就是不给显示」。
+  path.join(os.homedir(), '.local', 'bin', 'media-control'),
 ];
 
 /** 找 media-control 的绝对路径。找不到返回空串，调用方据此降级。 */

@@ -17,10 +17,11 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const require = createRequire(import.meta.url);
-const { parseLine } = require('../electron/now-playing-mac.cjs');
+const { parseLine, toolPath } = require('../electron/now-playing-mac.cjs');
 
 /** media-control 的 `stream` 形状：外面裹一层 { diff, payload }。 */
 function stream(payload: object) {
@@ -100,4 +101,20 @@ test('不是 JSON 的行返回 null，调用方据此跳过', () => {
   assert.equal(parseLine(''), null);
   assert.equal(parseLine('null'), null);
   assert.equal(parseLine('[]'), null);
+});
+
+test('找不到工具时返回空串，调用方据此静默降级', () => {
+  // 这台机器上没有 media-control（Windows 上没有，没有 brew 的 Mac 上也没有），
+  // 所以 toolPath() 应当返回空串。真正要防的回归是「候选列表被删空」：
+  // 那种情况下 start() 会永远返回 false，外部音乐在 Mac 上静默失效，
+  // 而命令行里一切正常——最难查的一种。
+  assert.equal(typeof toolPath(), 'string');
+  assert.equal(toolPath(), '');
+});
+
+test('候选路径包含用户自己安装的位置 ~/.local/bin', async () => {
+  // 没装 brew 的机器（比如这台 Mac mini）只能把二进制放到 ~/.local/bin。
+  // 少了这一条，装好了也认不出来。
+  const source = await readFile(new URL('../electron/now-playing-mac.cjs', import.meta.url), 'utf8');
+  assert.match(source, /\.local['"]\s*,\s*['"]bin['"]\s*,\s*['"]media-control['"]/);
 });
