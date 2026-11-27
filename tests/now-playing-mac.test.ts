@@ -17,6 +17,7 @@
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
@@ -103,13 +104,17 @@ test('不是 JSON 的行返回 null，调用方据此跳过', () => {
   assert.equal(parseLine('[]'), null);
 });
 
-test('找不到工具时返回空串，调用方据此静默降级', () => {
-  // 这台机器上没有 media-control（Windows 上没有，没有 brew 的 Mac 上也没有），
-  // 所以 toolPath() 应当返回空串。真正要防的回归是「候选列表被删空」：
-  // 那种情况下 start() 会永远返回 false，外部音乐在 Mac 上静默失效，
-  // 而命令行里一切正常——最难查的一种。
-  assert.equal(typeof toolPath(), 'string');
-  assert.equal(toolPath(), '');
+test('toolPath 只返回真实存在的那条候选，找不到就是空串', () => {
+  // 这条**不能断言「一定为空」**。我在第一版里就是这么写的，结果在 Windows 上绿、
+  // 在装了 media-control 的 Mac 上红——测试被「本机恰好没装」这个巧合骗过了。
+  // 真正要钉住的是契约：返回的要么是空串，要么是磁盘上真实存在的文件；
+  // 绝不能是「候选列表里的第一条」这种没验证过的字符串。
+  const found = toolPath();
+  assert.equal(typeof found, 'string');
+  if (found !== '') {
+    assert.ok(existsSync(found), `toolPath() 返回了 ${found}，但这个文件不存在`);
+    assert.match(found, /media-control$/);
+  }
 });
 
 test('候选路径包含用户自己安装的位置 ~/.local/bin', async () => {
