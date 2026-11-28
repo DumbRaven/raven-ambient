@@ -476,6 +476,10 @@ export default function App() {
     try {
       const stream = await line.current.open();
       player.current?.attachLineIn(stream);
+      // 成功也可能是「接上了但没声音」（mac 的 silent：两秒半内没见到非零字节）。
+      // 播放器暂停着的时候这是正常结果，所以不能算失败、不能弹提示；
+      // 但如果用户正在放歌还没声音，那就是权限没给——把话留在设置面板里。
+      if (line.current.lastReason) setLineHint(systemAudioHint(line.current.lastReason));
     } catch (error) {
       // 没接上只是「没有音频」，不是失败：歌名、封面来自系统媒体会话，与音频无关。
       // 原因交给设置面板的状态行说，不再用 toast 说「接不上外部音乐」——那句话会误导。
@@ -604,6 +608,8 @@ export default function App() {
             const stream = await line.current.open();
             if (!active) { for (const track of stream.getTracks()) track.stop(); return; }
             player.current?.attachLineIn(stream);
+            // 与 toggleLineMode 同一条规则：silent 也算接上了，只是把话留在面板里。
+            if (line.current.lastReason) setLineHint(systemAudioHint(line.current.lastReason));
           } catch (error) {
             // 没接上只是「没有音频」。原因写进设置面板，不再每次启动弹一句 toast：
             // 没装声卡的机器每次开机都被提醒一遍，那是噪音，不是信息。

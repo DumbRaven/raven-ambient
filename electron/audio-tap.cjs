@@ -37,6 +37,20 @@ const CHUNK_MS = 200;
 const MAX_QUEUE = 45;
 
 /**
+ * 起进程之后等多久才认定「没收到声音」。
+ *
+ * 为什么需要这个数：权限拿没拿到，我们**没法提前问**——
+ * `systemPreferences.askForMediaAccess` 只接受 'microphone' / 'camera'，
+ * 传 'screen' 会抛 `Error: Invalid media type`（实测，见 docs 第 5.4 节）；
+ * audiotee 自己的 README 也写明它没有能力预检那个权限，拿不到时它会
+ * 「安安静静地录一段全零」。所以唯一的判据是**真的有没有字节不为零**。
+ *
+ * 2.5 秒足够覆盖起进程 + Core Audio 建 tap 的时间，又不至于让用户对着
+ * 一个没有任何反馈的开关发呆。
+ */
+const SIGNAL_GRACE_MS = 2500;
+
+/**
  * 二进制的路径。
  *
  * **不能在 asar 里**：可执行文件被塞进 asar 之后没法被 spawn。
@@ -72,6 +86,15 @@ class AudioTap {
      * 「关了之后进程又被拉起来」。
      */
     this.intent = 0;
+    /**
+     * 起进程之后有没有见过非零样本。
+     *
+     * 这是判断「权限到底有没有」的唯一可靠证据。见 SIGNAL_GRACE_MS 的注释：
+     * 问不了权限，只能看数据。
+     */
+    this.loud = false;
+    /** 宽限期计时器：到点还没见到非零样本就报 silent。 */
+    this.grace = null;
   }
 
   /** 页面上显示什么由这个决定：live 表示真的有音频在流。 */
@@ -80,9 +103,9 @@ class AudioTap {
     this.state = next;
     // 带上状态名本身，不只给一个 live 布尔。
     //
-    // 页面侧靠它分辨「还在问权限」（asking）与「已经有结论」（denied/error）。
-    // 只给 live 的话这两类是同一个值（都是 false），页面会把「正在等用户点弹窗」
-    // 当成「用户已经拒绝了」，于是开关一按下去就显示失败文案，弹窗还没出来。
+    // 页面侧靠它分辨「进程起来了但还没声音」（starting / silent）与
+    // 「已经有结论」（denied / error）。只给 live 的话这几类都是 false，
+    // 页面只能猜，猜错的代价是「显示已接通，然后永远没有声音」。
     this.post({ type: 'state', live: next === 'live', state: next, reason });
   }
 
@@ -119,33 +142,14 @@ class AudioTap {
       return false;
     }
 
-    // 立刻报一句「正在问权限」，再去做那件要等用户点弹窗的事。
-    //
-    // 这条是给页面判断用的：它收到它，就说明抓取这条路在这台机器上是成立的
-    // （平台对、二进制在），于是可以把 MediaStream 建起来交给音频图；
-    // 至于后面有没有声音，是另一件事，走 denied/live 那两条状态。
-    // 少了这一条，页面只能等到权限询问结束才知道该不该建流，
-    // 用户要是在弹窗前面犹豫十秒，页面就干等十秒。
-    this.report('asking', '');
+    // 立刻报一句「正在起」，让页面知道抓取这条路在这台机器上是成立的
+    // （平台对、二进制在），可以先把 MediaStream 建起来交给音频图。
+    // 至于后面有没有声音，是另一件事——由 live / silent 两条状态回答。
+    this.report('starting', '');
 
     // 打包解出来之后可执行位可能丢，每次启动顺手补上。失败不影响流程：
     // 如果它本来就可执行，chmod 只是白做一次。
     try { fs.chmodSync(bin, 0o755); } catch { /* 只读挂载之类的情况，交给 spawn 报错 */ }
-
-    // 主动要一次权限（这就是「方案 C」）。
-    //
-    // 为什么必须主动要：macOS 对「系统音频录制」不一定弹窗。audiotee 的 README
-    // 原话是「至少一些常见终端会安安静静地录一段全零」——不主动要，用户看到的
-    // 症状是「开关打开了但没声音」，而不是「缺权限」，这两个的修法完全不同。
-    //
-    // 用 screen 这一档：macOS 把系统音频录制挂在同一个隐私面板（「录屏与系统录音」）
-    // 的同一套 TCC 条目下，没有单独的 API 可以问「能不能录系统声音」。
-    // 已经授权过时这个调用立刻返回 true，不会重复弹窗。
-    const allowed = await askScreen();
-    if (!allowed) {
-      this.report('denied', '系统拒绝了系统音频录制权限');
-      return false;
-    }
 
     this.stopping = false;
     const child = spawn(bin, [
@@ -164,11 +168,13 @@ class AudioTap {
     });
 
     child.on('error', error => {
+      this.clearGrace();
       this.child = null;
       this.report('error', error.message);
     });
 
     child.on('exit', (code, signal) => {
+      this.clearGrace();
       this.child = null;
       // 我们自己停的就不报错。用户关掉开关还看到一句红字是最讨厌的。
       if (this.stopping) { this.report('idle'); return; }
@@ -178,8 +184,29 @@ class AudioTap {
     });
 
     this.child = child;
-    this.report('live');
+
+    // 状态先报 starting（上面已经报过），这里只起宽限期。
+    //
+    // 为什么不在 spawn 成功时报 live：进程起来了不等于抓得到声音。
+    // 没权限时 audiotee 照样正常启动、正常输出 200ms 一块的 PCM，只是每块全是零
+    // ——它自己的 README 写着「至少一些常见终端会安安静静地录一段全零」。
+    // 报 live 会让界面显示「已接上」，然后用户永远没有声音，而日志一行错都没有。
+    this.loud = false;
+    this.grace = setTimeout(() => {
+      this.grace = null;
+      if (!this.loud) this.report('silent', '没有收到声音，可能缺少系统音频录制权限');
+    }, SIGNAL_GRACE_MS);
+    this.grace.unref?.();
+
     return true;
+  }
+
+  /** 清掉宽限期计时器。stop / exit / error 三条路都要清，否则它会去动已经没了的进程。 */
+  clearGrace() {
+    if (this.grace) {
+      clearTimeout(this.grace);
+      this.grace = null;
+    }
   }
 
   /**
@@ -196,6 +223,7 @@ class AudioTap {
     while (buffer.length - offset >= chunkBytes) {
       const piece = buffer.subarray(offset, offset + chunkBytes);
       offset += chunkBytes;
+      this.inspect(piece);
       this.push(piece);
     }
 
@@ -203,6 +231,25 @@ class AudioTap {
     // 半个样本永远凑不齐的情况：说明流的格式和我们假设的不一样
     // （audiotee 升级改了位深/声道）。留着这一个字节只会让后面全部错位。
     if (this.pending.length === 1) this.pending = Buffer.alloc(0);
+  }
+
+  /**
+   * 看一眼这块字节里有没有声音，第一次见到就报 live。
+   *
+   * 这是整个文件里唯一的「权限判断」——没有 API 能提前问，只能看数据。
+   * 扫描到第一个非零字节就提前返回：一块 19200 字节里只要有一个非零，就说明
+   * 这条采集链是通的，没必要扫完。
+   */
+  inspect(piece) {
+    if (this.loud) return;
+    for (let i = 0; i < piece.length; i += 1) {
+      if (piece[i] !== 0) {
+        this.loud = true;
+        this.clearGrace();
+        this.report('live', '');
+        return;
+      }
+    }
   }
 
   push(piece) {
@@ -216,6 +263,7 @@ class AudioTap {
 
   stop() {
     this.stopping = true;
+    this.clearGrace();
     const child = this.child;
     this.child = null;
     this.pending = 0;

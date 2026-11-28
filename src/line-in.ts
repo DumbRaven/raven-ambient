@@ -116,6 +116,10 @@ export class LineIn {
       // mac 那条路上没有设备：声音是系统级的，不存在「选哪个输入」。
       // 留一个固定的短名，设置面板拿它占位（那边 mac 分支不会显示设备名）。
       this.device = '系统音频';
+      // silent 不是失败：流是通的，只是两秒半内没见到非零字节——
+      // 播放器暂停着的时候静音才是对的。所以照常返回，只把原因记下来，
+      // 让 App 在设置面板里说一句「如果正在播放还没声音，去开权限」。
+      if (result.silent) this.lastReason = 'silent';
       return result.stream;
     }
     const stream = await openCable();

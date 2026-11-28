@@ -31,8 +31,10 @@ const FALLBACK_CHANNELS = 1;
  * 主进程推来的一块 PCM，或一条抓取状态。与 audio-tap.cjs 的 post() 形状一致。
  *
  * `state` 是状态名本身，不能只看 `live`：
- *   asking     —— 平台对、二进制在，正在等用户点权限弹窗。**不是失败**。
- *   live       —— 有音频在流。
+ *   starting   —— 平台对、二进制在、进程刚起。**不是失败**。
+ *   live       —— 真的读到了非零样本（权限是通的）。
+ *   silent     —— 进程在跑、字节在读，但两秒半里全是零。
+ *                 多半是缺权限，也可能只是播放器暂停着——所以它给流也给人话。
  *   denied / missing / error / unsupported / idle —— 有结论的结局，各自对应不同的提示。
  */
 export type TapMessage =

@@ -58,20 +58,27 @@ test('PCM 转浮点：忽略 byteOffset，只读属于这一段的那几个字�
   assert.equal(out[1], 500 / 32768);
 });
 
-test('四种失败各有各的说法，不能混成一句', () => {
+test('五种结局各有各的说法，不能混成一句', () => {
   const hints = {
     denied: systemAudioHint('denied'),
+    silent: systemAudioHint('silent'),
     missing: systemAudioHint('missing'),
     unsupported: systemAudioHint('unsupported'),
     error: systemAudioHint('error'),
   };
   const all = Object.values(hints);
-  assert.equal(new Set(all).size, 4, '四种原因必须是四句不同的话');
+  assert.equal(new Set(all).size, 5, '五种原因必须是五句不同的话');
 
   // 没权限那句必须指出具体去哪开——用户看到「没权限」之后唯一想问的就是这个。
   assert.ok(hints.denied.includes('系统设置'), '没权限时要指路到系统设置');
   assert.ok(hints.denied.includes('录屏与系统录音'), '要写出面板名');
   assert.ok(hints.denied.includes('仅系统录音'), '要写出具体那一节');
+
+  // silent 是「接上了但没听到声音」，最可能的原因还是同一个权限开关，
+  // 所以它也得指路到同一处——但说法必须和 denied 不同，否则用户会以为
+  // 「程序说没权限」和「程序接上了」是同一件事。
+  assert.ok(hints.silent.includes('仅系统录音'), 'silent 要指到具体那一节');
+  assert.ok(hints.silent.includes('正在播放'), 'silent 要先排除「根本没在放」这一种');
 
   // 缺程序是打包事故，用户自己修不了，别让他去翻设置。
   assert.ok(!hints.missing.includes('系统设置'), '缺程序不该让用户去系统设置里找');
@@ -87,6 +94,8 @@ test('四种失败各有各的说法，不能混成一句', () => {
 
 test('只有「没权限」这一种是用户能自己解决的，措辞要给出动作', () => {
   assert.ok(systemAudioHint('denied').includes('打开'), '要告诉用户去打开那个开关');
-  // 其余三种不该出现「打开开关」这种让用户徒劳去点的指令
+  // silent 也要给一个动作：「正在播放的话去把这个程序打开」。
+  assert.ok(systemAudioHint('silent').includes('打开'), 'silent 时要告诉用户去打开');
+  // 不支持的那种没有开关可开，别给假出路
   assert.ok(!systemAudioHint('unsupported').includes('打开'), '不支持的时候没有开关可开');
 });

@@ -14,15 +14,25 @@ import { listenTap, startTap, stopTap } from './audio-tap-bridge.ts';
 import { TapStream, type TapMessage } from './audio-tap.ts';
 
 /** 抓取没成的原因。每一种对应一句不同的话，不能混成一句「没声音」。 */
-export type TapReason = 'unsupported' | 'denied' | 'missing' | 'error';
+export type TapReason = 'unsupported' | 'denied' | 'missing' | 'error' | 'silent';
 
-export type TapResult = { ok: true; stream: MediaStream } | { ok: false; reason: TapReason; detail: string };
+/**
+ * `silent` 是唯一一个「流交出去了但可能没声音」的结果。
+ *
+ * 它不能算失败：流是真的（页面据此可以建音频图、可以让环境音避让），
+ * 只是我们等了两秒半没见到非零字节。这在两种情况下会正常发生——
+ * 播放器暂停着、或者系统没给权限。两者的共同点是「用户需要被告诉一声」，
+ * 所以走 ok:true + silent 标记，让上层把话写在设置面板里，而不是把整条路判死。
+ */
+export type TapResult =
+  | { ok: true; stream: MediaStream; silent?: boolean }
+  | { ok: false; reason: TapReason; detail: string };
 
 /**
  * 等第一条「有结论」的状态消息的超时。
  *
- * `asking` 那一条只说「平台对、二进制在」，真正的结论在后面（live / denied）。
- * 用户在系统弹窗前面犹豫多久都合理，但**弹窗本身**在 2 秒内就该出现；
+ * `starting` 那一条只说「平台对、二进制在、进程在起」，真正的结论在后面
+ * （live / silent / denied）。主进程那边宽限期是 2.5 秒，所以正常最多等 2.5 秒；
  * 5 秒还没结论说明这条路卡住了，那时候退回「没接上」比一直转圈好。
  */
 const CONCLUDE_MS = 5000;
@@ -37,6 +47,7 @@ function reasonOf(state: string): TapReason {
   if (state === 'missing') return 'missing';
   if (state === 'unsupported') return 'unsupported';
   if (state === 'denied') return 'denied';
+  if (state === 'silent') return 'silent';
   return 'error';
 }
 
@@ -79,10 +90,14 @@ export function openSystemAudio(): Promise<TapResult> {
     // 反过来先发再订阅会漏掉开头几条（表现是偶尔要多点一次开关）。
     off = listenTap((message: TapMessage) => {
       if (message.type === 'pcm') { tap.write(message); return; }
-      // asking 只说明「平台对、二进制在、正在等用户点弹窗」，还没有结论。
-      // 把它当成失败会让开关一按下去就显示「没权限」，而弹窗根本还没出来。
-      if (message.state === 'asking') return;
+      // starting 只说明「平台对、二进制在、进程刚起」，还没有结论。
+      // 把它当成失败会让开关一按下去就显示「没接上」，而进程才刚 spawn。
+      if (message.state === 'starting') return;
       if (message.state === 'live') { finish({ ok: true, stream }); return; }
+      // silent：两秒半没见到非零字节。流是真的，照给出去，只是打个标记
+      // 让上层在设置面板里说一句「如果播放器正在播放仍然没声音，去开权限」。
+      // 这里**不能**当成失败——播放器暂停着的时候，静音才是正确结果。
+      if (message.state === 'silent') { finish({ ok: true, stream, silent: true }); return; }
       finish({ ok: false, reason: reasonOf(message.state), detail: message.reason });
     });
 
@@ -104,12 +119,14 @@ export function closeSystemAudio(): void {
 }
 
 /**
- * 没接上时给用户看的那句话。
+ * 给用户看的那句话。
  *
- * 三种原因三句话，因为它们的下一步动作完全不同：
- *   denied    —— 用户得去系统设置里打开一个开关。
- *   missing   —— 装包出问题，用户自己修不了，别让他去找设置。
- *   error     —— 说不清，给一次重试的机会。
+ * 五种原因五句话，因为它们的下一步动作完全不同：
+ *   denied      —— 用户得去系统设置里打开一个开关。
+ *   silent      —— 流通了但没声音，多半还是同一个开关（只是这次没报错）。
+ *   missing     —— 装包出问题，用户自己修不了，别让他去找设置。
+ *   unsupported —— 系统版本不支持，说什么都没用。
+ *   error       —— 说不清，给一次重试的机会。
  *
  * 措辞里不出现「虚拟声卡」：mac 上根本不需要装那个东西，提它只会让人去搜一个
  * 不存在的下载页。
@@ -117,6 +134,9 @@ export function closeSystemAudio(): void {
 export function systemAudioHint(reason: TapReason): string {
   if (reason === 'denied') {
     return '还没拿到系统音频的录制权限。到「系统设置 → 隐私与安全性 → 录屏与系统录音」里，把「仅系统录音」那一节的开关打开。';
+  }
+  if (reason === 'silent') {
+    return '接上了，但还没听到声音。如果播放器正在播放，去「系统设置 → 隐私与安全性 → 录屏与系统录音」的「仅系统录音」里把这个程序打开。';
   }
   if (reason === 'missing') return '安装包里缺少音频抓取程序，重新下载一次安装包可以解决。';
   if (reason === 'unsupported') return '这个系统版本不支持直接抓系统音频。只有歌名，环境音不会自动避让。';
