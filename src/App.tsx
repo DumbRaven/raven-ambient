@@ -19,6 +19,7 @@ import PlayCard from './PlayCard';
 import { dismissSplash } from './splash';
 import RollNumber from './roll-number';
 import { LineIn, isRetriable, lineInError } from './line-in';
+import { systemAudioHint } from './system-audio';
 import { appLabel, emptyNowPlaying, hasTrack, parseNowPlaying, type NowPlaying } from './now-playing';
 import { askNowPlaying, commandNowPlaying, listenNowPlaying } from './now-playing-bridge';
 import { askMedia, dropWallpapers, forgetMediaDir as forgetMediaDirGrant, forgetMediaFile as forgetMediaFileGrant, isInside, listenMedia, looseMedia, mergeMedia, pickMediaFiles, pickMediaFolder, replaceMediaDir, replaceWallpapers, rescanMediaFolder, restoreMediaDirs, scanWallpapers, toMediaItem, toWallpaperItem, type MediaMessage } from './media';
@@ -96,11 +97,19 @@ export default function App() {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const [sleepUntil, setSleepUntil] = useState(0);
   const [remaining, setRemaining] = useState(0);
-  // 外部音乐输入：开关一开就抓虚拟声卡，设备写死，不需要用户选
+  // 外部音乐输入：开关一开就抓音频来源，不需要用户选
   const [lineError, setLineError] = useState('');
   // 「这台机器没有虚拟声卡」是常态而不是故障：它不占用 lineError（那个位置带「再试一次」），
   // 由设置面板的电表行单独说明。和 lineError 分开存，是为了两句话不会同时出现。
+  // 只对 Windows 有意义——mac 上不存在「装没装声卡」这件事。
   const [noCable, setNoCable] = useState(false);
+  // mac 那条路上「没接上」的原因，已经翻成给用户看的一句话。
+  //
+  // 为什么不用 noCable 那个布尔：mac 的失败有四种（不支持/没权限/缺程序/说不清），
+  // 每一种要用户做的事都不一样，压成一个布尔就只能说一句笼统的话，等于没说。
+  // 也不全塞进 lineError：那个位置带「再试一次」按钮，而「这台系统不支持」
+  // 点一百次也不会变，给一个假出路比不给更糟（规则见 src/line-in.ts）。
+  const [lineHint, setLineHint] = useState('');
   const line = useRef(new LineIn());
   // 正在试听哪一张。试听是「听一下就走」，8 秒后自己停，所以不放进 status 里。
   const [previewId, setPreviewId] = useState<string>();
@@ -455,25 +464,29 @@ export default function App() {
   async function toggleLineMode(next: boolean) {
     setLineError('');
     setNoCable(false);
+    setLineHint('');
     if (!next) {
       line.current.close();
       player.current?.detachLineIn();
       change({ lineMode: false });
       return;
     }
-    // 先把模式打开：订阅元数据这件事与声卡无关，抓声卡失败也不该把它拦下来。
+    // 先把模式打开：订阅元数据这件事与音频来源无关，抓音频失败也不该把它拦下来。
     change({ lineMode: true });
     try {
       const stream = await line.current.open();
       player.current?.attachLineIn(stream);
     } catch (error) {
-      // 没声卡只是「没有音频」，不是失败：原因交给设置面板的状态行说（noCable），
-      // 不再用 toast 说「接不上外部音乐」——歌名是接上的，那句话会误导。
+      // 没接上只是「没有音频」，不是失败：歌名、封面来自系统媒体会话，与音频无关。
+      // 原因交给设置面板的状态行说，不再用 toast 说「接不上外部音乐」——那句话会误导。
       //
-      // 只有可重试的原因才进 lineError：那个位置带一个「再试一次」按钮，
-      // 而设备没装的时候点了必然再失败，给用户一个假出路比不说更糟。
-      setLineError(isRetriable(error) ? lineInError(error) : '');
-      setNoCable(error instanceof Error && error.name === 'NotFoundError');
+      // 三种去处，规则是「用户能不能自己解决」：
+      //   mac 的任何原因 → lineHint 一句具体的话（去设置开权限 / 重下安装包 / 就是没有）
+      //   可重试的失败   → lineError（那个位置带「再试一次」，重试真的可能成）
+      //   不可重试       → noCable（设备根本没装，重试必然再失败）
+      if (line.current.lastReason) setLineHint(systemAudioHint(line.current.lastReason));
+      else setLineError(isRetriable(error) ? lineInError(error) : '');
+      setNoCable(!line.current.lastReason && error instanceof Error && error.name === 'NotFoundError');
     }
     // 不用在这里 setFilter 把「音乐」改掉：渲染时 activeFilter 会把
     // lineMode 下的 music 降级成 ambient（见那边的注释）。改 state 反而会
@@ -592,12 +605,13 @@ export default function App() {
             if (!active) { for (const track of stream.getTracks()) track.stop(); return; }
             player.current?.attachLineIn(stream);
           } catch (error) {
-            // 没声卡只是「没有音频」。原因写进设置面板，不再每次启动弹一句 toast：
+            // 没接上只是「没有音频」。原因写进设置面板，不再每次启动弹一句 toast：
             // 没装声卡的机器每次开机都被提醒一遍，那是噪音，不是信息。
-            // 与 toggleLineMode 同一条规则：只有可重试的原因才占用错误块。
+            // 与 toggleLineMode 同一条规则：只有用户能自己解决的原因才占用错误块。
             if (active) {
-              setLineError(isRetriable(error) ? lineInError(error) : '');
-              setNoCable(error instanceof Error && error.name === 'NotFoundError');
+              if (line.current.lastReason) setLineHint(systemAudioHint(line.current.lastReason));
+              else setLineError(isRetriable(error) ? lineInError(error) : '');
+              setNoCable(!line.current.lastReason && error instanceof Error && error.name === 'NotFoundError');
             }
           }
           if (active) player.current?.startAmbientOnly();
@@ -1137,6 +1151,7 @@ export default function App() {
         background={background}
         lineError={lineError}
         noCable={noCable}
+        lineHint={lineHint}
         status={status}
         sleepUntil={sleepUntil}
         remaining={remaining}

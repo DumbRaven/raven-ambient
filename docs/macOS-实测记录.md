@@ -307,7 +307,7 @@ curl -L -H "Authorization: Bearer $TOKEN" \
 
 **错误分类也一起改了**：`src/line-in.ts` 新增 `isRetriable()`。`lineError` 只装**可重试**的失败（`NotAllowedError` / `NotReadableError` / `OverconstrainedError`）——那三样配「再试一次」按钮有意义；`NotFoundError`（没装/没插）是**常态不是故障**，放进带按钮的位置等于给一条必然失败的假出路，它改走 `noCableHint` 那条状态说明。
 
-**剩下的能力边界（没变）**：`src/line-in.ts` 的 `cablePattern` 只认 VB-Cable，装 BlackHole 也不会被认出来。所以 Mac 上「外部音乐响起时压低环境音」这个核心功能**仍然用不了**——这与上面的解耦无关，是另一件事。
+**当时以为的能力边界（后来被推翻，见 5.4）**：`src/line-in.ts` 的 `cablePattern` 只认 VB-Cable，装 BlackHole 也不会被认出来，所以当时判断 Mac 上「外部音乐响起时压低环境音」用不了。**这个结论在 2026-11-28 被实测推翻**——走 Core Audio process tap（`audiotee`）不需要任何虚拟声卡，详见 5.4。
 
 本机实测的三态（2026-11-27）：
 
@@ -353,6 +353,38 @@ curl -L -H "Authorization: Bearer $TOKEN" \
 **教训一（比结论有用）**：把测试失败归因成「这个平台不适用」之前，先确认它在那个平台上**该不该**通过。这次差点用 5 条 `skip` 把一个「整盘可授权」的安全洞盖掉。判据是：测的是「什么该被拒绝」，就别问「这个平台上成不成立」，要问「这个平台上对应的是什么」。
 
 **教训二**：`isVolumeRoot()` 第一版写了 `if (process.platform !== 'darwin') return false;`，和上面刚立的原则正相反——Windows 上它直接跳过，`/Volumes/Ext` 就放行了。是新增的测试抓出来的。判「该用哪个默认解析器」时用 `process.platform` 是对的，判「某个具体路径该不该拒」时用它就错。
+
+### 5.4 系统音频：能抓到了，走 Core Audio process tap（2026-11-28 定案）
+
+这一节记录的是「Mac 上外部音乐响起时压低环境音」到底怎么实现。**结论：能实现，不需要虚拟声卡，也不用写 native 代码。**
+
+**先说被排除的两条路**（都实测过，不是查文档推的）：
+
+1. **Electron 的 `audio: 'loopback'`**：`node_modules/electron/electron.d.ts:22940` 原文写着「Specifying a loopback device will capture system audio, and is currently only supported on Windows」。macOS 上给这个值，`getDisplayMedia` 要么返回一条 `readyState` 从 `t=0` 就是 `ended` 的死轨（Background 会话下实测），要么整个请求挂到超时（Aqua 会话下实测）。我一度以为「Chromium 已经内建 CATap、只缺授权」（`MacCatapLoopbackAudioForScreenShare` 确实在 Web 版永久启用了），**但那是 Chromium 的能力，Electron 的 handler 在 darwin 上不接受这个参数**，两件事不能划等号。
+2. **`useSystemPicker: true`**（绕开 Electron 的短路、让 macOS 系统 picker 接管）：实测 `AbortError: Timeout starting video source`，连 video 都起不来，更没有音频。
+
+**走通的那条**：`audiotee`（[makeusabrew/audiotee](https://github.com/makeusabrew/audiotee)）—— 一个预编译的 Swift 二进制，用 macOS 14.2+ 的 Core Audio taps API 把系统输出写成裸 PCM 到 stdout。604760 字节，Mach-O universal（x86_64 + arm64），MIT。
+
+**决定性的一组对照实验**，同一份脚本、同一台机器，只有发起进程不同：
+
+| 怎么起的 | `launchctl managername` | 结果 |
+|---|---|---|
+| SSH（`mac_run.ps1`） | `Background` | `nonzero=0 peak=0` |
+| `launchctl asuser 501 sudo -u dumbraven` | `Aqua` | `nonzero=0 peak=0` |
+| `open 脚本.command` → Terminal.app | `Aqua` | **`nonzero=332332 peak=29891`，比例 15.5%** |
+
+**根因：TCC 权限是挂在发起进程的身份上的，不是挂在会话上。** SSH 进来的是 `/usr/libexec/sshd-keygen-wrapper`，它没有「系统音频录制」权限；即使用 `launchctl asuser` 强行换进 Aqua 会话，`launchctl managername` 显示对了，权限记录依然挂不到它身上。Terminal.app 有这条权限，所以跑在它里面的子进程能继承。
+
+这条坑值得单独记：**`launchctl managername` 是 `Aqua` 不代表能拿到图形相关的 TCC 权限**，这两件事我一开始混为一谈了，白试了两轮。
+
+**为什么这条对产品是好消息**：`audiotee` 的 README 明确写了，打包进 Electron app 时二进制会**继承父应用的 code signature**，所以 TCC 授权会挂在「Raven Ambient」名下——用户不需要去给终端授权，只需要在「系统设置 → 隐私与安全性 → 录屏与系统录音 → 仅系统录音」里给本应用一次授权。这比 Windows 那套（装 VB-Cable + 管理员权限 + 建多输出设备）简单得多。
+
+**尚未验证的两件事**（写下来免得后面当成已验）：
+
+1. **ad-hoc 签名下重新打包会不会掉授权**。TCC 对临时签名的 app 是按二进制哈希记的，理论上每次重新打包都要重新授权一次。要确认只能连续打包两次、各授权一次、看第二次是不是还要点。**没实测，不确定。**
+2. **装进 `.app` 之后 `audiotee` 还能不能读到 PCM**。上面那组成功的实验里，`audiotee` 是从 Terminal 起的；装进 `Raven Ambient.app` 之后它继承的是我们的签名，TCC 记录也换成我们，这条链没跑过。
+
+**再往下的实现要点**（还没做）：起子进程读 PCM（`--sample-rate 48000 --chunk-duration 0.2`，16-bit LE 单声道）→ 在渲染进程侧拼成 `MediaStream` 交给 `attachLineIn` → `src/line-in.ts` 加 Mac 分支，不再走 `cablePattern` 那条 VB-Cable 判据。预计 400–600 行，含子进程生命周期管理、PCM 帧对齐、授权引导文案和测试。
 
 ---
 

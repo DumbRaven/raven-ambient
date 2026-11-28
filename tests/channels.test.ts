@@ -23,21 +23,26 @@ function names(constant: string): string[] {
 const SEND = names('SEND');
 const RECEIVE = names('RECEIVE');
 
-test('页面能发的通道：七个，一个不多', () => {
+test('页面能发的通道：九个，一个不多', () => {
   // 检查更新占两条：update:check 发「请你查一下」，update:open 发「去下载」。
   // 后者不带参数——要打开的地址由主进程自己缓存，页面给的一律丢掉。
+  //
+  // mac 系统音频也占两条：tap:start / tap:stop。Windows 上不存在这一对——
+  // 那边页面自己 getUserMedia 拿虚拟声卡，不需要主进程帮忙。
   assert.deepEqual(SEND, [
     'focus:action',
     'media:request',
     'now:action',
     'stage:command',
     'stage:snapshot',
+    'tap:start',
+    'tap:stop',
     'update:check',
     'update:open',
   ]);
 });
 
-test('主进程能推的通道：八个，一个不多', () => {
+test('主进程能推的通道：九个，一个不多', () => {
   assert.deepEqual(RECEIVE, [
     'focus:press',
     'focus:snapshot',
@@ -46,6 +51,7 @@ test('主进程能推的通道：八个，一个不多', () => {
     'stage:closed',
     'stage:paint',
     'stage:press',
+    'tap:chunk',
     'update:result',
   ]);
 });

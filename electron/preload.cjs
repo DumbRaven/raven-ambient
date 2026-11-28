@@ -52,6 +52,15 @@ const SEND = new Set([
    * 利用来钓鱼的形状，而它本身只需要一个固定动作。
    */
   'update:open',
+  /**
+   * macOS 系统音频抓取的开关（外部音乐模式的音频来源）。
+   *
+   * Windows 上这一层不存在：那边是页面自己 getUserMedia 拿虚拟声卡。
+   * mac 上要由主进程起一个子进程去读 Core Audio tap，所以页面得能请它开关。
+   * 只接受主窗口的请求，子窗口发来的一律丢弃（见 electron/audio-tap.cjs）。
+   */
+  'tap:start',
+  'tap:stop',
 ]);
 
 /**
@@ -88,9 +97,32 @@ const RECEIVE = new Set([
    * Set 里抽所有单引号字面量来守白名单，写了就会被当成通道名。
    */
   'update:result',
+  /**
+   * mac 系统音频的 PCM 块与状态。与上面两条 SEND 成对。
+   *
+   * 两种形状，靠 type 区分：
+   *   pcm   —— 一块 16 位小端单声道 PCM（200ms）。
+   *   state —— 抓取器的状态：live 在流 / idle 停了 / missing 没有二进制 /
+   *            error 出错了（带 reason）。
+   *
+   * 为什么 PCM 走 IPC 而不是读本地文件：CSP 是 default-src self，页面拿不到
+   * 文件系统；而且这段数据一进页面就会被喂进 WebAudio，没有落盘的必要。
+   */
+  'tap:chunk',
 ]);
 
 contextBridge.exposeInMainWorld('raven', {
+  /**
+   * 宿主平台。`'darwin'` / `'win32'` / `'linux'`。
+   *
+   * 页面需要它来选「外部音乐」的音频来源：Windows 走虚拟声卡（getUserMedia），
+   * macOS 走主进程的 Core Audio tap。这不是能力，只是一个事实，暴露出去没有风险
+   * ——真正能被滥用的那些（fs、child_process）仍然一样都没有。
+   *
+   * 沙箱里的 preload 有 `process.platform` 的只读副本，这里直接透出来。
+   */
+  platform: process.platform,
+
   /** 发一条。返回 false 表示通道不在白名单里，不会静默成功。 */
   send(channel, payload) {
     if (typeof channel !== 'string' || !SEND.has(channel)) return false;

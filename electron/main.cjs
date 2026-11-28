@@ -5,6 +5,7 @@ const { attachFocusMini } = require('./focus-mini.cjs');
 const { attachDesktopStage } = require('./desktop-stage.cjs');
 const { registerMediaScheme, attachMedia } = require('./media.cjs');
 const { attachUpdate } = require('./update.cjs');
+const { attachAudioTap } = require('./audio-tap.cjs');
 
 if (process.env.RAVEN_DATA_DIR) app.setPath('userData', path.resolve(process.env.RAVEN_DATA_DIR));
 
@@ -101,6 +102,13 @@ app.whenReady().then(() => {
   // exe 也会自己退。
   app.on('will-quit', () => { try { nowPlaying.stop(); } catch { /* 已经退了 */ } });
   attachMedia();
+
+  // mac 上抓系统音频（外部音乐模式要「响起时压低环境音」）。Windows 上不需要：
+  // 那边页面自己 getUserMedia 拿虚拟声卡，主进程不参与。
+  // isMainWindow 拦住子窗口——番茄钟小窗和桌面放映窗也加载 preload，
+  // 但它们没有理由能起停一个系统级的抓取进程。
+  const audioTap = attachAudioTap({ isMainWindow: sender => !!mainWindow && !mainWindow.isDestroyed() && sender === mainWindow.webContents });
+  app.on('will-quit', () => { try { audioTap.stop(); } catch { /* 已经退了 */ } });
 
   // 默认一律拒绝，只放行音频输入（外部音乐的虚拟声卡）。
   // 摄像头、屏幕采集、通知、地理位置等仍然全部拒绝。

@@ -45,7 +45,11 @@ const build = {
   directories: { output: path.join(root, 'release') },
   extraResources: [{ from: path.join(root, 'build/raven-logo.png'), to: 'raven-logo.png' }],
   // NowPlaying.exe 在 mac 包里没有任何用处（也编不出来了），不带。
-  asarUnpack: [],
+  //
+  // 但 audiotee 必须**解到 asar 外面**：它是可执行文件，被塞进 asar 之后没法 spawn
+  // （Electron 只会把它当成一段压缩数据）。electron/audio-tap.cjs 的 binaryPath()
+  // 会把 app.asar/ 换回 app.asar.unpacked/ 去找它。
+  asarUnpack: ['electron/vendor/audiotee'],
   mac: {
     target: 'dir',
     category: 'public.app-category.music',

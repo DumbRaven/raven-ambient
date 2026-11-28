@@ -1,3 +1,6 @@
+import { tapPlatform } from './audio-tap-bridge.ts';
+import { openSystemAudio, type TapReason } from './system-audio.ts';
+
 /** 一个可以拿来当「外部音乐」的音频输入设备。 */
 export type InputDevice = { id: string; label: string };
 
@@ -75,12 +78,46 @@ export class LineIn {
   private stream?: MediaStream;
   /** 当前这条流对应的设备 id。 */
   device = '';
+  /**
+   * 上一次失败的原因，只对 mac 那条路有意义。
+   *
+   * Windows 的失败都挂在 DOMException 的 name 上（NotAllowedError 之类），
+   * mac 那边是主进程报上来的状态名，两种形状硬塞进一个字段只会让调用方两头猜。
+   * 所以 mac 的原因单独放这里，由 App 读出来交给设置面板。
+   */
+  lastReason: TapReason | null = null;
 
   get active() { return !!this.stream; }
 
-  /** 接上虚拟声卡。设备是写死的，调用方不需要传。 */
+  /**
+   * 接上外部音乐。
+   *
+   * 两条路，选哪条只看平台，不看设备：
+   *   mac   —— 主进程的 Core Audio tap（不需要也没有设备可选）。
+   *   其它  —— 虚拟声卡，设备写死成「找 CABLE Output」，调用方不用传。
+   *
+   * 之所以放在同一个方法里而不是叫 openCable/openTap 两个名字：调用方（App）
+   * 关心的是「接上外部音乐」，它不该知道这台机器用哪种方式做到。
+   */
   async open(): Promise<MediaStream> {
     this.close();
+    this.lastReason = null;
+    if (tapPlatform() === 'darwin') {
+      const result = await openSystemAudio();
+      if (!result.ok) {
+        this.lastReason = result.reason;
+        // 用 DOMException 而不是自定义类：上层已经有一整套按 name 分支的逻辑
+        // （isRetriable / lineInError），这里只需给一个它认识的名字。
+        // 三种失败里只有「用户能去设置里打开的那个」算可重试。
+        const name = result.reason === 'denied' ? 'NotAllowedError' : 'NotFoundError';
+        throw new DOMException(result.detail || '系统音频没接上', name);
+      }
+      this.stream = result.stream;
+      // mac 那条路上没有设备：声音是系统级的，不存在「选哪个输入」。
+      // 留一个固定的短名，设置面板拿它占位（那边 mac 分支不会显示设备名）。
+      this.device = '系统音频';
+      return result.stream;
+    }
     const stream = await openCable();
     this.stream = stream;
     this.device = stream.getAudioTracks()[0]?.label ?? 'CABLE Output';

@@ -53,6 +53,8 @@ async function boot(locked: boolean) {
       : id === './media.cjs' ? { registerMediaScheme: () => undefined, attachMedia: () => undefined }
       // 这个测试关心的是窗口生命周期，更新检查只要不炸就行。
       : id === './update.cjs' ? { attachUpdate: () => ({ check: async () => ({ status: 'current' }), open: () => false }) }
+      // 系统音频抓取同理：它只在 darwin 上真的起子进程，Windows 上 start() 直接返回 false。
+      : id === './audio-tap.cjs' ? { attachAudioTap: () => ({ stop: () => undefined }) }
       : { existsSync: () => false },
     process: { env: { RAVEN_DATA_DIR: 'F:/Vibe/.qa/mock-only' }, platform: 'win32', resourcesPath: 'F:/Vibe/.qa/mock-only' }, __dirname: 'F:/Vibe/electron',
     // 主进程里有个「万一 ready-to-show 不来也要露脸」的兜底定时器，沙箱里没有 setTimeout

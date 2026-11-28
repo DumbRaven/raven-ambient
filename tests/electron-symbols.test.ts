@@ -67,34 +67,40 @@ const NOT_IDENTIFIERS = new Set([
  * 不是完整的 JS 解析器——这里的目标是**宁严勿松**：只能允许明确
  * 声明过的符号，所以宁可多报几个候选，也不漏掉真问题。
  */
+/**
+ * 把一段参数列表（或解构模式）里的变量名收进 `names`。
+ *
+ * 不能只按逗号切开挑纯标识符——真实代码里这几种写法都会出现，漏掉哪一样
+ * 都会误报成「引用了但没定义」：
+ *   `function f({ isMainWindow })`  解构参数（本轮就踩在这个上）
+ *   `function f({ a, b: alias })`   带重命名
+ *   `function f(x = 1, ...rest)`    默认值与剩余
+ */
+function addParams(names: Set<string>, raw: string): void {
+  for (const part of raw.split(',')) {
+    // 去掉默认值、剩余运算符与多余的括号/方括号，剩下的可能是 `a` 或 `b: alias`
+    const trimmed = part.replace(/\.\.\./g, '').replace(/=.*$/s, '').replace(/[{}[\]]/g, '').trim();
+    if (!trimmed) continue;
+    const key = trimmed.split(':').pop()?.trim() ?? '';
+    if (key && /^[A-Za-z_$][\w$]*$/.test(key)) names.add(key);
+  }
+}
+
 function declaredNames(source: string): Set<string> {
   const names = new Set<string>();
 
   // const/let/var 声明（含解构粗略处理：把花括号里的词都当声明）
   for (const m of source.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g)) names.add(m[1]);
-  for (const m of source.matchAll(/\b(?:const|let|var)\s*\{([^}]*)\}/g)) {
-    for (const part of m[1].split(',')) {
-      const key = part.split(':').pop()?.trim().replace(/=.*$/s, '').trim();
-      if (key && /^[A-Za-z_$][\w$]*$/.test(key)) names.add(key);
-    }
-  }
+  for (const m of source.matchAll(/\b(?:const|let|var)\s*\{([^}]*)\}/g)) addParams(names, m[1]);
 
   // function 声明与函数参数
   for (const m of source.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\(([^)]*)\)/g)) {
     names.add(m[1]);
-    for (const arg of m[2].split(',')) {
-      const name = arg.trim().replace(/=.*$/s, '').trim();
-      if (name && /^[A-Za-z_$][\w$]*$/.test(name)) names.add(name);
-    }
+    addParams(names, m[2]);
   }
 
   // 箭头函数 / 方法简写的参数
-  for (const m of source.matchAll(/\(([^()]*)\)\s*=>/g)) {
-    for (const arg of m[1].split(',')) {
-      const name = arg.trim().replace(/=.*$/s, '').trim();
-      if (name && /^[A-Za-z_$][\w$]*$/.test(name)) names.add(name);
-    }
-  }
+  for (const m of source.matchAll(/\(([^()]*)\)\s*=>/g)) addParams(names, m[1]);
   for (const m of source.matchAll(/([A-Za-z_$][\w$]*)\s*=>/g)) names.add(m[1]);
 
   // class 名与 class 方法名
@@ -109,10 +115,7 @@ function declaredNames(source: string): Set<string> {
     /(?:^|\n)[ \t]+(?:static\s+)?(?:async\s+)?(?:get\s+|set\s+)?\*?([A-Za-z_$][\w$]*)\s*\(([^)]*)\)/g,
   )) {
     names.add(m[1]);
-    for (const arg of m[2].split(',')) {
-      const name = arg.trim().replace(/=.*$/s, '').trim();
-      if (name && /^[A-Za-z_$][\w$]*$/.test(name)) names.add(name);
-    }
+    addParams(names, m[2]);
   }
   // 对象字面量里的方法简写：`  name(args) {` 同上，但键名前面可能是 `,`
   for (const m of source.matchAll(/[,{]\s*(?:async\s+)?(?:get\s+|set\s+)?([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{/g)) {

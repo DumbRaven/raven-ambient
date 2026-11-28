@@ -5,7 +5,8 @@ import { radioKeyDown } from './radio-keys';
 import { formatTime } from './model';
 import { trackTransitions, transitionHints, transitionNames, type Cabinet, type TrackTransition } from './records';
 import { checkForUpdate, openDownload } from './update-bridge';
-import { noCableHint } from './line-in';
+import { noCableHint } from './line-in.ts';
+import { tapPlatform } from './audio-tap-bridge.ts';
 import type { UpdateReply } from './update-state';
 
 /**
@@ -14,13 +15,20 @@ import type { UpdateReply } from './update-state';
  * 每一项都是「一件具体的事」，所以按组排，不放总说明——用户是来找某一项的，
  * 不是来读目录的。说明文字只在「为什么值得做」这一层出现（比如清理只删封面图）。
  */
-export default function SettingsModal({ cabinet, busy, background, lineError, noCable, status, sleepUntil, remaining, imageInput, onChange, onClearBackground, onToggleLineMode, onClearCoverCache, onSetSleep }: {
+export default function SettingsModal({ cabinet, busy, background, lineError, noCable, lineHint, status, sleepUntil, remaining, imageInput, onChange, onClearBackground, onToggleLineMode, onClearCoverCache, onSetSleep }: {
   cabinet: Cabinet;
   busy: string;
   background: string;
   lineError: string;
   /** 这台机器没装虚拟声卡。与 lineError 互斥：它不占用带「再试一次」的错误块。 */
   noCable: boolean;
+  /**
+   * mac 那条路上「没接上」的具体原因，已经是一句给用户看的话。
+   *
+   * 与 noCable / lineError 三选一：mac 上不存在「装没装虚拟声卡」这件事，
+   * 四种失败原因（不支持/没权限/缺程序/说不清）也不能压成一个布尔。
+   */
+  lineHint: string;
   status: { lineInput: number; ducked: boolean; lineLive: boolean };
   sleepUntil: number;
   remaining: number;
@@ -80,6 +88,8 @@ export default function SettingsModal({ cabinet, busy, background, lineError, no
   const newer = update?.result.status === 'newer' ? update.result : null;
   const version = update?.current ?? '';
 
+  const mac = tapPlatform() === 'darwin';
+
   return (
     <>
       <h2 id="modal-title">设置</h2>
@@ -106,7 +116,9 @@ export default function SettingsModal({ cabinet, busy, background, lineError, no
       <div className="settings-group">
         <h3>外部音乐</h3>
         <p>
-          {noCable
+          {mac
+            ? <>打开开关后，系统会问一次「能不能录系统声音」。<span>外部音乐会在响起时压低环境音。</span></>
+            : noCable
             ? <>装好之后，把播放器的输出切到 CABLE Input。<span>外部音乐会在响起时压低环境音。</span></>
             : <>把播放器的输出切到 CABLE Input，再打开下面的开关。<span>外部音乐会在响起时压低环境音。</span></>}
         </p>
@@ -140,11 +152,13 @@ export default function SettingsModal({ cabinet, busy, background, lineError, no
                      - 其余：连上过但断了，重连有意义，才让人去关开一次。 */
                   lineError
                   ? '外部音乐没有接通'
+                  : lineHint
+                  ? lineHint
                   : noCable
                   ? noCableHint
                   : status.lineLive
-                  ? '已接上虚拟声卡，等待声音'
-                  : '虚拟声卡断开了 · 关掉再打开这个开关可以重连'}
+                  ? '已接上音频来源，等待声音'
+                  : '音频来源断开了 · 关掉再打开这个开关可以重连'}
             </small>
           </div>
         )}
