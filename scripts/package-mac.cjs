@@ -59,6 +59,21 @@ const build = {
     // ad-hoc 签名：没有开发者证书时的唯一选择。写 null 而不是去掉这个字段——
     // 去掉的话 electron-builder 会去找钥匙串里的证书，找不到就报错。
     identity: null,
+    // 这几句会原样显示在 macOS 的授权弹窗上，所以必须说清「用来干什么」，
+    // 不能留 electron-builder 的默认值（那里只有一句 "This app needs access
+    // to audio capture"，用户只能看到一个要权限但不知道为什么的框）。
+    //
+    // 只留真正用得上的两项：
+    //   · 系统音频录制 —— 「外部音乐」打开时用它抓播放器的声音，好让环境音自动避让
+    //   · 麦克风       —— Electron 自己会声明，删了不影响（我们从不录麦克风）
+    // 相机 / 蓝牙那几条是 electron-builder 的模板，这个应用一件都不做，
+    // 留着只会在隐私面板里多出几条永远不会被问到的项目。
+    extendInfo: {
+      NSAudioCaptureUsageDescription:
+        '打开「外部音乐」时，用它抓取播放器正在播放的声音，好让环境音自动避让。不录音，不上传。',
+      NSMicrophoneUsageDescription:
+        '只有在「外部音乐」需要确认音频输入时才会用到。不录音，不上传。',
+    },
   },
 };
 fs.writeFileSync(
