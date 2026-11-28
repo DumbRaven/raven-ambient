@@ -63,11 +63,11 @@ const build = {
     // 不能留 electron-builder 的默认值（那里只有一句 "This app needs access
     // to audio capture"，用户只能看到一个要权限但不知道为什么的框）。
     //
-    // 只留真正用得上的两项：
-    //   · 系统音频录制 —— 「外部音乐」打开时用它抓播放器的声音，好让环境音自动避让
-    //   · 麦克风       —— Electron 自己会声明，删了不影响（我们从不录麦克风）
-    // 相机 / 蓝牙那几条是 electron-builder 的模板，这个应用一件都不做，
-    // 留着只会在隐私面板里多出几条永远不会被问到的项目。
+    // extendInfo 是**合并**进 Info.plist，不是替换——实际打包验证过：相机与
+    // 蓝牙那几条 electron-builder 的模板默认值仍然留在里面。它们不会被问到
+    // （这个应用一件都不做），也就不值得为删掉它们去改 build 模板的优先级；
+    // 真要清净，得用 afterPack 钩子重写 Info.plist，为几行不会被看到的字符串
+    // 增加一条打包期代码路径，不划算。
     extendInfo: {
       NSAudioCaptureUsageDescription:
         '打开「外部音乐」时，用它抓取播放器正在播放的声音，好让环境音自动避让。不录音，不上传。',
