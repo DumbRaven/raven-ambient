@@ -22,7 +22,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const require = createRequire(import.meta.url);
-const { parseLine, toolPath } = require('../electron/now-playing-mac.cjs');
+const { MacBackend, parseLine, toolPath } = require('../electron/now-playing-mac.cjs');
 
 /** media-control 的 `stream` 形状：外面裹一层 { diff, payload }。 */
 function stream(payload: object) {
@@ -122,4 +122,26 @@ test('候选路径包含用户自己安装的位置 ~/.local/bin', async () => {
   // 少了这一条，装好了也认不出来。
   const source = await readFile(new URL('../electron/now-playing-mac.cjs', import.meta.url), 'utf8');
   assert.match(source, /\.local['"]\s*,\s*['"]bin['"]\s*,\s*['"]media-control['"]/);
+});
+
+test('先到的是歌名、后到的是封面——第二条不能被去重吃掉', () => {
+  // 2026-11-28 真机抓到的 bug：系统分两步给数据，先歌名后封面。
+  // 去重签名里若不含封面，第二条签名与第一条相同会被跳过，页面永远没封面。
+  // 症状是「有时有、有时没有」，取决于两条消息哪条先到，极难复现。
+  const sent: Array<{ title: string; cover: string }> = [];
+  const backend = new MacBackend();
+  backend.emit = (payload: { title: string; cover: string }) => { sent.push(payload); };
+
+  // 第一条：只有文字，没有封面。
+  backend.consume(`${stream({ title: 'Artwork Test', artist: 'A', album: 'B', playing: true })}\n`);
+  // 第二条：同一首歌，补上封面（base64 内容随意，长度不同即可）。
+  backend.consume(`${stream({ title: 'Artwork Test', artist: 'A', album: 'B', playing: true, artworkData: 'AAAA', artworkMimeType: 'image/jpeg' })}\n`);
+
+  assert.equal(sent.length, 2, '第二条带封面的快照必须推给页面');
+  assert.equal(sent[0].cover, '');
+  assert.match(sent[1].cover, /^data:image\/jpeg;base64,/);
+
+  // 第三条与第二条完全相同，应当被去重挡掉（否则每 200ms 重算一次配色会掉帧）。
+  backend.consume(`${stream({ title: 'Artwork Test', artist: 'A', album: 'B', playing: true, artworkData: 'AAAA', artworkMimeType: 'image/jpeg' })}\n`);
+  assert.equal(sent.length, 2, '内容没变时不应重复推送');
 });

@@ -156,7 +156,15 @@ class MacBackend {
       if (!payload) continue;
       // stream 会跟着播放进度反复吐同一首歌。只有真的换了歌（或放/暂停变了）
       // 才往页面推——否则页面每 200ms 重算一次碟面配色，白白掉帧。
-      const signature = [payload.app, payload.title, payload.artist, payload.album, payload.status].join('\u0000');
+      //
+      // **封面长度必须进签名**（2026-11-28 真机抓到的 bug）：系统是分两步给的，
+      // 先给歌名歌手，几百毫秒后才补上封面。如果签名只看文字字段，第二条「带封面」
+      // 的消息与第一条签名相同，会被这里直接跳过——页面永远拿不到封面，唱盘中心
+      // 只剩一块纯色。症状是「有时有封面、有时没有」，取决于两条消息哪条先到。
+      // 放长度而不是整串 base64：封面几万到几 MB，塞进签名会让每次比较都搬一大段字符串。
+      const signature = [
+        payload.app, payload.title, payload.artist, payload.album, payload.status, String(payload.cover.length),
+      ].join('\u0000');
       if (signature === this.signature) continue;
       this.signature = signature;
       if (this.emit) this.emit(payload);

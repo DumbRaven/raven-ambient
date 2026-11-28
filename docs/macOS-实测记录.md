@@ -283,13 +283,31 @@ curl -L -H "Authorization: Bearer $TOKEN" \
 
 ## 5. 已知未验 / 已知做不到
 
-### 5.1 封面：字段名确认存在，但没拿到过真实数据
+### 5.1 封面：2026-11-28 用带封面的真实文件验通了（并抓到一个去重 bug）
 
-`artworkData` / `artworkMimeType` 这两个字段在 media-control 的 README 里有（`jq -r .artworkData | base64 -d > cover`），**但我们没有一首带封面的歌**。
+**之前是未验状态**：`artworkData` / `artworkMimeType` 这两个字段 media-control 的 README 里有，但我们没有一首带封面的歌，payload 里根本没有这两个 key，只验过 `parseLine` 的映射逻辑（单测），没验过 media-control 真的吐不吐。
 
-实测的 payload 里**根本没有这两个 key**——因为测试音频无封面。所以「拿到带封面的歌之后封面能不能正确拼成 data URL」这一步是**未验**的。`parseLine()` 里那段拼接逻辑有单测覆盖（含「封面缺 MIME 退回 image/jpeg」「没封面时 cover 是空串」），但那验的是映射，不是 media-control 真的吐不吐这个字段。
+**现在验通了**，用的是自己造的文件：`ffmpeg -i long35.m4a -i cover.png -map 0:a -map 1:v -c:v mjpeg -disposition:v attached_pic`，塞一张 600×600 的蓝橙条纹图，导入 Apple Music 播放。media-control 的真实输出：
 
-验这一步需要一首带内嵌封面的歌，也就是等装第三方播放器（网易云）+ 手机验证码登录之后。
+```
+title = "Artwork Test"
+artist = "Raven QA"
+album = "Probe Album"
+playing = true
+bundleIdentifier = "com.apple.Music"
+artworkMimeType = "image/jpeg"
+artworkData len = 63032          ← base64，真实存在
+```
+
+`parseLine` 转出来：`cover = "data:image/jpeg;base64,/9j/4AAQSkZ…"`，长度 63055；把这串 base64 解回来是 47274 字节、头 4 字节 `ffd8ffe0`（标准 JPEG 头），**打开就是那张条纹图，没有坏**。
+
+app 界面也确认了：`.vinyl-label` 的 `background-image` 是 `url("data:image/jpeg;base64,/9j/4AAQSkZJRg…")`，长度 63062；`.playing-title` 显示 `APPLE MUSIC` / `Artwork Test`。
+
+**顺带修掉一个真 bug（`electron/now-playing-mac.cjs` 的 `consume`）**：去重签名原来只含 `[app, title, artist, album, status]`，**不含封面**。而 macOS 是分两步给数据的——先歌名歌手，几百毫秒后才补封面。于是第二条「带封面」的消息签名与第一条相同，被去重直接跳过，**页面永远拿不到封面**，唱盘中心只剩一块纯色。
+
+症状极隐蔽：**有时有封面、有时没有**，取决于两条消息哪条先到。真机上第一次看到封面（`bgImageLen: 63062`），换个时机再跑就变成 `bgImageLen: 4`（`none`），一开始还以为是异步取色把图盖掉了。
+
+修法：签名里加 `String(payload.cover.length)`——放长度不放整串 base64（封面几万字节到几 MB，塞进签名会让每次比较都搬一大段字符串）。补了 `tests/now-playing-mac.test.ts` 的「先到的是歌名、后到的是封面——第二条不能被去重吃掉」，并做了负向验证：把这一项删掉，测试立刻红。
 
 ### 5.2 lineMode：已解耦，没声卡也能显示歌名（`ae28db8` 落地）
 
@@ -319,7 +337,7 @@ curl -L -H "Authorization: Bearer $TOKEN" \
 
 第一行和错误块**永远不同时出现**，这是 `isRetriable` 那条规则直接推出来的结果。
 
-### 5.3 测试：434 全过；那 5 条失败曾经是函数真失守，不是平台差异
+### 5.3 测试：全绿；那 5 条失败曾经是函数真失守，不是平台差异
 
 **这一节在 2026-11-27 晚改过两次，第二次把结论整个推翻了。**
 
@@ -348,43 +366,112 @@ curl -L -H "Authorization: Bearer $TOKEN" \
 - 黑名单按平台分两份（`WINDOWS_BLOCKED` / `POSIX_BLOCKED`），**逐段比对**而不是前缀字符串拼接。
 - 根目录与挂载盘根单独挡（`/`、`/Volumes`、`/Volumes/<盘名>`），盘里的子目录照常放行——用户的素材通常在 `/Volumes/Ext/素材` 下面。
 
-**现在的数字**：Mac 与 Windows **都是 434 tests / 434 pass / 0 fail**。`tests/media-grants.test.ts` 从 12 条涨到 15 条，新增的 3 条把这次 bug 本身固化成回归（含「在 Mac 上 `C:\Windows` 也必须拒」这条与宿主无关的契约）。
+**现在的数字**：2026-11-27 那次是 Mac 与 Windows **都是 434 tests / 434 pass / 0 fail**；2026-11-28 加了 Apple Music 封面与去重两条（见 5.1），Windows 侧现在是 **441 tests / 441 pass / 0 fail**。`tests/media-grants.test.ts` 从 12 条涨到 15 条，新增的 3 条把这次 bug 本身固化成回归（含「在 Mac 上 `C:\Windows` 也必须拒」这条与宿主无关的契约）。
 
 **教训一（比结论有用）**：把测试失败归因成「这个平台不适用」之前，先确认它在那个平台上**该不该**通过。这次差点用 5 条 `skip` 把一个「整盘可授权」的安全洞盖掉。判据是：测的是「什么该被拒绝」，就别问「这个平台上成不成立」，要问「这个平台上对应的是什么」。
 
 **教训二**：`isVolumeRoot()` 第一版写了 `if (process.platform !== 'darwin') return false;`，和上面刚立的原则正相反——Windows 上它直接跳过，`/Volumes/Ext` 就放行了。是新增的测试抓出来的。判「该用哪个默认解析器」时用 `process.platform` 是对的，判「某个具体路径该不该拒」时用它就错。
 
-### 5.4 系统音频：能抓到了，走 Core Audio process tap（2026-11-28 定案）
+### 5.4 系统音频：路线验证可行，但 macOS 27 的授权不落盘（2026-11-28 收工时的真实状态）
 
-这一节记录的是「Mac 上外部音乐响起时压低环境音」到底怎么实现。**结论：能实现，不需要虚拟声卡，也不用写 native 代码。**
+**这一节在 2026-11-28 晚被整个改写过。** 原来写的是「能实现了，不需要虚拟声卡也不用 native 代码」——技术路线那半是对的，但「装进 app 就能用」那半**没做成**。收工时的事实是：`audiotee` 能从 Terminal 里抓到真实音频，从 app 自己 spawn 起来永远是静音。下面按「已验证 / 已排除 / 卡在哪」分开记，别再把推测当成结论。
 
-**先说被排除的两条路**（都实测过，不是查文档推的）：
+#### 已验证可行：Core Audio process tap
 
-1. **Electron 的 `audio: 'loopback'`**：`node_modules/electron/electron.d.ts:22940` 原文写着「Specifying a loopback device will capture system audio, and is currently only supported on Windows」。macOS 上给这个值，`getDisplayMedia` 要么返回一条 `readyState` 从 `t=0` 就是 `ended` 的死轨（Background 会话下实测），要么整个请求挂到超时（Aqua 会话下实测）。我一度以为「Chromium 已经内建 CATap、只缺授权」（`MacCatapLoopbackAudioForScreenShare` 确实在 Web 版永久启用了），**但那是 Chromium 的能力，Electron 的 handler 在 darwin 上不接受这个参数**，两件事不能划等号。
-2. **`useSystemPicker: true`**（绕开 Electron 的短路、让 macOS 系统 picker 接管）：实测 `AbortError: Timeout starting video source`，连 video 都起不来，更没有音频。
+`audiotee`（[makeusabrew/audiotee](https://github.com/makeusabrew/audiotee)）——预编译 Swift 二进制，用 macOS 14.2+ 的 Core Audio taps API 把系统输出写成裸 PCM 到 stdout。604760 字节，Mach-O universal（x86_64 + arm64），MIT。
 
-**走通的那条**：`audiotee`（[makeusabrew/audiotee](https://github.com/makeusabrew/audiotee)）—— 一个预编译的 Swift 二进制，用 macOS 14.2+ 的 Core Audio taps API 把系统输出写成裸 PCM 到 stdout。604760 字节，Mach-O universal（x86_64 + arm64），MIT。
-
-**决定性的一组对照实验**，同一份脚本、同一台机器，只有发起进程不同：
+**同一份脚本、同一台机器，只有发起进程不同**的四次实测（都是 `--sample-rate 48000 --chunk-duration 0.2`，16-bit LE 单声道，边 `afplay` 放测试音频边采）：
 
 | 怎么起的 | `launchctl managername` | 结果 |
 |---|---|---|
 | SSH（`mac_run.ps1`） | `Background` | `nonzero=0 peak=0` |
-| `launchctl asuser 501 sudo -u dumbraven` | `Aqua` | `nonzero=0 peak=0` |
-| `open 脚本.command` → Terminal.app | `Aqua` | **`nonzero=332332 peak=29891`，比例 15.5%** |
+| `launchctl asuser 501 sudo -u dumbraven`（强换会话） | `Aqua` | `nonzero=0 peak=0` |
+| `open xxx.command` → Terminal.app | `Aqua` | **`nonzero=332332 peak=29891`，15.5%** |
+| 同上，重启 Mac 后第一次 | `Aqua` | **`nonzero=328817 peak=24004`，69.9%** |
 
-**根因：TCC 权限是挂在发起进程的身份上的，不是挂在会话上。** SSH 进来的是 `/usr/libexec/sshd-keygen-wrapper`，它没有「系统音频录制」权限；即使用 `launchctl asuser` 强行换进 Aqua 会话，`launchctl managername` 显示对了，权限记录依然挂不到它身上。Terminal.app 有这条权限，所以跑在它里面的子进程能继承。
+还有两次破锁后的成功：`48.7%` 与 `33.4%`。**这条路线本身是通的，PCM 是真的。**
 
-这条坑值得单独记：**`launchctl managername` 是 `Aqua` 不代表能拿到图形相关的 TCC 权限**，这两件事我一开始混为一谈了，白试了两轮。
+`audiotee` 的 stderr 有一条完整的成功链可以作为「tap 建成了」的判据：
 
-**为什么这条对产品是好消息**：`audiotee` 的 README 明确写了，打包进 Electron app 时二进制会**继承父应用的 code signature**，所以 TCC 授权会挂在「Raven Ambient」名下——用户不需要去给终端授权，只需要在「系统设置 → 隐私与安全性 → 录屏与系统录音 → 仅系统录音」里给本应用一次授权。这比 Windows 那套（装 VB-Cable + 管理员权限 + 建多输出设备）简单得多。
+```
+AudioHardwareCreateProcessTap completed {"status":"0"}
+Tap format retrieved {"channels":"1","sample_rate":"48000"}
+Audio converter created 48000→16000
+Using device's native format {bits_per_channel:16, channels:1, ...}
+stream_start
+Creating IO proc
+```
 
-**尚未验证的两件事**（写下来免得后面当成已验）：
+**只有走到 `stream_start` / `Creating IO proc` 才算 IO proc 挂上了**。卡在 `Successfully retrieved device format` 之后就没了，等于 tap 建了但没开始推数据。
 
-1. **ad-hoc 签名下重新打包会不会掉授权**。TCC 对临时签名的 app 是按二进制哈希记的，理论上每次重新打包都要重新授权一次。要确认只能连续打包两次、各授权一次、看第二次是不是还要点。**没实测，不确定。**
-2. **装进 `.app` 之后 `audiotee` 还能不能读到 PCM**。上面那组成功的实验里，`audiotee` 是从 Terminal 起的；装进 `Raven Ambient.app` 之后它继承的是我们的签名，TCC 记录也换成我们，这条链没跑过。
+#### 已排除的两条路（实测过，不是查文档推的）
 
-**再往下的实现要点**（还没做）：起子进程读 PCM（`--sample-rate 48000 --chunk-duration 0.2`，16-bit LE 单声道）→ 在渲染进程侧拼成 `MediaStream` 交给 `attachLineIn` → `src/line-in.ts` 加 Mac 分支，不再走 `cablePattern` 那条 VB-Cable 判据。预计 400–600 行，含子进程生命周期管理、PCM 帧对齐、授权引导文案和测试。
+1. **Electron 的 `audio: 'loopback'`**：`electron.d.ts:22940` 原文「...is currently only supported on Windows」。macOS 上给这个值，`getDisplayMedia` 要么返回 `readyState` 从 `t=0` 就是 `ended` 的死轨（Background 下实测），要么整个请求挂到超时（Aqua 下实测）。**Chromium 内建 CATap 是 Web 版的能力，Electron 的 `setDisplayMediaRequestHandler` 在 darwin 上不接受这个参数，两件事不能划等号。**
+2. **`useSystemPicker: true`**：`AbortError: Timeout starting video source`，连 video 都起不来。
+
+#### 已排除的签名路子：`--options runtime` 走不通
+
+Core Audio tap 会让 `coreaudiod` 向 `tccd` 查 `kTCCServiceMicrophone`，而 hardened runtime 下这条要求 `com.apple.security.device.audio-input` entitlement：
+
+```
+Prompting policy for hardened runtime; service: kTCCServiceMicrophone
+requires entitlement com.apple.security.device.audio-input but it is missing
+```
+
+给 app 加 `--entitlements` 能让这条消失（`AUTHREQ_PROMPTING` 出现），但**加 `--options runtime` 会让 app 启动即崩**：
+
+```
+Library not loaded: @rpath/Electron Framework.framework/Electron Framework
+Reason: code signature in '.../Electron Framework' not valid for use in process:
+        mapping process and mapped file (non-platform) have different Team IDs
+```
+
+把每个 Mach-O（Electron Framework 本体、libGLESv2、libffmpeg、各 Helper、Squirrel、Mantle、ReactiveObjC、chrome_crashpad_handler）都用 ad-hoc 重签一遍再签外层，照样报同样的 Team IDs 不一致。**Electron Framework 需要 Apple 官方 Team ID，ad-hoc 签名没有，这条路彻底走不通。**
+
+#### 顺带查清的两件事
+
+**cdhash 是确定的，不会因为「重新打包」而随机变化。** 同一个包、同一条签名命令连签两次，`CDHash` 完全一致（实测 `756ffa630763031b99042f9dae8c0aafd0a8cefc`）。`scripts/package-mac.cjs` 里 `identity: null` 会让 electron-builder 跳过签名、直接用 Electron 自带的 linker-signed 签名，那条 cdhash 也是内容决定的（`2e8fbaade7de12b32c80708466ff71ac0ca2ace4`）。**之前观察到的「每次 cdhash 都变」是我混用了三种签名方式（先 `--deep`、再 `--sign -`、再带 `--entitlements`）造成的人为结果，不是必然。**
+
+**「系统音频录制」的授权不写进 `TCC.db`。** 全盘只有 `/Library/Application Support/com.apple.TCC/TCC.db` 一份，`select distinct service from access` 里从来没有 `kTCCServiceAudioCapture`；`/Library/Preferences/Audio/com.apple.SystemSettings.plist` 里的 `Tap_UIDList` 也始终是空数组。`tccd` 内存里能记出 `authValue=2`（允许），但**不落盘**——重启 `tccd` 或换 responsible 进程就丢。
+
+#### 卡在哪：coreaudiod ↔ tccd 的死锁
+
+app 自己 spawn `audiotee` 时永远静音。用 `sample` 把两边都抓下来，是一条三方互锁：
+
+```
+audiotee        mach_msg / HALC_ProxyObject::SetPropertyData      （等 coreaudiod 回包）
+coreaudiod      HALS_IOContext::CheckTCCAudioInputAccess
+                  → CheckTCCAndThrow
+                  → macOS_TCC_And_Input_Status_Handler::CheckTCC
+                  → TCCAccessCheckAuditToken                      （等 tccd 回包）
+tccd            RunLoop（等用户点弹窗，而弹窗走 UserNotificationCenter）
+```
+
+`audiotee` 的 IO 线程栈停在 `caulk::mach::semaphore::wait_signal_or_error` → `semaphore_wait_signal_trap`，几千个采样不动一次；`processAudio` 回调一次都没进。核验命令：
+
+```
+sudo sample <audiotee pid> 2 -f /tmp/a.txt   # 看有没有 processAudio / IOWorkLoop
+sudo sample <coreaudiod pid> 2 -f /tmp/c.txt # 看有没有 CheckTCCAudioInputAccess
+```
+
+**两个实测出来的规律：**
+
+1. **只 `killall coreaudiod` 无效，必须 `killall -9 tccd coreaudiod` 同时杀**。死锁形成以后杀一边，另一边还在等，重新请求立刻再次锁死。同时杀掉后立刻跑，成功率 100%（复现过两次：48.7% 和 33.4%）。
+2. **TCC 按 `responsible` 进程查，不是按发起请求的二进制。** `procinfo` 显示 app 内 spawn 的 `audiotee` 的 `responsible pid` 就是 app 主进程；Terminal 里跑时 responsible 是 `com.apple.Terminal`（有授权）。所以「同一个二进制，Terminal 里能出声、app 里全零」不是文件坏、不是路径错——**是授权身份不同**。
+
+**重启 Mac 解决不了这个问题。** 重启后 Terminal 路径第一次就直接 69.9%（不用破锁），说明死锁是长时间运行累积的状态；但 app 自己 spawn 仍然是 SILENT、`Tap_UIDList` 仍然为空。清理掉所有多余的 `.app` 副本（`~/Raven Ambient.app.old*` 等四份）也没有改变结论。
+
+#### 收工时的结论与下一步
+
+**代码保持现状**（`a3798b2` + `e0e6328`）：`audiotee` 子进程管理、PCM→`MediaStream` 拼装、`silent` 判据（2.5 秒没收到非零样本就报 `silent`，不再假装「已接上」）、以及指路「系统设置 → 隐私与安全性 → 录屏与系统录音 → 仅系统录音」的文案，全部保留——它们是对的，只是授权这一步在 macOS 27.2.1 上过不去。
+
+**没做成的是**：让 app 自己在「允许」之后真的拿到 PCM。可能的方向（都未验证）：
+
+1. 等 Apple 修 `TCCAccessCheckAuditToken` 在 audio tap 下的死锁（这是系统 bug 的样子）。
+2. 拿 Apple 开发者证书做正式签名 + 公证（`--options runtime` 只有正式签名才不崩），看授权是否变成可持久。
+3. 改走 BlackHole 虚拟声卡：`src/line-in.ts` 的 `cablePattern` 改成也认 BlackHole，走已有的 `openCable()` 路径。这条不碰 TCC audio tap，但要用户装驱动 + 建多输出设备。
+
+**不要因为这一节之前的措辞「能实现了」就以为已经能用。** 现在产品层面的真实状态是：Mac 上打开「外部音乐」能显示歌名和封面（`media-control` 那条链与 audio tap 无关，已验），但环境音避让在这台 macOS 27.2.1 上待解。
 
 ---
 
