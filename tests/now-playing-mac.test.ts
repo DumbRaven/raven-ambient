@@ -145,3 +145,29 @@ test('先到的是歌名、后到的是封面——第二条不能被去重吃�
   backend.consume(`${stream({ title: 'Artwork Test', artist: 'A', album: 'B', playing: true, artworkData: 'AAAA', artworkMimeType: 'image/jpeg' })}\n`);
   assert.equal(sent.length, 2, '内容没变时不应重复推送');
 });
+
+test('同一首歌，后面那条不带封面也不能把已显示的封面抹掉', () => {
+  // 真机实测：封面稳定显示 8 秒后突然变空。原因是系统会反复推同一条消息，
+  // 其中一部分不带 artwork——「带封面」→「不带封面」两条会连着推两次，
+  // 唱盘中心就被清掉了。修法是同一首歌里把上一张封面留底补回去。
+  const sent: Array<{ title: string; cover: string }> = [];
+  const backend = new MacBackend();
+  backend.emit = (payload: { title: string; cover: string }) => { sent.push(payload); };
+
+  backend.consume(`${stream({ title: 'Same Song', playing: true, artworkData: 'BBBB', artworkMimeType: 'image/jpeg' })}\n`);
+  assert.match(sent[0].cover, /^data:image\/jpeg;base64,/);
+
+  // 同一条消息，这次不带封面（系统刷进度时就是这样）。
+  backend.consume(`${stream({ title: 'Same Song', playing: true })}\n`);
+
+  // 不该再推一次「没封面」的快照；就算推了，封面也必须是上一张。
+  for (const item of sent) {
+    assert.match(item.cover, /^data:image\/jpeg;base64,/, '同一首歌的封面不能被后来的无封面消息抹掉');
+  }
+
+  // 换了歌之后才允许没有封面（新歌的封面还没到）。
+  sent.length = 0;
+  backend.consume(`${stream({ title: 'Another Song', playing: true })}\n`);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].cover, '', '换歌后不应沿用上一首的封面');
+});

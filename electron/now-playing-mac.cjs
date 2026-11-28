@@ -109,6 +109,16 @@ class MacBackend {
     this.buffer = '';
     /** 上一次推出去的快照里那几个「换歌才会变」的字段，用来跳过重复推送。 */
     this.signature = '';
+    /**
+     * 上一张封面，以及它属于哪首（`app\u0000title`）。
+     *
+     * 为什么需要记：系统会**反复**给同一条消息，其中一部分不带封面（它只在
+     * 第一次拿到元数据时附带 artwork，之后刷进度就不带了）。如果不留底，
+     * 「带封面」→「不带封面」两条会连着推两次，唱盘中心的封面被清掉，
+     * 肉眼看到的是封面先出现、几秒后消失。真机实测就是这样：稳定 8 秒后突然变空。
+     */
+    this.lastCover = '';
+    this.lastKey = '';
     /** @type {((payload: object) => void) | null} */
     this.emit = null;
   }
@@ -154,6 +164,20 @@ class MacBackend {
       if (!line) continue;
       const payload = parseLine(line);
       if (!payload) continue;
+
+      // 封面留底：同一条消息反复推时，后面几条可能不带 artwork。
+      // 同一首歌里「有封面」不能被后一条「没封面」抹掉（那会让唱盘中心闪一下变空）。
+      // 换歌（key 变了）时才允许把底丢掉，重新等新封面。
+      const key = `${payload.app}\u0000${payload.title}`;
+      if (key !== this.lastKey) {
+        this.lastKey = key;
+        this.lastCover = payload.cover;
+      } else if (payload.cover) {
+        this.lastCover = payload.cover;
+      } else if (this.lastCover) {
+        payload.cover = this.lastCover;
+      }
+
       // stream 会跟着播放进度反复吐同一首歌。只有真的换了歌（或放/暂停变了）
       // 才往页面推——否则页面每 200ms 重算一次碟面配色，白白掉帧。
       //
@@ -203,6 +227,10 @@ class MacBackend {
     }
     this.buffer = '';
     this.signature = '';
+    // 停掉时把封面底也丢掉：下次重新起来应当按当前这首歌重新等封面，
+    // 而不是拿上一次会话留下的那张（可能已经不是同一首了）。
+    this.lastCover = '';
+    this.lastKey = '';
   }
 }
 
